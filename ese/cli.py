@@ -12,9 +12,19 @@ app = typer.Typer(help="Ensemble Software Engineering (ESE) CLI")
 
 
 @app.command()
-def init(config: str = typer.Option("ese.config.yaml", help="Path to write the generated config")):
+def init(
+    config: str = typer.Option("ese.config.yaml", help="Path to write the generated config"),
+    simple: bool = typer.Option(
+        True,
+        "--simple/--advanced",
+        help="Use simple setup (default) or advanced role-level setup.",
+    ),
+):
     """Create an ESE configuration via an interactive wizard."""
-    written = run_wizard(config_path=config)
+    written = run_wizard(config_path=config, advanced=not simple)
+    if not written:
+        typer.echo("⚠️ Setup canceled. Config was not written.")
+        raise typer.Exit(code=1)
     typer.echo(f"✅ Wrote {written}")
 
 
@@ -51,12 +61,7 @@ def doctor(config: str = typer.Option("ese.config.yaml", help="Path to ESE confi
         typer.echo("✅ Doctor checks passed")
 
 
-@app.command()
-def run(
-    config: str = typer.Option("ese.config.yaml", help="Path to ESE config"),
-    artifacts_dir: str = typer.Option("artifacts", help="Directory for pipeline artifacts"),
-):
-    """Run the full ESE pipeline."""
+def _start_pipeline(config: str, artifacts_dir: str) -> None:
     ok, violations, _ = run_doctor(config_path=config)
     if not ok:
         typer.echo("❌ ESE doctor failed. Violations:")
@@ -68,10 +73,28 @@ def run(
         cfg = load_config(path=config)
         summary_path = run_pipeline(cfg=cfg or {}, artifacts_dir=artifacts_dir)
     except (ConfigValidationError, PipelineError) as err:
-        typer.echo(f"❌ ESE run failed: {err}")
+        typer.echo(f"❌ ESE start failed: {err}")
         raise typer.Exit(code=2) from err
 
     typer.echo(f"✅ Pipeline completed. Summary: {summary_path}")
+
+
+@app.command("start")
+def start(
+    config: str = typer.Option("ese.config.yaml", help="Path to ESE config"),
+    artifacts_dir: str = typer.Option("artifacts", help="Directory for pipeline artifacts"),
+):
+    """Start the full ESE pipeline."""
+    _start_pipeline(config=config, artifacts_dir=artifacts_dir)
+
+
+@app.command("run", hidden=True)
+def run_alias(
+    config: str = typer.Option("ese.config.yaml", help="Path to ESE config"),
+    artifacts_dir: str = typer.Option("artifacts", help="Directory for pipeline artifacts"),
+):
+    """Backward-compatible alias for `ese start`."""
+    _start_pipeline(config=config, artifacts_dir=artifacts_dir)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,7 @@ jobs:
         run: ese doctor --config ese.config.yaml
 
       - name: Run ESE pipeline
-        run: ese run --config ese.config.yaml --artifacts-dir artifacts
+        run: ese start --config ese.config.yaml --artifacts-dir artifacts
 
       - name: Upload ESE artifacts (optional)
         if: always()

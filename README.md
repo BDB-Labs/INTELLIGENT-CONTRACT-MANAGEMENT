@@ -19,10 +19,10 @@ flowchart TD
 
 ## Quick start
 1. Create a validated config (`version: 1`) with role assignments and constraints.
-   `ese init` now includes a role picker (architect, implementer, adversarial_reviewer, security_auditor, test_generator, performance_analyst, documentation_writer, devops_sre, database_engineer, release_manager).
-   It also includes provider/model presets for common models, plus a `custom_api` option for custom provider name/base URL/model IDs.
+   `ese init` uses simple setup by default (goal profile + provider + model), with `ese init --advanced` for role-level configuration.
+   It includes provider/model presets, alias-based model input, and a `custom_api` option for custom provider name/base URL/model IDs.
 2. Run `ese doctor --config ese.config.yaml` to enforce ensemble separation.
-3. Run `ese run --config ese.config.yaml --artifacts-dir artifacts` to execute the pipeline.
+3. Run `ese start --config ese.config.yaml --artifacts-dir artifacts` to execute the pipeline.
 4. Review `artifacts/ese_summary.md` and `artifacts/pipeline_state.json`.
 
 `runtime.adapter` defaults to `dry-run` and can be set to `openai` or a custom callable with `module:function`.
@@ -45,6 +45,7 @@ Use `ese roles` to print this list directly in the CLI.
 ## Provider and model presets
 - Providers with built-in model pickers: `openai`, `anthropic`, `google`, `xai`, `openrouter`, `huggingface`, `local`.
 - Each provider includes common model IDs plus `custom (type model id)`.
+- Model aliases are supported (for example `g5`, `g5mini`, `sonnet`, `flash`, `pro`).
 - `custom_api` lets you enter:
   - custom provider name,
   - optional API base URL,
@@ -55,6 +56,8 @@ Use `ese roles` to print this list directly in the CLI.
 - `dry-run`: no external API calls; generates deterministic placeholder artifacts.
 - `openai`: calls the OpenAI Responses API with retry/timeout handling.
 - `module:function`: custom Python callable adapter.
+
+`ese run` remains available as a backward-compatible alias for `ese start`.
 
 Example runtime config for real OpenAI execution:
 
