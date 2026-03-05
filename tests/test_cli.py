@@ -71,6 +71,18 @@ def test_start_command_runs_pipeline_and_writes_summary(tmp_path: Path) -> None:
     assert "Pipeline completed" in result.stdout
 
 
+def test_start_command_uses_config_artifacts_dir_by_default(tmp_path: Path) -> None:
+    cfg = _base_cfg()
+    configured_dir = tmp_path / "configured-artifacts"
+    cfg["output"] = {"artifacts_dir": str(configured_dir), "enforce_json": True}
+    config_path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
+
+    result = runner.invoke(app, ["start", "--config", config_path])
+
+    assert result.exit_code == 0
+    assert (configured_dir / "ese_summary.md").exists()
+
+
 def test_run_alias_still_works(tmp_path: Path) -> None:
     cfg = _base_cfg()
     config_path = _write_cfg(tmp_path / "ese.config.yaml", cfg)

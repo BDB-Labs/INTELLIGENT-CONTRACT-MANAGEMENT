@@ -41,12 +41,15 @@ ese doctor --config ese.config.yaml
 3. Execute the pipeline:
 
 ```bash
-ese start --config ese.config.yaml --artifacts-dir artifacts
+ese start --config ese.config.yaml
 ```
+
+Pass `--artifacts-dir ...` only when you want to override `output.artifacts_dir` from the config.
 
 4. Review outputs:
 - `artifacts/ese_summary.md`
 - `artifacts/pipeline_state.json`
+- per-role reports in `artifacts/*.json` when `output.enforce_json: true` (default)
 
 `ese run` remains available as a backward-compatible alias for `ese start`.
 
@@ -74,6 +77,8 @@ Built-in runtime adapters:
 - `openai`: OpenAI Responses API adapter with retry/timeout handling.
 - `custom_api`: Responses-compatible custom provider adapter with validated base URL and auth env var.
 - `module:function`: custom Python callable adapter.
+
+When `output.enforce_json: true`, adapters must return valid JSON role reports and `gating.fail_on_high: true` will stop the pipeline on `HIGH` or `CRITICAL` findings.
 
 ### OpenAI runtime example
 

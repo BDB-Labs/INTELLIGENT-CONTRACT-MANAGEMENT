@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from ese.pipeline import run_pipeline
+import pytest
+
+from ese.pipeline import PipelineError, run_pipeline
 
 
 def _cfg() -> dict:
@@ -35,11 +37,12 @@ def test_pipeline_writes_expected_artifacts_and_state(tmp_path: Path) -> None:
     summary_path = run_pipeline(_cfg(), artifacts_dir=str(artifacts_dir))
 
     assert summary_path == str(artifacts_dir / "ese_summary.md")
-    assert (artifacts_dir / "01_architect.md").exists()
-    assert (artifacts_dir / "02_implementer.md").exists()
-    assert (artifacts_dir / "03_adversarial_reviewer.md").exists()
+    assert (artifacts_dir / "01_architect.json").exists()
+    assert (artifacts_dir / "02_implementer.json").exists()
+    assert (artifacts_dir / "03_adversarial_reviewer.json").exists()
 
     state = json.loads((artifacts_dir / "pipeline_state.json").read_text(encoding="utf-8"))
+    assert state["status"] == "completed"
     executed_roles = [item["role"] for item in state["execution"]]
     assert executed_roles == ["architect", "implementer", "adversarial_reviewer"]
 
@@ -48,13 +51,11 @@ def test_pipeline_context_chaining_visible_in_dry_run_outputs(tmp_path: Path) ->
     artifacts_dir = tmp_path / "artifacts"
     run_pipeline(_cfg(), artifacts_dir=str(artifacts_dir))
 
-    implementer_output = (artifacts_dir / "02_implementer.md").read_text(encoding="utf-8")
-    reviewer_output = (artifacts_dir / "03_adversarial_reviewer.md").read_text(encoding="utf-8")
+    implementer_output = json.loads((artifacts_dir / "02_implementer.json").read_text(encoding="utf-8"))
+    reviewer_output = json.loads((artifacts_dir / "03_adversarial_reviewer.json").read_text(encoding="utf-8"))
 
-    assert "Context keys:" in implementer_output
-    assert "architect" in implementer_output
-    assert "Context keys:" in reviewer_output
-    assert "implementer" in reviewer_output
+    assert implementer_output["metadata"]["context_keys"] == ["architect"]
+    assert reviewer_output["metadata"]["context_keys"] == ["architect", "implementer"]
 
 
 def test_pipeline_orders_custom_roles_after_builtin_order(tmp_path: Path) -> None:
@@ -71,3 +72,73 @@ def test_pipeline_orders_custom_roles_after_builtin_order(tmp_path: Path) -> Non
     state = json.loads((artifacts_dir / "pipeline_state.json").read_text(encoding="utf-8"))
     executed_roles = [item["role"] for item in state["execution"]]
     assert executed_roles == ["architect", "implementer", "custom_role"]
+
+
+def test_pipeline_uses_configured_artifacts_dir_when_not_overridden(tmp_path: Path) -> None:
+    cfg = _cfg()
+    configured_dir = tmp_path / "configured-artifacts"
+    cfg["output"] = {"artifacts_dir": str(configured_dir), "enforce_json": True}
+
+    summary_path = run_pipeline(cfg)
+
+    assert summary_path == str(configured_dir / "ese_summary.md")
+    assert (configured_dir / "01_architect.json").exists()
+
+
+def test_pipeline_blocks_on_high_severity_findings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = _cfg()
+    artifacts_dir = tmp_path / "artifacts"
+
+    def _gating_adapter(**kwargs) -> str:  # noqa: ANN003
+        role = kwargs["role"]
+        if role == "architect":
+            return json.dumps(
+                {
+                    "summary": "Architecture complete.",
+                    "findings": [],
+                    "artifacts": [],
+                    "next_steps": [],
+                },
+            )
+        return json.dumps(
+            {
+                "summary": "Reviewer found a release blocker.",
+                "findings": [
+                    {
+                        "severity": "HIGH",
+                        "title": "Release blocker",
+                        "details": "A critical defect must be fixed before continuing.",
+                    },
+                ],
+                "artifacts": [],
+                "next_steps": ["Fix the blocker."],
+            },
+        )
+
+    monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("test-gating", _gating_adapter))
+
+    with pytest.raises(PipelineError) as exc:
+        run_pipeline(cfg, artifacts_dir=str(artifacts_dir))
+
+    assert "Pipeline gated by HIGH severity findings" in str(exc.value)
+
+    state = json.loads((artifacts_dir / "pipeline_state.json").read_text(encoding="utf-8"))
+    assert state["status"] == "failed"
+    assert "Release blocker" in state["failure"]
+
+
+def test_pipeline_rejects_non_json_output_when_enforced(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+
+    def _bad_adapter(**kwargs) -> str:  # noqa: ANN003
+        return "not json"
+
+    monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("bad-adapter", _bad_adapter))
+
+    with pytest.raises(PipelineError) as exc:
+        run_pipeline(_cfg(), artifacts_dir=str(artifacts_dir))
+
+    assert "must be valid JSON" in str(exc.value)

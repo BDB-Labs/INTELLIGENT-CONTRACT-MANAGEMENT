@@ -18,6 +18,13 @@ class AdapterExecutionError(RuntimeError):
     """Raised when a runtime adapter cannot execute successfully."""
 
 
+def _json_output_enabled(cfg: Mapping[str, Any]) -> bool:
+    output_cfg = cfg.get("output")
+    if not isinstance(output_cfg, Mapping):
+        return True
+    return bool(output_cfg.get("enforce_json", True))
+
+
 def dry_run_adapter(
     *,
     role: str,
@@ -28,6 +35,23 @@ def dry_run_adapter(
 ) -> str:
     """Return deterministic placeholder output without external model calls."""
     snippet = prompt[:400].strip()
+    if _json_output_enabled(cfg):
+        payload = {
+            "summary": f"Dry-run placeholder output for role '{role}'.",
+            "findings": [],
+            "artifacts": [],
+            "next_steps": [
+                "Replace dry-run with a real adapter to execute this role against a model.",
+            ],
+            "metadata": {
+                "model": model,
+                "adapter": "dry-run",
+                "prompt_excerpt": snippet or "(empty prompt)",
+                "context_keys": sorted(context.keys()),
+            },
+        }
+        return json.dumps(payload)
+
     lines = [
         f"# {role}",
         "",
@@ -165,12 +189,19 @@ def _openai_payload(
     if context_lines:
         context_text = "\n\nUpstream context:\n" + "\n\n".join(context_lines)
 
+    instructions = (
+        f"You are the {role} role in an ensemble software engineering pipeline. "
+        "Respond in concise Markdown focused on actionable output."
+    )
+    if _json_output_enabled(cfg):
+        instructions = (
+            f"You are the {role} role in an ensemble software engineering pipeline. "
+            "Return valid JSON only and follow the requested schema exactly."
+        )
+
     payload: dict[str, Any] = {
         "model": model_name,
-        "instructions": (
-            f"You are the {role} role in an ensemble software engineering pipeline. "
-            "Respond in concise Markdown focused on actionable output."
-        ),
+        "instructions": instructions,
         "input": prompt + context_text,
     }
 

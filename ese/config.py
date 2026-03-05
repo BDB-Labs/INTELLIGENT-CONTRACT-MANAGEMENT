@@ -49,6 +49,16 @@ class RoleConfig(BaseModel):
     model: str | None = None
     temperature: float | None = None
 
+    @field_validator("provider", "model")
+    @classmethod
+    def _optional_non_empty(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("must be a non-empty string")
+        return cleaned
+
 
 class ConstraintsConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -86,6 +96,14 @@ class OutputConfig(BaseModel):
 
     artifacts_dir: str = "artifacts"
     enforce_json: bool = True
+
+    @field_validator("artifacts_dir")
+    @classmethod
+    def _validate_artifacts_dir(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("must be a non-empty string")
+        return cleaned
 
 
 class GatingConfig(BaseModel):
@@ -199,10 +217,37 @@ class ESEConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_adapter_contract(self) -> "ESEConfig":
         adapter = self.runtime.adapter.strip().lower()
+        provider_name = self.provider.name.strip().lower()
+        role_providers = {
+            role: (role_cfg.provider or self.provider.name).strip().lower()
+            for role, role_cfg in self.roles.items()
+        }
+
+        if self.gating.fail_on_high and not self.output.enforce_json:
+            raise ValueError(
+                "gating.fail_on_high requires output.enforce_json for deterministic severity parsing",
+            )
+
+        if adapter == "openai":
+            if provider_name != "openai":
+                raise ValueError("runtime.adapter=openai requires provider.name='openai'")
+
+            incompatible_roles = [
+                f"{role}={resolved_provider}"
+                for role, resolved_provider in role_providers.items()
+                if resolved_provider != "openai"
+            ]
+            if incompatible_roles:
+                details = ", ".join(incompatible_roles)
+                raise ValueError(
+                    "runtime.adapter=openai requires all role providers to resolve to 'openai' "
+                    f"(found {details})",
+                )
+            return self
+
         if adapter != "custom_api":
             return self
 
-        provider_name = self.provider.name.strip().lower()
         if provider_name == "openai":
             raise ValueError("runtime.adapter=custom_api requires provider.name to be a custom provider")
         if not self.provider.api_key_env:
@@ -213,6 +258,18 @@ class ESEConfig(BaseModel):
         if not provider_base_url and not runtime_base_url:
             raise ValueError(
                 "runtime.adapter=custom_api requires provider.base_url or runtime.custom_api.base_url",
+            )
+
+        incompatible_roles = [
+            f"{role}={resolved_provider}"
+            for role, resolved_provider in role_providers.items()
+            if resolved_provider != provider_name
+        ]
+        if incompatible_roles:
+            details = ", ".join(incompatible_roles)
+            raise ValueError(
+                "runtime.adapter=custom_api requires all role providers to match "
+                f"provider.name='{provider_name}' (found {details})",
             )
         return self
 

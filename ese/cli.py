@@ -61,7 +61,7 @@ def doctor(config: str = typer.Option("ese.config.yaml", help="Path to ESE confi
         typer.echo("✅ Doctor checks passed")
 
 
-def _start_pipeline(config: str, artifacts_dir: str) -> None:
+def _start_pipeline(config: str, artifacts_dir: str | None) -> None:
     ok, violations, _ = run_doctor(config_path=config)
     if not ok:
         typer.echo("❌ ESE doctor failed. Violations:")
@@ -82,7 +82,10 @@ def _start_pipeline(config: str, artifacts_dir: str) -> None:
 @app.command("start")
 def start(
     config: str = typer.Option("ese.config.yaml", help="Path to ESE config"),
-    artifacts_dir: str = typer.Option("artifacts", help="Directory for pipeline artifacts"),
+    artifacts_dir: str | None = typer.Option(
+        None,
+        help="Directory for pipeline artifacts (overrides output.artifacts_dir in config)",
+    ),
 ):
     """Start the full ESE pipeline."""
     _start_pipeline(config=config, artifacts_dir=artifacts_dir)
@@ -91,7 +94,10 @@ def start(
 @app.command("run", hidden=True)
 def run_alias(
     config: str = typer.Option("ese.config.yaml", help="Path to ESE config"),
-    artifacts_dir: str = typer.Option("artifacts", help="Directory for pipeline artifacts"),
+    artifacts_dir: str | None = typer.Option(
+        None,
+        help="Directory for pipeline artifacts (overrides output.artifacts_dir in config)",
+    ),
 ):
     """Backward-compatible alias for `ese start`."""
     _start_pipeline(config=config, artifacts_dir=artifacts_dir)

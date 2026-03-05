@@ -23,10 +23,25 @@ Role context is explicit and stable:
 - `implementer` receives `architect` output.
 - All other roles receive `architect` + `implementer` outputs.
 
+## Role artifact contract
+
+- When `output.enforce_json=true` (default), role artifacts use the `.json` extension.
+- Each role artifact must be a JSON object with at least:
+  - `summary` (string)
+  - `findings` (list)
+  - `artifacts` (list of strings)
+  - `next_steps` (list of strings)
+- Each finding must include:
+  - `severity` (`LOW`, `MEDIUM`, `HIGH`, or `CRITICAL`)
+  - `title` (string)
+  - `details` (string)
+- When `gating.fail_on_high=true`, the pipeline stops after the first role that reports a `HIGH` or `CRITICAL` finding.
+
 ## `pipeline_state.json` schema
 
 ```json
 {
+  "status": "completed",
   "mode": "ensemble",
   "provider": "openai",
   "adapter": "dry-run",
@@ -55,5 +70,9 @@ For contract version `1`:
 - top-level keys shown above are stable,
 - execution ordering rules are stable,
 - role chaining behavior is stable.
+
+On gated failures, `pipeline_state.json` also includes:
+- `status: "failed"`
+- `failure`: a human-readable reason for the stop condition
 
 Any breaking contract change requires config/version policy updates and release notes.

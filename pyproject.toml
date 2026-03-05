@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "ese-cli"
 version = "1.0.0"
@@ -11,8 +15,16 @@ dependencies = [
   "pydantic>=2.7",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+]
+
 [project.scripts]
 ese = "ese.cli:app"
+
+[tool.setuptools.packages.find]
+include = ["ese*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

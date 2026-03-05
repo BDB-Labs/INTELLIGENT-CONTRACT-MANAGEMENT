@@ -36,6 +36,25 @@
 | `openai.base_url` | string | no | Optional OpenAI endpoint override. |
 | `custom_api.base_url` | string | no | Optional custom API endpoint override. |
 
+## Output object
+
+| Key | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `artifacts_dir` | string | no | Non-empty directory used by `ese start` unless `--artifacts-dir` overrides it. |
+| `enforce_json` | bool | no | When `true` (default), each role artifact must be valid JSON and uses a `.json` extension. |
+
+## Gating object
+
+| Key | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `fail_on_high` | bool | no | When `true` (default), pipeline execution stops on `HIGH` or `CRITICAL` findings. Requires `output.enforce_json=true`. |
+
+## `openai` validation rules
+
+When `runtime.adapter=openai`:
+- `provider.name` must be `openai`.
+- All role providers must resolve to `openai`.
+
 ## `custom_api` validation rules
 
 When `runtime.adapter=custom_api`:

@@ -72,3 +72,49 @@ def test_custom_api_contract_requires_base_url() -> None:
         validate_config(cfg, source="test.yaml")
 
     assert "runtime.adapter=custom_api requires provider.base_url or runtime.custom_api.base_url" in str(exc.value)
+
+
+def test_validate_config_rejects_fail_on_high_without_json() -> None:
+    cfg = _base_cfg()
+    cfg["output"] = {"artifacts_dir": "artifacts", "enforce_json": False}
+    cfg["gating"] = {"fail_on_high": True}
+
+    with pytest.raises(ConfigValidationError) as exc:
+        validate_config(cfg, source="test.yaml")
+
+    assert "gating.fail_on_high requires output.enforce_json" in str(exc.value)
+
+
+def test_validate_config_rejects_openai_adapter_with_non_openai_role_provider() -> None:
+    cfg = _base_cfg()
+    cfg["runtime"]["adapter"] = "openai"
+    cfg["roles"]["implementer"] = {
+        "provider": "openrouter",
+        "model": "openai/gpt-5",
+    }
+
+    with pytest.raises(ConfigValidationError) as exc:
+        validate_config(cfg, source="test.yaml")
+
+    assert "runtime.adapter=openai requires all role providers to resolve to 'openai'" in str(exc.value)
+
+
+def test_validate_config_rejects_custom_api_role_provider_mismatch() -> None:
+    cfg = _base_cfg()
+    cfg["provider"] = {
+        "name": "my-gateway",
+        "model": "my-model",
+        "api_key_env": "CUSTOM_GATEWAY_TOKEN",
+        "base_url": "https://gateway.example/v1",
+    }
+    cfg["runtime"]["adapter"] = "custom_api"
+    cfg["runtime"]["custom_api"] = {"base_url": "https://gateway.example/v1"}
+    cfg["roles"]["implementer"] = {
+        "provider": "other-gateway",
+        "model": "other-model",
+    }
+
+    with pytest.raises(ConfigValidationError) as exc:
+        validate_config(cfg, source="test.yaml")
+
+    assert "runtime.adapter=custom_api requires all role providers to match provider.name='my-gateway'" in str(exc.value)
