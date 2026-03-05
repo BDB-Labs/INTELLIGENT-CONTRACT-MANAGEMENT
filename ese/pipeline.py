@@ -18,9 +18,47 @@ PIPELINE_ORDER = [
     "security_auditor",
     "test_generator",
     "performance_analyst",
+    "documentation_writer",
+    "devops_sre",
+    "database_engineer",
+    "release_manager",
 ]
 
 JSON_REPORT_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
+SPECIALIST_ROLE_INSTRUCTIONS = {
+    "adversarial_reviewer": (
+        "Act as an adversarial code reviewer. Hunt for correctness bugs, edge cases, "
+        "regressions, unsafe assumptions, and missing validation."
+    ),
+    "security_auditor": (
+        "Perform a security review. Focus on trust boundaries, authz/authn gaps, secrets "
+        "handling, injection risks, data exposure, and abuse paths."
+    ),
+    "test_generator": (
+        "Design a pragmatic automated test plan. Focus on missing unit, integration, and "
+        "end-to-end coverage, including the highest-risk failure modes."
+    ),
+    "performance_analyst": (
+        "Review performance and scalability. Focus on hot paths, latency risks, query or "
+        "algorithmic complexity, memory pressure, and caching opportunities."
+    ),
+    "documentation_writer": (
+        "Produce documentation deliverables. Focus on README updates, API usage notes, "
+        "migration guidance, operator runbooks, and any documentation gaps that block adoption."
+    ),
+    "devops_sre": (
+        "Review operational readiness. Focus on CI/CD safety, deployment sequencing, rollback "
+        "plans, observability, alerting, and day-2 operability."
+    ),
+    "database_engineer": (
+        "Review data-layer design. Focus on schema correctness, migrations, indexes, query "
+        "plans, transaction safety, consistency, and rollback strategy."
+    ),
+    "release_manager": (
+        "Assess release readiness. Focus on blockers, rollout sequencing, rollback readiness, "
+        "dependency coordination, and launch sign-off criteria."
+    ),
+}
 
 
 class PipelineError(RuntimeError):
@@ -72,7 +110,14 @@ def _build_scope(cfg: Dict[str, Any]) -> str:
     for candidate in candidates:
         if isinstance(candidate, str) and candidate.strip():
             return candidate.strip()
-    return "No project scope supplied. Proceed with generic role behavior."
+    return ""
+
+
+def _require_scope(cfg: Dict[str, Any]) -> str:
+    scope = _build_scope(cfg)
+    if scope:
+        return scope
+    raise PipelineError("No project scope supplied. Set input.scope in the config or pass --scope.")
 
 
 def _output_cfg(cfg: Dict[str, Any]) -> Dict[str, Any]:
@@ -134,6 +179,13 @@ def _role_prompt(
     architect_output = outputs.get("architect", "").strip()
     implementer_output = outputs.get("implementer", "").strip()
     json_contract = f"\n\n{_json_report_contract()}" if enforce_json else ""
+    artifact_guidance = ""
+    if enforce_json:
+        artifact_guidance = (
+            "\n\nUse `findings` only for actionable issues or gaps. "
+            "Use `artifacts` for concrete deliverables such as docs, runbooks, test files, "
+            "rollout checklists, or migration notes."
+        )
 
     if role == "architect":
         return textwrap.dedent(
@@ -158,6 +210,27 @@ def _role_prompt(
 
             Architect Plan:
             {architect_output or "(none provided)"}
+
+            {json_contract}
+            """,
+        ).strip()
+
+    if role in SPECIALIST_ROLE_INSTRUCTIONS:
+        return textwrap.dedent(
+            f"""
+            You are the {role}.
+            {SPECIALIST_ROLE_INSTRUCTIONS[role]}
+
+            Scope:
+            {scope}
+
+            Architect Plan:
+            {architect_output or "(none provided)"}
+
+            Implementer Output:
+            {implementer_output or "(none provided)"}
+
+            {artifact_guidance}
 
             {json_contract}
             """,
@@ -402,7 +475,7 @@ def run_pipeline(cfg: Dict[str, Any], artifacts_dir: str | None = None) -> str:
 
     provider = (cfg.get("provider") or {}).get("name", "unknown")
     mode = cfg.get("mode", "ensemble")
-    scope = _build_scope(cfg)
+    scope = _require_scope(cfg)
     role_order = _normalize_role_order(cfg)
     adapter_name, adapter = _resolve_adapter(cfg)
     output_cfg = _output_cfg(cfg)

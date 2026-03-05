@@ -11,9 +11,17 @@
 | `provider` | object | yes | Global provider/model defaults. |
 | `roles` | map | yes | Role-specific overrides and metadata. |
 | `constraints` | object | no | Ensemble separation checks (for doctor). |
+| `input` | object | no | Human scope/prompt for the run. Required at execution time. |
 | `output` | object | no | Artifact/output behavior flags. |
 | `gating` | object | no | Pipeline failure gating preferences. |
 | `runtime` | object | no | Adapter and runtime execution settings. |
+
+## Input object
+
+| Key | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `scope` | string | no | Recommended primary task/scope field. `ese start` requires this unless `--scope` is provided. |
+| `prompt` | string | no | Alternate free-form input field; used only when `scope` is absent. |
 
 ## Provider object
 
@@ -54,6 +62,11 @@
 When `runtime.adapter=openai`:
 - `provider.name` must be `openai`.
 - All role providers must resolve to `openai`.
+
+## Demo configs
+
+- `runtime.adapter=dry-run` is the supported demo path.
+- Demo configs may still carry provider/model defaults for the ensemble without requiring auth or live API calls.
 
 ## `custom_api` validation rules
 

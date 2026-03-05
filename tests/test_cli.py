@@ -35,6 +35,9 @@ def _base_cfg() -> dict:
         "runtime": {
             "adapter": "dry-run",
         },
+        "input": {
+            "scope": "Ship a CLI improvement safely",
+        },
     }
 
 
@@ -91,6 +94,29 @@ def test_run_alias_still_works(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         ["run", "--config", config_path, "--artifacts-dir", str(artifacts_dir)],
+    )
+
+    assert result.exit_code == 0
+    assert (artifacts_dir / "ese_summary.md").exists()
+
+
+def test_start_command_accepts_scope_override(tmp_path: Path) -> None:
+    cfg = _base_cfg()
+    cfg.pop("input")
+    config_path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
+    artifacts_dir = tmp_path / "artifacts"
+
+    result = runner.invoke(
+        app,
+        [
+            "start",
+            "--config",
+            config_path,
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--scope",
+            "Audit the release process for rollout gaps",
+        ],
     )
 
     assert result.exit_code == 0

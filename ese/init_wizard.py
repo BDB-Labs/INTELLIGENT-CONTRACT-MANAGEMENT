@@ -7,7 +7,7 @@ from typing import Any, Dict
 
 import questionary
 
-from ese.config import resolve_role_model, write_config
+from ese.config import ConfigValidationError, resolve_role_model, validate_config, write_config
 
 PROVIDER_CHOICES = [
     "openai",
@@ -19,6 +19,53 @@ PROVIDER_CHOICES = [
     "local",
     "custom_api",
 ]
+
+PROVIDER_SUPPORT = {
+    "openai": {
+        "live_title": "openai - built-in live adapter",
+        "demo_title": "openai - demo or built-in live adapter",
+        "supports_live": True,
+    },
+    "anthropic": {
+        "live_title": "anthropic - requires custom module adapter",
+        "demo_title": "anthropic - demo only unless you bring a custom adapter",
+        "supports_live": False,
+    },
+    "google": {
+        "live_title": "google - requires custom module adapter",
+        "demo_title": "google - demo only unless you bring a custom adapter",
+        "supports_live": False,
+    },
+    "xai": {
+        "live_title": "xai - requires custom module adapter",
+        "demo_title": "xai - demo only unless you bring a custom adapter",
+        "supports_live": False,
+    },
+    "openrouter": {
+        "live_title": "openrouter - requires custom module adapter",
+        "demo_title": "openrouter - demo only unless you bring a custom adapter",
+        "supports_live": False,
+    },
+    "huggingface": {
+        "live_title": "huggingface - requires custom module adapter",
+        "demo_title": "huggingface - demo only unless you bring a custom adapter",
+        "supports_live": False,
+    },
+    "local": {
+        "live_title": "local - requires custom module adapter",
+        "demo_title": "local - demo only unless you bring a custom adapter",
+        "supports_live": False,
+    },
+    "custom_api": {
+        "live_title": "custom_api - Responses-compatible gateway",
+        "demo_title": "custom_api - demo or gateway-backed live adapter",
+        "supports_live": True,
+    },
+}
+
+DEMO_EXECUTION_MODE = "demo"
+LIVE_EXECUTION_MODE = "live"
+CUSTOM_MODULE_EXECUTION_MODE = "custom_module"
 
 GOAL_PROFILES = [
     "fast",
@@ -283,7 +330,7 @@ def _default_api_key_env(provider: str) -> str:
 
 
 def _provider_default_from_env() -> str:
-    detectable_providers = [p for p in PROVIDER_CHOICES if p != "custom_api"]
+    detectable_providers = PROVIDER_CHOICES
     configured = [p for p in detectable_providers if os.getenv(_default_api_key_env(p))]
     if not configured:
         return "openai"
@@ -292,6 +339,35 @@ def _provider_default_from_env() -> str:
     if "openai" in configured:
         return "openai"
     return configured[0]
+
+
+def _provider_choices(*, advanced: bool) -> list[questionary.Choice]:
+    choices: list[questionary.Choice] = []
+    for provider in PROVIDER_CHOICES:
+        support = PROVIDER_SUPPORT[provider]
+        if support["supports_live"] or advanced:
+            title = str(support["live_title"])
+        else:
+            title = str(support["demo_title"])
+        choices.append(questionary.Choice(title=title, value=provider))
+    return choices
+
+
+def _validate_non_empty_text(label: str):
+    def _validator(value: str | None) -> bool | str:
+        if isinstance(value, str) and value.strip():
+            return True
+        return f"{label} is required."
+
+    return _validator
+
+
+def _validate_adapter_reference(value: str | None) -> bool | str:
+    raw = (value or "").strip()
+    module_name, separator, object_name = raw.partition(":")
+    if separator and module_name.strip() and object_name.strip():
+        return True
+    return "Enter adapter reference in 'module:function' format."
 
 
 def _resolve_model_alias(provider: str, model_name: str) -> str:
@@ -349,32 +425,66 @@ def _select_default_model(provider: str, goal_profile: str | None = None) -> str
     return model_choice
 
 
-def _select_runtime_adapter(provider: str, *, advanced: bool) -> str:
-    adapter_choices = ["dry-run"]
-    if provider == "openai":
-        adapter_choices.append("openai")
-    if provider == "custom_api":
-        adapter_choices.append("custom_api")
-    if advanced:
-        adapter_choices.append("custom module:function")
+def _select_execution_mode(provider: str, *, advanced: bool) -> str:
+    supports_live = bool(PROVIDER_SUPPORT[provider]["supports_live"])
+    choices: list[questionary.Choice] = []
 
-    default_adapter = "dry-run"
-    if provider == "openai" and os.getenv(_default_api_key_env(provider)):
-        default_adapter = "openai"
-    if provider == "custom_api" and os.getenv(_default_api_key_env(provider)):
-        default_adapter = "custom_api"
+    if supports_live:
+        live_title = "live - built-in runtime adapter"
+        if provider == "custom_api":
+            live_title = "live - Responses-compatible gateway adapter"
+        choices.append(questionary.Choice(title=live_title, value=LIVE_EXECUTION_MODE))
 
-    adapter_choice = questionary.select(
-        "Runtime adapter:",
-        choices=adapter_choices,
-        default=default_adapter,
+    choices.append(
+        questionary.Choice(
+            title="demo - dry-run with provider/model defaults",
+            value=DEMO_EXECUTION_MODE,
+        ),
+    )
+
+    if advanced and not supports_live:
+        choices.append(
+            questionary.Choice(
+                title="custom module - live execution via module:function",
+                value=CUSTOM_MODULE_EXECUTION_MODE,
+            ),
+        )
+    elif advanced and supports_live:
+        choices.append(
+            questionary.Choice(
+                title="custom module - override built-in runtime",
+                value=CUSTOM_MODULE_EXECUTION_MODE,
+            ),
+        )
+
+    default_mode = LIVE_EXECUTION_MODE if supports_live and os.getenv(_default_api_key_env(provider)) else DEMO_EXECUTION_MODE
+    if not supports_live:
+        default_mode = DEMO_EXECUTION_MODE
+
+    return questionary.select(
+        "Execution mode:",
+        choices=choices,
+        default=default_mode,
     ).ask()
 
-    if adapter_choice == "custom module:function":
-        return questionary.text(
-            "Custom adapter reference (module:function):",
-        ).ask()
-    return adapter_choice
+
+def _resolve_runtime_adapter(
+    *,
+    provider: str,
+    execution_mode: str,
+    advanced: bool,
+) -> str:
+    if execution_mode == DEMO_EXECUTION_MODE:
+        return "dry-run"
+    if execution_mode == LIVE_EXECUTION_MODE:
+        if provider in {"openai", "custom_api"}:
+            return provider
+        if not advanced:
+            return "dry-run"
+    return questionary.text(
+        "Custom adapter reference (module:function):",
+        validate=_validate_adapter_reference,
+    ).ask()
 
 
 def _role_choices() -> list[questionary.Choice]:
@@ -412,6 +522,7 @@ def _preview_config(cfg: Dict[str, Any]) -> None:
     roles = cfg.get("roles", {}) or {}
     role_models = {role: resolve_role_model(cfg, role) for role in roles}
     pairs = (cfg.get("constraints") or {}).get("disallow_same_model_pairs") or []
+    scope = ((cfg.get("input") or {}).get("scope") or "").strip()
 
     violations: list[str] = []
     for left, right in pairs:
@@ -422,8 +533,10 @@ def _preview_config(cfg: Dict[str, Any]) -> None:
         "",
         "Configuration preview:",
         f"  mode: {cfg.get('mode')}",
+        f"  scope: {scope}",
         f"  provider: {(cfg.get('provider') or {}).get('name')} / {(cfg.get('provider') or {}).get('model')}",
         f"  runtime.adapter: {(cfg.get('runtime') or {}).get('adapter')}",
+        f"  output.artifacts_dir: {(cfg.get('output') or {}).get('artifacts_dir')}",
         "  role models:",
     ]
     lines.extend(f"    - {role}: {model}" for role, model in role_models.items())
@@ -467,9 +580,10 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
         mode = questionary.select("Setup mode:", choices=["ensemble", "solo"]).ask()
         provider = questionary.select(
             "Provider:",
-            choices=PROVIDER_CHOICES,
+            choices=_provider_choices(advanced=advanced),
             default=_provider_default_from_env(),
         ).ask()
+        execution_mode = _select_execution_mode(provider, advanced=advanced)
 
         provider_name = provider
         provider_cfg: Dict[str, Any] = {}
@@ -477,13 +591,8 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
         if provider == "custom_api":
             provider_name = questionary.text(
                 "Custom provider name (e.g., my-gateway):",
-                validate=lambda value: bool((value or "").strip()) or "Provider name is required.",
+                validate=_validate_non_empty_text("Provider name"),
             ).ask()
-            custom_base_url = questionary.text(
-                "Custom API base URL (required, e.g., https://gateway.example/v1):",
-                validate=lambda value: bool((value or "").strip()) or "Base URL is required.",
-            ).ask()
-            provider_cfg["base_url"] = custom_base_url.strip()
 
         goal_profile = None
         selected_roles: list[str]
@@ -507,12 +616,30 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
             preset = GOAL_TO_PRESET[goal_profile]
             selected_roles = GOAL_DEFAULT_ROLES[goal_profile]
 
-        model = _select_default_model(provider=provider, goal_profile=goal_profile)
-        api_key_env = questionary.text(
-            "API key environment variable:",
-            default=_default_api_key_env(provider),
+        scope = questionary.text(
+            "Project scope or task for this ensemble run:",
+            validate=_validate_non_empty_text("Project scope"),
         ).ask()
-        runtime_adapter = _select_runtime_adapter(provider, advanced=advanced)
+        model = _select_default_model(provider=provider, goal_profile=goal_profile)
+        runtime_adapter = _resolve_runtime_adapter(
+            provider=provider,
+            execution_mode=execution_mode,
+            advanced=advanced,
+        )
+
+        api_key_env = None
+        if runtime_adapter in {"openai", "custom_api"}:
+            api_key_env = questionary.text(
+                "API key environment variable:",
+                default=_default_api_key_env(provider),
+                validate=_validate_non_empty_text("API key environment variable"),
+            ).ask()
+        if runtime_adapter == "custom_api":
+            custom_base_url = questionary.text(
+                "Custom API base URL (required, e.g., https://gateway.example/v1):",
+                validate=_validate_non_empty_text("Base URL"),
+            ).ask()
+            provider_cfg["base_url"] = custom_base_url.strip()
 
         enforce_json = questionary.confirm(
             "Enforce JSON-only outputs for role reports?",
@@ -530,11 +657,13 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
             "provider": {
                 "name": provider_name,
                 "model": model,
-                "api_key_env": api_key_env,
                 **provider_cfg,
             },
             "preset": preset,
             "roles": _roles_for_preset(preset=preset, selected_roles=selected_roles),
+            "input": {
+                "scope": scope.strip(),
+            },
             "output": {
                 "artifacts_dir": "artifacts",
                 "enforce_json": enforce_json,
@@ -549,6 +678,8 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
                 "retry_backoff_seconds": 1.0,
             },
         }
+        if api_key_env:
+            cfg["provider"]["api_key_env"] = api_key_env
 
         if runtime_adapter == "openai":
             cfg["runtime"]["openai"] = {
@@ -568,9 +699,17 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
                     selected_roles=selected_roles,
                 )
 
-        _preview_config(cfg)
+        try:
+            validated_cfg = validate_config(cfg, source=config_path)
+        except ConfigValidationError as err:
+            questionary.print(f"\nConfiguration error:\n  {err}\n")
+            if not questionary.confirm("Restart setup?", default=True).ask():
+                return None
+            continue
+
+        _preview_config(validated_cfg)
         if questionary.confirm("Write this config?", default=True).ask():
-            write_config(config_path, cfg)
+            write_config(config_path, validated_cfg)
             return config_path
 
         if not questionary.confirm("Restart setup?", default=True).ask():

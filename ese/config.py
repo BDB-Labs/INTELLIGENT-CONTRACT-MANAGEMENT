@@ -91,6 +91,23 @@ class ConstraintsConfig(BaseModel):
         return pairs
 
 
+class InputConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    scope: str | None = None
+    prompt: str | None = None
+
+    @field_validator("scope", "prompt")
+    @classmethod
+    def _optional_non_empty(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("must be a non-empty string")
+        return cleaned
+
+
 class OutputConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
@@ -159,6 +176,13 @@ class RuntimeConfig(BaseModel):
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("must be a non-empty string")
+        builtin_adapters = {"dry-run", "openai", "custom_api"}
+        if cleaned not in builtin_adapters:
+            module_name, separator, object_name = cleaned.partition(":")
+            if not separator or not module_name.strip() or not object_name.strip():
+                raise ValueError(
+                    "must be one of {'dry-run', 'openai', 'custom_api'} or use 'module:function' format",
+                )
         return cleaned
 
     @field_validator("timeout_seconds", "retry_backoff_seconds")
@@ -193,6 +217,7 @@ class ESEConfig(BaseModel):
     provider: ProviderConfig
     roles: dict[str, RoleConfig] = Field(default_factory=dict)
     constraints: ConstraintsConfig = Field(default_factory=ConstraintsConfig)
+    input: InputConfig = Field(default_factory=InputConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
     gating: GatingConfig = Field(default_factory=GatingConfig)
     runtime: RuntimeConfig = Field(default_factory=RuntimeConfig)

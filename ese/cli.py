@@ -61,7 +61,7 @@ def doctor(config: str = typer.Option("ese.config.yaml", help="Path to ESE confi
         typer.echo("✅ Doctor checks passed")
 
 
-def _start_pipeline(config: str, artifacts_dir: str | None) -> None:
+def _start_pipeline(config: str, artifacts_dir: str | None, scope: str | None) -> None:
     ok, violations, _ = run_doctor(config_path=config)
     if not ok:
         typer.echo("❌ ESE doctor failed. Violations:")
@@ -71,6 +71,10 @@ def _start_pipeline(config: str, artifacts_dir: str | None) -> None:
 
     try:
         cfg = load_config(path=config)
+        if scope and scope.strip():
+            input_cfg = dict((cfg or {}).get("input") or {})
+            input_cfg["scope"] = scope.strip()
+            cfg["input"] = input_cfg
         summary_path = run_pipeline(cfg=cfg or {}, artifacts_dir=artifacts_dir)
     except (ConfigValidationError, PipelineError) as err:
         typer.echo(f"❌ ESE start failed: {err}")
@@ -86,9 +90,13 @@ def start(
         None,
         help="Directory for pipeline artifacts (overrides output.artifacts_dir in config)",
     ),
+    scope: str | None = typer.Option(
+        None,
+        help="Project scope/task override for this run (overrides input.scope in config)",
+    ),
 ):
     """Start the full ESE pipeline."""
-    _start_pipeline(config=config, artifacts_dir=artifacts_dir)
+    _start_pipeline(config=config, artifacts_dir=artifacts_dir, scope=scope)
 
 
 @app.command("run", hidden=True)
@@ -98,9 +106,13 @@ def run_alias(
         None,
         help="Directory for pipeline artifacts (overrides output.artifacts_dir in config)",
     ),
+    scope: str | None = typer.Option(
+        None,
+        help="Project scope/task override for this run (overrides input.scope in config)",
+    ),
 ):
     """Backward-compatible alias for `ese start`."""
-    _start_pipeline(config=config, artifacts_dir=artifacts_dir)
+    _start_pipeline(config=config, artifacts_dir=artifacts_dir, scope=scope)
 
 
 if __name__ == "__main__":

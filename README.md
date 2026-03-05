@@ -32,6 +32,11 @@ pip install ese-cli
 ese init --advanced
 ```
 
+The wizard now asks for:
+- a real project scope/task,
+- whether this should be a `demo` config (`dry-run`, no API calls) or a `live` config,
+- provider/model defaults appropriate for that choice.
+
 2. Validate configuration and ensemble constraints:
 
 ```bash
@@ -52,6 +57,12 @@ Pass `--artifacts-dir ...` only when you want to override `output.artifacts_dir`
 - per-role reports in `artifacts/*.json` when `output.enforce_json: true` (default)
 
 `ese run` remains available as a backward-compatible alias for `ese start`.
+
+For ad hoc runs, you can override the saved scope:
+
+```bash
+ese start --config ese.config.yaml --scope "Review the release checklist for hidden rollback risks"
+```
 
 ## Role catalog
 
@@ -79,6 +90,12 @@ Built-in runtime adapters:
 - `module:function`: custom Python callable adapter.
 
 When `output.enforce_json: true`, adapters must return valid JSON role reports and `gating.fail_on_high: true` will stop the pipeline on `HIGH` or `CRITICAL` findings.
+
+## Demo vs live setup
+
+- `demo`: writes a safe `dry-run` config using the selected provider/model defaults. This is the prudent path for first-time setup, local walkthroughs, and providers without native live adapters.
+- `live`: uses the built-in runtime only for `openai` and `custom_api`.
+- Other providers remain available for model selection in the wizard, but live execution requires an explicit `module:function` adapter in advanced mode.
 
 ### OpenAI runtime example
 

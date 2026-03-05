@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from ese.pipeline import PipelineError, run_pipeline
+from ese.pipeline import PipelineError, _role_prompt, run_pipeline
 
 
 def _cfg() -> dict:
@@ -142,3 +142,46 @@ def test_pipeline_rejects_non_json_output_when_enforced(
         run_pipeline(_cfg(), artifacts_dir=str(artifacts_dir))
 
     assert "must be valid JSON" in str(exc.value)
+
+
+def test_pipeline_requires_explicit_scope(tmp_path: Path) -> None:
+    cfg = _cfg()
+    cfg.pop("input")
+
+    with pytest.raises(PipelineError) as exc:
+        run_pipeline(cfg, artifacts_dir=str(tmp_path / "artifacts"))
+
+    assert "Set input.scope in the config or pass --scope" in str(exc.value)
+
+
+def test_documentation_writer_prompt_is_specialized() -> None:
+    prompt = _role_prompt(
+        role="documentation_writer",
+        scope="Document a new authentication flow",
+        outputs={
+            "architect": "Introduce auth middleware and session contracts.",
+            "implementer": "Added login handlers and token refresh support.",
+        },
+        enforce_json=True,
+    )
+
+    lowered = prompt.lower()
+    assert "documentation deliverables" in lowered
+    assert "readme updates" in lowered
+    assert "migration guidance" in lowered
+
+
+def test_release_manager_prompt_is_specialized() -> None:
+    prompt = _role_prompt(
+        role="release_manager",
+        scope="Launch a staged rollout for feature flags",
+        outputs={
+            "architect": "Use a staged rollout with metrics checkpoints.",
+            "implementer": "Implemented flag checks and telemetry hooks.",
+        },
+        enforce_json=True,
+    )
+
+    lowered = prompt.lower()
+    assert "assess release readiness" in lowered
+    assert "rollback readiness" in lowered

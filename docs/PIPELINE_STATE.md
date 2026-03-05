@@ -14,6 +14,10 @@ Execution order is deterministic:
    - `security_auditor`
    - `test_generator`
    - `performance_analyst`
+   - `documentation_writer`
+   - `devops_sre`
+   - `database_engineer`
+   - `release_manager`
 2. Any custom roles run after built-ins in the order they appear in `roles`.
 
 ## Context chaining contract

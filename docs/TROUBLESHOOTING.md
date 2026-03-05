@@ -36,6 +36,17 @@ Checks:
 - Ensure `runtime.max_retries` is an integer `>= 0`.
 - Ensure `gating.fail_on_high` is only used with `output.enforce_json: true`.
 - Ensure built-in adapter/provider combinations are compatible (for example `runtime.adapter=openai` requires OpenAI role providers only).
+- Ensure custom adapters use `module:function` format.
+
+## Missing scope
+
+Symptoms:
+- `No project scope supplied. Set input.scope in the config or pass --scope.`
+
+Checks:
+- Set `input.scope` in `ese.config.yaml`.
+- Or run `ese start --scope "..."` for a one-off override.
+- Regenerate the config with `ese init` if you want the wizard to capture scope for you.
 
 ## Ensemble doctor violations
 
@@ -69,6 +80,16 @@ Checks:
 - Inspect the failing role artifact and `pipeline_state.json`.
 - Fix or waive the blocking findings before rerunning.
 - Set `gating.fail_on_high: false` only if you intentionally want advisory-only execution.
+
+## Demo vs live confusion
+
+Symptoms:
+- Provider selected successfully, but runtime is `dry-run`.
+
+Checks:
+- Re-run `ese init` and choose `live` execution mode for supported providers.
+- Use `demo` when you want provider/model defaults without live API calls.
+- For non-OpenAI live execution, provide a `module:function` adapter in advanced mode unless you have a Responses-compatible gateway configured via `custom_api`.
 
 ## Pipeline output interpretation
 

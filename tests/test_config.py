@@ -27,6 +27,9 @@ def _base_cfg() -> dict:
             "max_retries": 2,
             "retry_backoff_seconds": 1.0,
         },
+        "input": {
+            "scope": "Review a login refactor",
+        },
     }
 
 
@@ -118,3 +121,13 @@ def test_validate_config_rejects_custom_api_role_provider_mismatch() -> None:
         validate_config(cfg, source="test.yaml")
 
     assert "runtime.adapter=custom_api requires all role providers to match provider.name='my-gateway'" in str(exc.value)
+
+
+def test_validate_config_rejects_invalid_custom_adapter_format() -> None:
+    cfg = _base_cfg()
+    cfg["runtime"]["adapter"] = "not-a-reference"
+
+    with pytest.raises(ConfigValidationError) as exc:
+        validate_config(cfg, source="test.yaml")
+
+    assert "module:function" in str(exc.value)
