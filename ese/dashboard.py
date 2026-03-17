@@ -14,11 +14,19 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from ese.config import ConfigValidationError, load_config
+from ese.feedback import record_feedback
 from ese.doctor import evaluate_doctor
 from ese.pipeline import run_pipeline
 from ese.pr_review import PullRequestReviewError, run_pr_review
-from ese.reports import RunReportError, collect_run_report, list_recent_runs, load_artifact_view
-from ese.templates import list_task_templates, run_task_pipeline
+from ese.reports import (
+    RunReportError,
+    collect_run_report,
+    list_recent_runs,
+    load_artifact_view,
+    render_junit,
+    render_sarif,
+)
+from ese.templates import list_task_templates, recommend_template_for_scope, run_task_pipeline
 
 
 class DashboardJobStore:
@@ -151,6 +159,54 @@ def _allocate_run_artifacts_dir(base_dir: str, *, kind: str) -> str:
         candidate = root / f"{base_name}-{suffix}"
         suffix += 1
     return str(candidate)
+
+
+def _coerce_bool(value: Any, *, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() not in {"", "0", "false", "no", "off"}
+
+
+def _task_run_kwargs(payload: dict[str, Any], *, root_artifacts_dir: str) -> dict[str, Any]:
+    run_artifacts_dir = _allocate_run_artifacts_dir(
+        str(payload.get("artifacts_dir") or root_artifacts_dir),
+        kind="task-run",
+    )
+    return {
+        "scope": str(payload.get("scope") or ""),
+        "template_key": str(payload.get("template_key") or "feature-delivery"),
+        "provider": str(payload.get("provider") or "openai"),
+        "execution_mode": str(payload.get("execution_mode") or "auto"),
+        "artifacts_dir": run_artifacts_dir,
+        "model": str(payload.get("model")) if payload.get("model") else None,
+        "runtime_adapter": str(payload.get("runtime_adapter")) if payload.get("runtime_adapter") else None,
+        "base_url": str(payload.get("base_url")) if payload.get("base_url") else None,
+        "config_path": str(payload.get("config_path")) if payload.get("config_path") else None,
+        "repo_path": str(payload.get("repo_path")) if payload.get("repo_path") else None,
+        "include_repo_status": _coerce_bool(payload.get("include_repo_status"), default=True),
+        "include_repo_diff": _coerce_bool(payload.get("include_repo_diff"), default=True),
+        "max_repo_diff_chars": int(payload.get("max_repo_diff_chars") or 8000),
+    }
+
+
+def _export_report_payload(artifacts_dir: str, export_format: str) -> tuple[str, str, str]:
+    report = collect_run_report(artifacts_dir)
+    clean_format = export_format.strip().lower()
+    if clean_format == "sarif":
+        return (
+            render_sarif(report),
+            "application/sarif+json; charset=utf-8",
+            "ese_report.sarif.json",
+        )
+    if clean_format == "junit":
+        return (
+            render_junit(report),
+            "application/xml; charset=utf-8",
+            "ese_report.junit.xml",
+        )
+    raise ConfigValidationError("format must be 'sarif' or 'junit'.")
 
 
 def _dashboard_html(bootstrap: dict[str, Any]) -> str:
@@ -404,6 +460,28 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       font-size: 0.82rem;
       color: var(--muted);
     }
+    .field-group[data-hidden="true"] {
+      display: none;
+    }
+    .feedback-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .suggestion-snippet {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(18, 24, 30, 0.94);
+      color: #f5efe6;
+      font-family: "SFMono-Regular", "Consolas", monospace;
+      font-size: 0.84rem;
+      line-height: 1.45;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     @media (max-width: 1100px) {
       .shell, .sections { grid-template-columns: 1fr; }
       .sidebar { position: static; }
@@ -419,28 +497,45 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
   <div class="shell">
     <aside class="panel sidebar">
       <h1>ESE Dashboard</h1>
-      <p class="lede">Start task-first runs, inspect blockers, and rerun from any role without leaving the local product.</p>
+      <p class="lede">Start task-first runs, compare independent specialist voices, and carry pluralistic review signal through to release decisions.</p>
       <form id="run-form">
+        <label for="interface_mode">Experience</label>
+        <select id="interface_mode" name="interface_mode">
+          <option value="beginner">beginner</option>
+          <option value="expert">expert</option>
+        </select>
+
         <label for="scope">Task Scope</label>
         <textarea id="scope" name="scope" placeholder="Describe the feature, review target, rollout risk, or engineering question."></textarea>
 
-        <label for="review_focus">PR Review Focus</label>
-        <input id="review_focus" name="review_focus" placeholder="Optional reviewer guidance for PR mode">
+        <div class="field-group" data-advanced="true">
+          <label for="review_focus">PR Review Focus</label>
+          <input id="review_focus" name="review_focus" placeholder="Optional reviewer guidance for PR mode">
+        </div>
 
         <label for="repo_path">Repo Path</label>
         <input id="repo_path" name="repo_path" placeholder="Path to the Git repo for PR review">
 
-        <label for="pr_ref">PR Number or URL</label>
-        <input id="pr_ref" name="pr_ref" placeholder="Optional GitHub PR number or URL">
+        <div class="field-group" data-advanced="true">
+          <label for="pr_ref">PR Number or URL</label>
+          <input id="pr_ref" name="pr_ref" placeholder="Optional GitHub PR number or URL">
+        </div>
 
-        <label for="base_ref">Base Ref</label>
-        <input id="base_ref" name="base_ref" placeholder="Defaults from PR or origin/main">
+        <div class="field-group" data-advanced="true">
+          <label for="base_ref">Base Ref</label>
+          <input id="base_ref" name="base_ref" placeholder="Defaults from PR or origin/main">
+        </div>
 
-        <label for="head_ref">Head Ref</label>
-        <input id="head_ref" name="head_ref" placeholder="Defaults from PR or HEAD">
+        <div class="field-group" data-advanced="true">
+          <label for="head_ref">Head Ref</label>
+          <input id="head_ref" name="head_ref" placeholder="Defaults from PR or HEAD">
+        </div>
 
         <label for="template">Template</label>
-        <select id="template" name="template"></select>
+        <div class="btn-row" style="margin-bottom:14px;">
+          <select id="template" name="template"></select>
+          <button id="recommend-template" type="button" class="secondary">Recommend</button>
+        </div>
 
         <label for="provider">Provider</label>
         <select id="provider" name="provider">
@@ -454,24 +549,54 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <option value="custom_api">custom_api</option>
         </select>
 
-        <label for="execution_mode">Execution</label>
-        <select id="execution_mode" name="execution_mode">
-          <option value="auto">auto</option>
-          <option value="demo">demo</option>
-          <option value="live">live</option>
+        <div class="field-group" data-advanced="true">
+          <label for="execution_mode">Execution</label>
+          <select id="execution_mode" name="execution_mode">
+            <option value="auto">auto</option>
+            <option value="demo">demo</option>
+            <option value="live">live</option>
+          </select>
+        </div>
+
+        <div class="field-group" data-advanced="true">
+          <label for="model">Model Override</label>
+          <input id="model" name="model" placeholder="Optional provider model id">
+        </div>
+
+        <div class="field-group" data-advanced="true">
+          <label for="base_url">Base URL</label>
+          <input id="base_url" name="base_url" placeholder="Required for custom_api live runs">
+        </div>
+
+        <div class="field-group" data-advanced="true">
+          <label for="runtime_adapter">Runtime Adapter</label>
+          <input id="runtime_adapter" name="runtime_adapter" placeholder="Optional module:function for advanced live runs">
+        </div>
+
+        <label for="include_repo_context">Task Repo Context</label>
+        <select id="include_repo_context" name="include_repo_context">
+          <option value="true">enabled</option>
+          <option value="false">disabled</option>
         </select>
 
-        <label for="model">Model Override</label>
-        <input id="model" name="model" placeholder="Optional provider model id">
+        <div class="field-group" data-advanced="true">
+          <label for="include_repo_status">Include Git Status</label>
+          <select id="include_repo_status" name="include_repo_status">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
 
-        <label for="base_url">Base URL</label>
-        <input id="base_url" name="base_url" placeholder="Required for custom_api live runs">
+          <label for="include_repo_diff">Include Working Diff</label>
+          <select id="include_repo_diff" name="include_repo_diff">
+            <option value="true">true</option>
+            <option value="false">false</option>
+          </select>
+        </div>
 
-        <label for="runtime_adapter">Runtime Adapter</label>
-        <input id="runtime_adapter" name="runtime_adapter" placeholder="Optional module:function for advanced live runs">
-
-        <label for="config_path">Config Path</label>
-        <input id="config_path" name="config_path" placeholder="Optional path to run an existing config instead">
+        <div class="field-group" data-advanced="true">
+          <label for="config_path">Config Path</label>
+          <input id="config_path" name="config_path" placeholder="Optional path to run an existing config instead">
+        </div>
 
         <label for="artifacts_dir">Artifacts Directory</label>
         <input id="artifacts_dir" name="artifacts_dir" value="">
@@ -514,6 +639,22 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
             <h2>Next Steps</h2>
             <div id="next-steps"></div>
           </section>
+          <section class="panel section">
+            <h2>Code Suggestions</h2>
+            <div id="code-suggestions"></div>
+          </section>
+          <section class="panel section">
+            <h2>Pluralism</h2>
+            <div id="consensus"></div>
+          </section>
+          <section class="panel section">
+            <h2>Run Delta</h2>
+            <div id="comparison"></div>
+          </section>
+          <section class="panel section">
+            <h2>Learning Loop</h2>
+            <div id="learning"></div>
+          </section>
         </div>
       </section>
     </main>
@@ -525,15 +666,24 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     const bootstrap = window.ESE_BOOTSTRAP;
     const form = document.getElementById('run-form');
     const templateSelect = document.getElementById('template');
+    const interfaceMode = document.getElementById('interface_mode');
+    const recommendTemplateButton = document.getElementById('recommend-template');
     const artifactsInput = document.getElementById('artifacts_dir');
     const configInput = document.getElementById('config_path');
     const repoInput = document.getElementById('repo_path');
+    const includeRepoContext = document.getElementById('include_repo_context');
+    const includeRepoStatus = document.getElementById('include_repo_status');
+    const includeRepoDiff = document.getElementById('include_repo_diff');
     const heroMeta = document.getElementById('hero-meta');
     const jobStatus = document.getElementById('job-status');
     const metrics = document.getElementById('metrics');
     const historyEl = document.getElementById('history');
     const blockersEl = document.getElementById('blockers');
     const nextStepsEl = document.getElementById('next-steps');
+    const codeSuggestionsEl = document.getElementById('code-suggestions');
+    const consensusEl = document.getElementById('consensus');
+    const comparisonEl = document.getElementById('comparison');
+    const learningEl = document.getElementById('learning');
     const rolesEl = document.getElementById('roles');
     const viewerEl = document.getElementById('viewer');
     const refreshButton = document.getElementById('refresh-button');
@@ -545,6 +695,7 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       history: [],
       selectedArtifact: null,
     };
+    const advancedFields = Array.from(document.querySelectorAll('[data-advanced="true"]'));
 
     artifactsInput.value = state.artifactsDir;
     repoInput.value = bootstrap.repo_path || '';
@@ -573,6 +724,20 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       templateSelect.innerHTML = templates.map((template) => {
         return `<option value="${template.key}">${template.title}</option>`;
       }).join('');
+    }
+
+    function applyInterfaceMode() {
+      const mode = interfaceMode.value;
+      const hideAdvanced = mode === 'beginner';
+      advancedFields.forEach((element) => {
+        element.dataset.hidden = hideAdvanced ? 'true' : 'false';
+      });
+      prButton.textContent = hideAdvanced ? 'Review PR' : 'Review PR / Diff';
+      runButton.textContent = hideAdvanced ? 'Start Task Run' : 'Start Configured Run';
+    }
+
+    function parseBool(value) {
+      return String(value).trim().toLowerCase() !== 'false';
     }
 
     function statusClass(status) {
@@ -604,6 +769,10 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       const documentButtons = (report.documents || []).map((document) => `
         <button type="button" class="secondary" data-open-document="${document.key}">${escapeHtml(document.title)}</button>
       `).join('');
+      const exportButtons = `
+        <button type="button" class="secondary" data-export-format="sarif">Export SARIF</button>
+        <button type="button" class="secondary" data-export-format="junit">Export JUnit</button>
+      `;
       const pills = [
         report.status ? `<span class="pill ${statusClass(report.status)}">Status: ${report.status}</span>` : '',
         report.provider ? `<span class="pill">Provider: ${escapeHtml(report.provider)}</span>` : '',
@@ -615,13 +784,20 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
         ${report.scope ? `<h2 style="margin-top:12px; margin-bottom:8px;">${escapeHtml(report.scope)}</h2>` : ''}
         <div class="tiny mono">${escapeHtml(report.artifacts_dir || '')}</div>
         ${report.updated_at ? `<div class="tiny">Updated ${escapeHtml(report.updated_at)}</div>` : ''}
-        ${documentButtons ? `<div class="viewer-actions" style="margin-top:12px;">${documentButtons}</div>` : ''}
+        <div class="viewer-actions" style="margin-top:12px;">${documentButtons}${exportButtons}</div>
       `;
 
       heroMeta.querySelectorAll('[data-open-document]').forEach((button) => {
         button.addEventListener('click', async () => {
           state.selectedArtifact = { document: button.dataset.openDocument };
           await loadArtifactView();
+        });
+      });
+      heroMeta.querySelectorAll('[data-export-format]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const format = button.dataset.exportFormat;
+          const url = `/api/export?artifacts_dir=${encodeURIComponent(state.artifactsDir)}&format=${encodeURIComponent(format)}`;
+          window.open(url, '_blank');
         });
       });
     }
@@ -684,6 +860,11 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <div class="finding ${findingClass(finding.severity)}">
             <strong>${escapeHtml(finding.severity)}</strong> ${escapeHtml(finding.title || 'Untitled finding')}
             ${finding.details ? `<div class="tiny">${escapeHtml(finding.details)}</div>` : ''}
+            <div class="feedback-row">
+              <button type="button" class="secondary" data-feedback-role="${role.role}" data-feedback-title="${escapeHtml(finding.title || '')}" data-feedback-rating="useful">Useful</button>
+              <button type="button" class="secondary" data-feedback-role="${role.role}" data-feedback-title="${escapeHtml(finding.title || '')}" data-feedback-rating="noisy">Noisy</button>
+              <button type="button" class="secondary" data-feedback-role="${role.role}" data-feedback-title="${escapeHtml(finding.title || '')}" data-feedback-rating="wrong">Wrong</button>
+            </div>
           </div>
         `).join('');
         const nextSteps = (role.next_steps || []).map((step) => `<div class="tiny">Next: ${escapeHtml(step)}</div>`).join('');
@@ -718,6 +899,22 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           await rerunFromRole(button.dataset.rerunRole);
         });
       });
+      rolesEl.querySelectorAll('[data-feedback-role]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const payload = {
+            artifacts_dir: state.artifactsDir,
+            role: button.dataset.feedbackRole,
+            title: button.dataset.feedbackTitle,
+            feedback: button.dataset.feedbackRating,
+          };
+          await request('/api/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          await loadReport();
+        });
+      });
     }
 
     function renderBlockers(report) {
@@ -747,6 +944,105 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <div>${escapeHtml(item.text)}</div>
         </article>
       `).join('');
+    }
+
+    function renderCodeSuggestions(report) {
+      const suggestions = report?.code_suggestions || [];
+      if (!suggestions.length) {
+        codeSuggestionsEl.innerHTML = `<div class="empty">No concrete code suggestions surfaced yet.</div>`;
+        return;
+      }
+      codeSuggestionsEl.innerHTML = suggestions.slice(0, 8).map((item) => `
+        <article class="card">
+          <div class="role-header">
+            <div>
+              <strong>${escapeHtml(item.role || 'role')}</strong>
+              <div class="tiny">
+                ${escapeHtml(item.source || 'suggestion')}
+                ${item.kind ? ` · ${escapeHtml(item.kind)}` : ''}
+                ${item.severity ? ` · ${escapeHtml(item.severity)}` : ''}
+              </div>
+            </div>
+          </div>
+          ${item.path ? `<div class="tiny mono">${escapeHtml(item.path)}</div>` : ''}
+          ${item.title ? `<div style="margin-top:8px;"><strong>${escapeHtml(item.title)}</strong></div>` : ''}
+          <div>${escapeHtml(item.suggestion || item.title || 'Suggestion unavailable.')}</div>
+          ${item.snippet ? `<pre class="suggestion-snippet">${escapeHtml(item.snippet)}</pre>` : ''}
+        </article>
+      `).join('');
+    }
+
+    function renderConsensus(report) {
+      const consensus = report?.consensus || {};
+      const agreements = consensus.agreements || [];
+      const disagreements = consensus.disagreements || [];
+      const solo = consensus.solo_blockers || [];
+      if (!agreements.length && !disagreements.length && !solo.length) {
+        consensusEl.innerHTML = `<div class="empty">No cross-role consensus or disagreement signal yet.</div>`;
+        return;
+      }
+      const sections = [];
+      if (agreements.length) {
+        sections.push(...agreements.slice(0, 4).map((item) => `
+          <article class="card">
+            <strong>${escapeHtml(item.title)}</strong>
+            <div class="tiny">Consensus across ${escapeHtml(item.roles.join(', '))}</div>
+          </article>
+        `));
+      }
+      if (disagreements.length) {
+        sections.push(...disagreements.slice(0, 3).map((item) => `
+          <article class="card">
+            <strong>${escapeHtml(item.title)}</strong>
+            <div class="tiny">${escapeHtml(item.note || 'Severity disagreement')}</div>
+          </article>
+        `));
+      }
+      if (solo.length) {
+        sections.push(...solo.slice(0, 3).map((item) => `
+          <article class="card">
+            <strong>${escapeHtml(item.title)}</strong>
+            <div class="tiny">Single-role blocker from ${escapeHtml(item.roles.join(', '))}</div>
+          </article>
+        `));
+      }
+      consensusEl.innerHTML = sections.join('');
+    }
+
+    function renderComparison(report) {
+      const comparison = report?.comparison || {};
+      if (!comparison.previous_artifacts_dir) {
+        comparisonEl.innerHTML = `<div class="empty">No previous run found for comparison.</div>`;
+        return;
+      }
+      comparisonEl.innerHTML = `
+        <article class="card">
+          <div class="tiny mono">${escapeHtml(comparison.previous_artifacts_dir)}</div>
+          <div style="margin-top:10px;">New blockers: ${comparison.new_blockers.length}</div>
+          <div>Resolved blockers: ${comparison.resolved_blockers.length}</div>
+          <div>Persistent blockers: ${comparison.persistent_blockers.length}</div>
+        </article>
+      `;
+    }
+
+    function renderLearning(report) {
+      const feedback = report?.feedback || {};
+      const counts = feedback.counts || {};
+      const guidance = feedback.guidance || [];
+      if (!guidance.length && !Object.values(counts).some((value) => value)) {
+        learningEl.innerHTML = `<div class="empty">No feedback recorded yet. Mark findings useful, noisy, or wrong to tune future runs.</div>`;
+        return;
+      }
+      learningEl.innerHTML = `
+        <article class="card">
+          <div>Useful: ${counts.useful || 0}</div>
+          <div>Noisy: ${counts.noisy || 0}</div>
+          <div>Wrong: ${counts.wrong || 0}</div>
+        </article>
+        ${(guidance || []).map((item) => `
+          <article class="card"><div>${escapeHtml(item)}</div></article>
+        `).join('')}
+      `;
     }
 
     function renderArtifactView(view) {
@@ -817,6 +1113,10 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
         renderRoles(report);
         renderBlockers(report);
         renderNextSteps(report);
+        renderCodeSuggestions(report);
+        renderConsensus(report);
+        renderComparison(report);
+        renderLearning(report);
         await loadArtifactView();
       } catch (error) {
         if (preferLatest && runs.length && runs[0].artifacts_dir !== state.artifactsDir) {
@@ -831,6 +1131,10 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
         renderRoles(null);
         blockersEl.innerHTML = `<div class="empty">${error.message}</div>`;
         nextStepsEl.innerHTML = `<div class="empty">No next steps available.</div>`;
+        codeSuggestionsEl.innerHTML = `<div class="empty">No code suggestions available.</div>`;
+        consensusEl.innerHTML = `<div class="empty">No consensus data available.</div>`;
+        comparisonEl.innerHTML = `<div class="empty">No comparison data available.</div>`;
+        learningEl.innerHTML = `<div class="empty">No feedback summary available.</div>`;
         renderArtifactView(null);
       }
     }
@@ -900,6 +1204,9 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
         runtime_adapter: form.runtime_adapter.value.trim() || undefined,
         config_path: configPath || undefined,
         artifacts_dir: form.artifacts_dir.value.trim() || bootstrap.artifacts_dir,
+        repo_path: parseBool(form.include_repo_context.value) ? (form.repo_path.value.trim() || bootstrap.repo_path || '.') : undefined,
+        include_repo_status: parseBool(form.include_repo_status.value),
+        include_repo_diff: parseBool(form.include_repo_diff.value),
       };
 
       const endpoint = configPath ? '/api/run-config' : '/api/run';
@@ -945,9 +1252,17 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       await loadReport();
     });
 
+    interfaceMode.addEventListener('change', applyInterfaceMode);
+    recommendTemplateButton.addEventListener('click', async () => {
+      const scope = form.scope.value.trim();
+      const response = await request(`/api/recommend-template?scope=${encodeURIComponent(scope)}`);
+      templateSelect.value = response.template_key;
+    });
+
     async function boot() {
       const templates = await request('/api/templates');
       renderTemplates(templates.templates);
+      applyInterfaceMode();
       await loadReport({ preferLatest: true });
     }
 
@@ -988,11 +1303,20 @@ def serve_dashboard(
             self.end_headers()
             self.wfile.write(body)
 
-        def _send_text(self, body: str, content_type: str = "text/html; charset=utf-8") -> None:
+        def _send_text(
+            self,
+            body: str,
+            content_type: str = "text/html; charset=utf-8",
+            *,
+            status: HTTPStatus = HTTPStatus.OK,
+            headers: dict[str, str] | None = None,
+        ) -> None:
             payload = body.encode("utf-8")
-            self.send_response(HTTPStatus.OK)
+            self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(payload)))
+            for key, value in (headers or {}).items():
+                self.send_header(key, value)
             self.end_headers()
             self.wfile.write(payload)
 
@@ -1044,6 +1368,30 @@ def serve_dashboard(
 
             if parsed.path == "/api/history":
                 self._send_json({"runs": list_recent_runs(self._artifacts_dir_from_query())})
+                return
+
+            if parsed.path == "/api/recommend-template":
+                query = parse_qs(parsed.query)
+                scope = query.get("scope", [""])[0]
+                self._send_json({"template_key": recommend_template_for_scope(scope)})
+                return
+
+            if parsed.path == "/api/export":
+                query = parse_qs(parsed.query)
+                export_format = query.get("format", ["sarif"])[0]
+                try:
+                    body, content_type, filename = _export_report_payload(
+                        self._artifacts_dir_from_query(),
+                        export_format,
+                    )
+                except (ConfigValidationError, RunReportError) as err:
+                    self._send_json({"error": str(err)}, status=HTTPStatus.BAD_REQUEST)
+                    return
+                self._send_text(
+                    body,
+                    content_type=content_type,
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                )
                 return
 
             if parsed.path == "/api/artifact":
@@ -1100,22 +1448,10 @@ def serve_dashboard(
 
             try:
                 if parsed.path == "/api/run":
-                    run_artifacts_dir = _allocate_run_artifacts_dir(
-                        str(payload.get("artifacts_dir") or root_artifacts_dir),
-                        kind="task-run",
-                    )
                     job_id = jobs.start(
                         "task-run",
                         _run_task_job,
-                        scope=str(payload.get("scope") or ""),
-                        template_key=str(payload.get("template_key") or "feature-delivery"),
-                        provider=str(payload.get("provider") or "openai"),
-                        execution_mode=str(payload.get("execution_mode") or "auto"),
-                        artifacts_dir=run_artifacts_dir,
-                        model=str(payload.get("model")) if payload.get("model") else None,
-                        runtime_adapter=str(payload.get("runtime_adapter")) if payload.get("runtime_adapter") else None,
-                        base_url=str(payload.get("base_url")) if payload.get("base_url") else None,
-                        config_path=str(payload.get("config_path")) if payload.get("config_path") else None,
+                        **_task_run_kwargs(payload, root_artifacts_dir=root_artifacts_dir),
                     )
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
@@ -1169,7 +1505,19 @@ def serve_dashboard(
                     )
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
-            except (ConfigValidationError, PullRequestReviewError) as err:
+
+                if parsed.path == "/api/feedback":
+                    entry = record_feedback(
+                        str(payload.get("artifacts_dir") or root_artifacts_dir),
+                        role=str(payload.get("role") or ""),
+                        title=str(payload.get("title") or ""),
+                        feedback=str(payload.get("feedback") or ""),
+                        artifacts_dir=str(payload.get("artifacts_dir") or root_artifacts_dir),
+                        details=str(payload.get("details")) if payload.get("details") else None,
+                    )
+                    self._send_json({"entry": entry}, status=HTTPStatus.CREATED)
+                    return
+            except (ConfigValidationError, PullRequestReviewError, ValueError) as err:
                 self._send_json({"error": str(err)}, status=HTTPStatus.BAD_REQUEST)
                 return
 

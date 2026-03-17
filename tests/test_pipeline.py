@@ -197,6 +197,16 @@ def test_pipeline_rejects_empty_role_configuration(tmp_path: Path) -> None:
     assert "No roles configured" in str(exc.value)
 
 
+def test_pipeline_rejects_non_mapping_roles_configuration(tmp_path: Path) -> None:
+    cfg = _cfg()
+    cfg["roles"] = ["architect", "implementer"]
+
+    with pytest.raises(PipelineError) as exc:
+        run_pipeline(cfg, artifacts_dir=str(tmp_path / "artifacts"))
+
+    assert "roles must be a mapping of role names to role configs" in str(exc.value)
+
+
 def test_documentation_writer_prompt_is_specialized() -> None:
     prompt = _role_prompt(
         role="documentation_writer",
@@ -242,3 +252,64 @@ def test_specialist_prompt_includes_additional_context_without_placeholder_noise
     assert "Additional Run Context" in prompt
     assert "Unified diff" in prompt
     assert "(none provided)" not in prompt
+    assert "code_suggestions" in prompt
+
+
+def test_pipeline_normalizes_structured_code_suggestions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+
+    def _suggesting_adapter(**kwargs) -> str:  # noqa: ANN003
+        role = kwargs["role"]
+        return json.dumps(
+            {
+                "summary": f"{role} completed.",
+                "findings": [],
+                "artifacts": [],
+                "next_steps": [],
+                "code_suggestions": [
+                    {
+                        "path": "src/app.py",
+                        "kind": "patch",
+                        "summary": "Guard missing config",
+                        "suggestion": "Add an early return before dereferencing config in the request handler.",
+                        "snippet": "if config is None:\n    return default_response()",
+                    },
+                ],
+            },
+        )
+
+    monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("suggesting", _suggesting_adapter))
+
+    run_pipeline(_cfg(), artifacts_dir=str(artifacts_dir))
+
+    report = json.loads((artifacts_dir / "01_architect.json").read_text(encoding="utf-8"))
+    assert report["code_suggestions"][0]["path"] == "src/app.py"
+    assert report["code_suggestions"][0]["kind"] == "patch"
+    assert "default_response" in report["code_suggestions"][0]["snippet"]
+
+
+def test_pipeline_rejects_resume_artifact_outside_artifacts_dir(tmp_path: Path) -> None:
+    cfg = _cfg()
+    artifacts_dir = tmp_path / "artifacts"
+    artifacts_dir.mkdir()
+    outside_artifact = tmp_path / "outside.json"
+    outside_artifact.write_text("seeded output", encoding="utf-8")
+    state = {
+        "status": "completed",
+        "artifacts": {
+            "architect": str(outside_artifact),
+        },
+        "role_models": {
+            "architect": "openai:gpt-5-mini",
+        },
+        "execution": [],
+    }
+    (artifacts_dir / "pipeline_state.json").write_text(json.dumps(state), encoding="utf-8")
+
+    with pytest.raises(PipelineError) as exc:
+        run_pipeline(cfg, artifacts_dir=str(artifacts_dir), start_role="implementer")
+
+    assert "escapes artifacts_dir" in str(exc.value)

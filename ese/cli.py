@@ -7,18 +7,29 @@ from typing import Any
 import typer
 import yaml
 
-from ese.config import ConfigValidationError, load_config
+from ese.config import ConfigValidationError, load_config, write_config
 from ese.dashboard import serve_dashboard
-from ese.doctor import evaluate_doctor, run_doctor
+from ese.doctor import build_doctor_guidance, evaluate_doctor, run_doctor
+from ese.feedback import record_feedback as persist_feedback
 from ese.init_wizard import ROLE_DESCRIPTIONS, run_wizard
 from ese.pipeline import CONFIG_SNAPSHOT_NAME, PipelineError, run_pipeline
-from ese.pr_review import DEFAULT_MAX_DIFF_CHARS, PullRequestReviewError, run_pr_review
-from ese.reports import RunReportError, collect_run_report, render_report_text, render_status_text
+from ese.pr_review import DEFAULT_MAX_DIFF_CHARS, PullRequestReviewError, build_pr_review_config, render_pull_request_review_markdown
+from ese.reports import (
+    RunReportError,
+    collect_run_report,
+    render_code_suggestions_json,
+    render_code_suggestions_markdown,
+    render_junit,
+    render_report_text,
+    render_sarif,
+    render_status_text,
+)
 from ese.templates import (
     AUTO_EXECUTION_MODE,
     build_task_config,
     list_task_templates,
-    run_task_pipeline,
+    provider_runtime_summary,
+    recommend_template_for_scope,
 )
 
 
@@ -51,11 +62,72 @@ def main(ctx: typer.Context) -> None:
         _launch_dashboard()
 
 
-def _print_doctor_guidance(violations: list[str]) -> None:
-    if any("No project scope supplied" in item for item in violations):
-        typer.echo("Hint: pass `--scope`, run `ese task \"...\"`, or regenerate config with `ese init`.")
-    if any("share model" in item for item in violations):
-        typer.echo("Hint: use `ese init --advanced` or edit per-role model overrides under roles.")
+def _print_doctor_guidance(cfg: dict[str, Any], violations: list[str]) -> None:
+    for item in build_doctor_guidance(cfg, violations):
+        typer.echo(f"Hint: {item}")
+
+
+def _print_preflight(kind: str, cfg: dict[str, Any]) -> None:
+    roles = ", ".join((cfg.get("roles") or {}).keys())
+    provider_cfg = cfg.get("provider") or {}
+    runtime_cfg = cfg.get("runtime") or {}
+    output_cfg = cfg.get("output") or {}
+    input_cfg = cfg.get("input") or {}
+    provider_runtime = cfg.get("provider_runtime") or provider_runtime_summary(
+        str(provider_cfg.get("name") or ""),
+        execution_mode=str(cfg.get("execution_mode") or AUTO_EXECUTION_MODE),
+        runtime_adapter=str(runtime_cfg.get("adapter") or ""),
+    )
+    lines = [
+        "Preflight:",
+        f"  - run type: {kind}",
+        f"  - template: {cfg.get('template_key', 'custom')}",
+        f"  - provider: {provider_cfg.get('name', 'unknown')}",
+        f"  - model: {provider_cfg.get('model', 'unknown')}",
+        f"  - adapter: {runtime_cfg.get('adapter', 'dry-run')}",
+        f"  - roles: {roles or 'none'}",
+        f"  - artifacts dir: {output_cfg.get('artifacts_dir', 'artifacts')}",
+        f"  - runtime note: {provider_runtime.get('note', 'n/a')}",
+    ]
+    scope = str(input_cfg.get("scope") or "").strip()
+    if scope:
+        lines.append(f"  - scope: {scope}")
+    repo_path = str(input_cfg.get("repo_path") or "").strip()
+    if repo_path:
+        lines.append(f"  - repo context: {repo_path}")
+    typer.echo("\n".join(lines))
+
+
+def _print_run_follow_up(artifacts_dir: str) -> None:
+    try:
+        report = collect_run_report(artifacts_dir)
+    except RunReportError:
+        return
+
+    if report.get("blockers"):
+        typer.echo(f"Blockers: {report['blocker_count']}")
+    consensus = report.get("consensus") or {}
+    if consensus.get("agreements"):
+        top = consensus["agreements"][0]
+        typer.echo(
+            "Top consensus: "
+            f"{top['title']} across {', '.join(top['roles'])}",
+        )
+    comparison = report.get("comparison") or {}
+    if comparison.get("previous_artifacts_dir"):
+        typer.echo(
+            "Run delta: "
+            f"+{len(comparison.get('new_blockers', []))} new blockers, "
+            f"-{len(comparison.get('resolved_blockers', []))} resolved blockers",
+        )
+    suggestions = report.get("code_suggestions") or []
+    if suggestions:
+        top = suggestions[0]
+        target = str(top.get("path") or "").strip()
+        prefix = f"Code suggestion [{target}]" if target else "Code suggestion"
+        typer.echo(f"{prefix}: {top['suggestion']}")
+    for action in report.get("suggested_actions", [])[:2]:
+        typer.echo(f"Next: {action['text']} [{action['command']}]")
 
 
 def _load_effective_cfg(config: str, scope: str | None) -> dict[str, Any]:
@@ -66,6 +138,41 @@ def _load_effective_cfg(config: str, scope: str | None) -> dict[str, Any]:
         input_cfg["scope"] = scope.strip()
         effective_cfg["input"] = input_cfg
     return effective_cfg
+
+
+def _guidance_cfg(config: str) -> dict[str, Any]:
+    try:
+        return load_config(path=config)
+    except ConfigValidationError:
+        return {}
+
+
+def _filtered_code_suggestions(
+    report: dict[str, Any],
+    *,
+    role: str | None = None,
+    path_filter: str | None = None,
+) -> list[dict[str, Any]]:
+    suggestions = [
+        item
+        for item in report.get("code_suggestions", [])
+        if isinstance(item, dict)
+    ]
+    clean_role = (role or "").strip()
+    clean_path = (path_filter or "").strip()
+    if clean_role:
+        suggestions = [
+            item
+            for item in suggestions
+            if str(item.get("role") or "").strip() == clean_role
+        ]
+    if clean_path:
+        suggestions = [
+            item
+            for item in suggestions
+            if clean_path in str(item.get("path") or "").strip()
+        ]
+    return suggestions
 
 
 @app.command()
@@ -107,7 +214,7 @@ def doctor(config: str = typer.Option("ese.config.yaml", help="Path to ESE confi
         typer.echo("❌ ESE doctor failed. Violations:")
         for v in violations:
             typer.echo(f"  - {v}")
-        _print_doctor_guidance(violations)
+        _print_doctor_guidance(_guidance_cfg(config), violations)
         raise typer.Exit(code=2)
 
     # Solo mode returns violations as messages to display.
@@ -126,12 +233,14 @@ def _start_pipeline(config: str, artifacts_dir: str | None, scope: str | None) -
         typer.echo(f"❌ ESE start failed: {err}")
         raise typer.Exit(code=2) from err
 
+    _print_preflight("start", effective_cfg)
+
     ok, violations, _ = evaluate_doctor(effective_cfg)
     if not ok:
         typer.echo("❌ ESE doctor failed. Violations:")
         for v in violations:
             typer.echo(f"  - {v}")
-        _print_doctor_guidance(violations)
+        _print_doctor_guidance(effective_cfg, violations)
         raise typer.Exit(code=2)
 
     try:
@@ -141,6 +250,7 @@ def _start_pipeline(config: str, artifacts_dir: str | None, scope: str | None) -
         raise typer.Exit(code=2) from err
 
     typer.echo(f"✅ Pipeline completed. Summary: {summary_path}")
+    _print_run_follow_up(str(Path(summary_path).parent))
 
 
 @app.command("start")
@@ -201,7 +311,7 @@ def templates(json_output: bool = typer.Option(False, "--json", help="Emit templ
 @app.command("task")
 def task(
     scope: str = typer.Argument(..., help="Project scope or task to run"),
-    template: str = typer.Option("feature-delivery", help="Opinionated task template"),
+    template: str = typer.Option("", help="Opinionated task template (defaults from scope if omitted)"),
     provider: str = typer.Option("openai", help="Provider preset"),
     execution_mode: str = typer.Option(AUTO_EXECUTION_MODE, help="auto, demo, or live"),
     artifacts_dir: str = typer.Option("artifacts", help="Directory for run artifacts"),
@@ -210,14 +320,19 @@ def task(
     provider_name: str | None = typer.Option(None, help="Custom provider name when using custom_api"),
     base_url: str | None = typer.Option(None, help="Base URL for custom_api live runs"),
     api_key_env: str | None = typer.Option(None, help="API key environment variable override"),
+    repo_path: str | None = typer.Option(None, help="Optional Git repo path to inject working-tree context into the task"),
+    include_repo_status: bool = typer.Option(True, help="Include git status in task repo context"),
+    include_repo_diff: bool = typer.Option(True, help="Include working diff in task repo context"),
+    max_repo_diff_chars: int = typer.Option(8000, help="Maximum diff characters to inject for task repo context"),
     write_config_path: str | None = typer.Option(None, "--write-config", help="Optional path to save the generated config"),
     show_config: bool = typer.Option(False, help="Print the generated config before running"),
 ):
     """Run ESE from a task description without hand-authoring config first."""
+    chosen_template = (template or "").strip() or recommend_template_for_scope(scope)
     try:
         cfg = build_task_config(
             scope=scope,
-            template_key=template,
+            template_key=chosen_template,
             provider=provider,
             execution_mode=execution_mode,
             artifacts_dir=artifacts_dir,
@@ -226,30 +341,24 @@ def task(
             runtime_adapter=runtime_adapter,
             provider_name=provider_name,
             base_url=base_url,
+            repo_path=repo_path,
+            include_repo_status=include_repo_status,
+            include_repo_diff=include_repo_diff,
+            max_repo_diff_chars=max_repo_diff_chars,
         )
+        _print_preflight("task", cfg)
         if show_config:
             typer.echo(yaml.safe_dump(cfg, sort_keys=False).strip())
         if write_config_path:
-            Path(write_config_path).parent.mkdir(parents=True, exist_ok=True)
-        _, summary_path = run_task_pipeline(
-            scope=scope,
-            template_key=template,
-            provider=provider,
-            execution_mode=execution_mode,
-            artifacts_dir=artifacts_dir,
-            model=model,
-            api_key_env=api_key_env,
-            runtime_adapter=runtime_adapter,
-            provider_name=provider_name,
-            base_url=base_url,
-            config_path=write_config_path,
-        )
+            write_config(write_config_path, cfg)
+        summary_path = run_pipeline(cfg=cfg, artifacts_dir=artifacts_dir)
     except (ConfigValidationError, PipelineError) as err:
         typer.echo(f"❌ ESE task failed: {err}")
         raise typer.Exit(code=2) from err
 
     adapter_name = str((cfg.get("runtime") or {}).get("adapter") or "dry-run")
-    typer.echo(f"✅ Task run completed using template '{template}' via {adapter_name}. Summary: {summary_path}")
+    typer.echo(f"✅ Task run completed using template '{chosen_template}' via {adapter_name}. Summary: {summary_path}")
+    _print_run_follow_up(str(Path(summary_path).parent))
 
 
 @app.command("pr")
@@ -273,7 +382,7 @@ def pr(
 ):
     """Review a pull request or branch diff and export a GitHub-ready markdown summary."""
     try:
-        context, cfg, summary_path, review_path = run_pr_review(
+        context, cfg = build_pr_review_config(
             repo_path=repo_path,
             pr=pr,
             base=base,
@@ -289,7 +398,16 @@ def pr(
             provider_name=provider_name,
             base_url=base_url,
             max_diff_chars=max_diff_chars,
-            config_path=write_config_path,
+        )
+        _print_preflight("pr-review", cfg)
+        if write_config_path:
+            write_config(write_config_path, cfg)
+        summary_path = run_pipeline(cfg=cfg, artifacts_dir=artifacts_dir)
+        report = collect_run_report(artifacts_dir)
+        review_path = str(Path(artifacts_dir) / "pr_review.md")
+        Path(review_path).write_text(
+            render_pull_request_review_markdown(context, report),
+            encoding="utf-8",
         )
     except (ConfigValidationError, PipelineError, PullRequestReviewError) as err:
         typer.echo(f"❌ ESE PR review failed: {err}")
@@ -301,6 +419,7 @@ def pr(
         f"for {context.head_ref} against {context.base_ref} via {adapter_name}. "
         f"Summary: {summary_path} Review: {review_path}",
     )
+    _print_run_follow_up(str(Path(summary_path).parent))
 
 
 @app.command("status")
@@ -338,6 +457,29 @@ def report(
     typer.echo(render_report_text(run_report))
 
 
+@app.command("suggestions")
+def suggestions(
+    artifacts_dir: str = typer.Option("artifacts", help="Directory containing run artifacts"),
+    role: str | None = typer.Option(None, help="Optional role filter"),
+    path_filter: str | None = typer.Option(None, "--path", help="Optional substring filter for target file paths"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable code suggestions JSON"),
+):
+    """Print synthesized programmer-facing code suggestions for a run."""
+    try:
+        report = collect_run_report(artifacts_dir)
+    except RunReportError as err:
+        typer.echo(f"❌ ESE suggestions failed: {err}")
+        raise typer.Exit(code=2) from err
+
+    filtered = _filtered_code_suggestions(report, role=role, path_filter=path_filter)
+    filtered_report = dict(report)
+    filtered_report["code_suggestions"] = filtered
+    if json_output:
+        typer.echo(render_code_suggestions_json(filtered_report))
+        return
+    typer.echo(render_code_suggestions_markdown(filtered_report))
+
+
 @app.command("rerun")
 def rerun(
     from_role: str = typer.Argument(..., help="Role to rerun from"),
@@ -359,6 +501,63 @@ def rerun(
         raise typer.Exit(code=2) from err
 
     typer.echo(f"✅ Reran pipeline from role '{from_role}'. Summary: {summary_path}")
+    _print_run_follow_up(str(Path(summary_path).parent))
+
+
+@app.command("export")
+def export(
+    artifacts_dir: str = typer.Option("artifacts", help="Directory containing run artifacts"),
+    format: str = typer.Option("sarif", help="Export format: sarif or junit"),
+    output_path: str | None = typer.Option(None, help="Optional output path override"),
+):
+    """Export run findings in CI-friendly formats."""
+    try:
+        report = collect_run_report(artifacts_dir)
+    except RunReportError as err:
+        typer.echo(f"❌ ESE export failed: {err}")
+        raise typer.Exit(code=2) from err
+
+    clean_format = format.strip().lower()
+    if clean_format == "sarif":
+        payload = render_sarif(report)
+        target = output_path or str(Path(artifacts_dir) / "ese_report.sarif.json")
+    elif clean_format == "junit":
+        payload = render_junit(report)
+        target = output_path or str(Path(artifacts_dir) / "ese_report.junit.xml")
+    else:
+        typer.echo("❌ ESE export failed: format must be 'sarif' or 'junit'")
+        raise typer.Exit(code=2)
+
+    Path(target).write_text(payload, encoding="utf-8")
+    typer.echo(f"✅ Exported {clean_format} report: {target}")
+
+
+@app.command("feedback")
+def feedback(
+    role: str = typer.Option(..., help="Role that produced the finding"),
+    title: str = typer.Option(..., help="Finding title"),
+    rating: str = typer.Option(..., help="Feedback rating: useful, noisy, or wrong"),
+    artifacts_dir: str = typer.Option("artifacts", help="Artifacts directory for the run family"),
+    details: str | None = typer.Option(None, help="Optional note about why this feedback was recorded"),
+):
+    """Record operator feedback so future runs can improve signal without collapsing dissent."""
+    try:
+        entry = persist_feedback(
+            artifacts_dir,
+            role=role,
+            title=title,
+            feedback=rating,
+            artifacts_dir=artifacts_dir,
+            details=details,
+        )
+    except ValueError as err:
+        typer.echo(f"❌ ESE feedback failed: {err}")
+        raise typer.Exit(code=2) from err
+
+    typer.echo(
+        "✅ Feedback recorded "
+        f"for {entry['role']} / {entry['title']} as {entry['feedback']}.",
+    )
 
 
 @app.command("dashboard")

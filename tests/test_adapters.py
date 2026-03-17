@@ -5,6 +5,7 @@ import json
 import pytest
 
 from ese.adapters import AdapterExecutionError, custom_api_adapter, local_adapter, openai_adapter
+from ese.local_runtime import LocalRuntimeError
 
 
 class _FakeResponse:
@@ -163,3 +164,39 @@ def test_local_adapter_success(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     assert output == "local ok"
+
+
+def test_local_adapter_wraps_local_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = {
+        "provider": {
+            "name": "local",
+            "model": "qwen2.5-coder:14b",
+            "base_url": "http://localhost:11434/v1",
+        },
+        "roles": {
+            "architect": {},
+        },
+        "runtime": {
+            "adapter": "local",
+            "timeout_seconds": 30,
+            "max_retries": 0,
+            "retry_backoff_seconds": 0.1,
+            "local": {"base_url": "http://localhost:11434/v1"},
+        },
+    }
+
+    def _raise_runtime_error(cfg, auto_start=True, require_models=True):  # noqa: ANN001
+        raise LocalRuntimeError("Ollama is unavailable")
+
+    monkeypatch.setattr("ese.adapters.ensure_local_runtime_ready", _raise_runtime_error)
+
+    with pytest.raises(AdapterExecutionError) as exc:
+        local_adapter(
+            role="architect",
+            model="local:qwen2.5-coder:14b",
+            prompt="test prompt",
+            context={},
+            cfg=cfg,
+        )
+
+    assert "Ollama is unavailable" in str(exc.value)

@@ -1,10 +1,20 @@
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
 
-from ese.reports import collect_run_report, list_recent_runs, load_artifact_view
+import pytest
+
+from ese.feedback import record_feedback
 from ese.pipeline import run_pipeline
+from ese.reports import (
+    collect_run_report,
+    list_recent_runs,
+    load_artifact_view,
+    render_junit,
+    render_sarif,
+)
 
 
 def _cfg() -> dict:
@@ -74,3 +84,87 @@ def test_load_artifact_view_supports_role_and_document_targets(tmp_path: Path) -
     assert summary_view["kind"] == "document"
     assert summary_view["key"] == "summary"
     assert "# ESE Summary" in summary_view["content"]
+
+
+def test_collect_run_report_includes_comparison_feedback_and_code_suggestions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "runs"
+    run_one = root / "20260308-task-run"
+    run_two = root / "20260309-task-run"
+
+    def _clean_adapter(**kwargs) -> str:  # noqa: ANN003
+        role = kwargs["role"]
+        return json.dumps(
+            {
+                "summary": f"{role} completed cleanly.",
+                "findings": [],
+                "artifacts": [],
+                "next_steps": [],
+            },
+        )
+
+    def _finding_adapter(**kwargs) -> str:  # noqa: ANN003
+        role = kwargs["role"]
+        if role == "adversarial_reviewer":
+            return json.dumps(
+                {
+                    "summary": "Reviewer found a concrete defect.",
+                    "findings": [
+                        {
+                            "severity": "HIGH",
+                            "title": "Null dereference risk",
+                            "details": "Guard the optional config object before dereferencing it in the request path.",
+                        },
+                    ],
+                    "artifacts": [],
+                    "next_steps": ["Add a guard clause and cover it with a regression test."],
+                    "code_suggestions": [
+                        {
+                            "path": "src/request_handler.py",
+                            "kind": "patch",
+                            "summary": "Guard the optional config before access",
+                            "suggestion": "Guard the optional config object before dereferencing it in the request path.",
+                            "snippet": "if config is None:\n    return default_response()",
+                        },
+                    ],
+                },
+            )
+        return _clean_adapter(**kwargs)
+
+    monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("clean", _clean_adapter))
+    run_pipeline(_cfg(), artifacts_dir=str(run_one))
+
+    monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("finding", _finding_adapter))
+    cfg = _cfg()
+    cfg["gating"] = {"fail_on_high": False}
+    run_pipeline(cfg, artifacts_dir=str(run_two))
+    record_feedback(
+        run_two,
+        role="adversarial_reviewer",
+        title="Null dereference risk",
+        feedback="useful",
+    )
+
+    report = collect_run_report(str(run_two))
+
+    assert report["comparison"]["previous_artifacts_dir"] == str(run_one)
+    assert len(report["comparison"]["new_blockers"]) == 1
+    assert report["feedback"]["counts"]["useful"] == 1
+    assert report["code_suggestions"][0]["suggestion"].startswith("Guard the optional config object")
+    assert report["code_suggestions"][0]["path"] == "src/request_handler.py"
+    assert "default_response" in report["code_suggestions"][0]["snippet"]
+    assert report["code_suggestion_groups"]["paths"] == ["src/request_handler.py"]
+    assert report["consensus"]["solo_blockers"][0]["title"] == "Null dereference risk"
+    assert {"code_suggestions_md", "code_suggestions_json"} <= {
+        item["key"]
+        for item in report["documents"]
+    }
+
+    sarif = render_sarif(report)
+    junit = render_junit(report)
+    assert "Null dereference risk" in sarif
+    assert "<failure" in junit
+    assert (run_two / "code_suggestions.md").exists()
+    assert (run_two / "code_suggestions.json").exists()

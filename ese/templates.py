@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ese.config import ConfigValidationError, validate_config, write_config
+from ese.repo_context import RepoContextError, build_repo_context, render_repo_context
 from ese.init_wizard import (
     COMMON_MODELS_BY_PROVIDER,
     GOAL_DEFAULT_ROLES,
@@ -126,6 +127,24 @@ def list_task_templates() -> list[TaskTemplate]:
     return list(TASK_TEMPLATES.values())
 
 
+def recommend_template_for_scope(scope: str) -> str:
+    """Choose a pragmatic default template from natural-language task scope."""
+    text = (scope or "").strip().lower()
+    if not text:
+        return "feature-delivery"
+    if any(keyword in text for keyword in ("release", "rollout", "launch", "deploy", "go live")):
+        return "release-readiness"
+    if any(keyword in text for keyword in ("security", "auth", "permission", "threat", "vulnerability")):
+        return "security-hardening"
+    if any(keyword in text for keyword in ("performance", "latency", "throughput", "scale", "memory")):
+        return "performance-pass"
+    if any(keyword in text for keyword in ("docs", "documentation", "readme", "migration guide", "runbook")):
+        return "documentation-refresh"
+    if any(keyword in text for keyword in ("pr", "pull request", "diff review", "code review")):
+        return "pr-review"
+    return "feature-delivery"
+
+
 def resolve_task_template(template_key: str) -> TaskTemplate:
     key = (template_key or "").strip().lower()
     template = TASK_TEMPLATES.get(key)
@@ -157,6 +176,30 @@ def _default_model_for(provider: str, goal_profile: str) -> str:
 def _supports_builtin_live(provider: str) -> bool:
     support = PROVIDER_SUPPORT.get(provider, {})
     return bool(support.get("supports_live"))
+
+
+def provider_runtime_summary(provider: str, *, execution_mode: str, runtime_adapter: str | None) -> dict[str, Any]:
+    """Explain the effective runtime posture for a provider and execution mode."""
+    clean_provider = (provider or "").strip().lower()
+    clean_mode = (execution_mode or AUTO_EXECUTION_MODE).strip().lower() or AUTO_EXECUTION_MODE
+    support = PROVIDER_SUPPORT.get(clean_provider, {})
+    supports_live = bool(support.get("supports_live"))
+    note = ""
+    if clean_mode == DEMO_EXECUTION_MODE:
+        note = f"{clean_provider} will run in demo mode via dry-run artifacts."
+    elif runtime_adapter:
+        note = f"{clean_provider} will use custom runtime adapter '{runtime_adapter}'."
+    elif supports_live:
+        note = f"{clean_provider} uses a built-in live adapter."
+    else:
+        note = f"{clean_provider} requires a custom runtime adapter for live execution."
+    return {
+        "provider": clean_provider,
+        "supports_builtin_live": supports_live,
+        "execution_mode": clean_mode,
+        "runtime_adapter": runtime_adapter,
+        "note": note,
+    }
 
 
 def _resolve_execution_mode(
@@ -198,6 +241,10 @@ def build_task_config(
     runtime_adapter: str | None = None,
     provider_name: str | None = None,
     base_url: str | None = None,
+    repo_path: str | None = None,
+    include_repo_status: bool = True,
+    include_repo_diff: bool = True,
+    max_repo_diff_chars: int = 8000,
     enforce_json: bool = True,
     fail_on_high: bool | None = None,
 ) -> dict[str, Any]:
@@ -227,6 +274,8 @@ def build_task_config(
     cfg: dict[str, Any] = {
         "version": 1,
         "mode": template.mode,
+        "template_key": template.key,
+        "template_title": template.title,
         "provider": provider_cfg,
         "preset": template.preset,
         "roles": roles_cfg,
@@ -246,6 +295,21 @@ def build_task_config(
             "retry_backoff_seconds": 1.0,
         },
     }
+
+    repo_context_payload: dict[str, Any] | None = None
+    if repo_path and repo_path.strip():
+        try:
+            repo_context_payload = build_repo_context(
+                repo_path=repo_path,
+                include_status=include_repo_status,
+                include_diff=include_repo_diff,
+                max_diff_chars=max_repo_diff_chars,
+            )
+        except RepoContextError as err:
+            raise ConfigValidationError(f"Could not collect repo context: {err}") from err
+        cfg["input"]["repo_path"] = repo_context_payload["repo_path"]
+        cfg["input"]["prompt"] = render_repo_context(repo_context_payload)
+        cfg["input"]["repo_context"] = repo_context_payload
 
     if template.mode == "ensemble":
         cfg["constraints"] = _ensemble_constraints(selected_roles=list(template.roles))
@@ -288,6 +352,14 @@ def build_task_config(
         }
         cfg["provider"]["base_url"] = base_url.strip()
 
+    cfg["provider_runtime"] = provider_runtime_summary(
+        clean_provider,
+        execution_mode=effective_mode,
+        runtime_adapter=str(cfg["runtime"].get("adapter") or ""),
+    )
+    if repo_context_payload is not None:
+        cfg["provider_runtime"]["repo_context_enabled"] = True
+
     return validate_config(cfg, source="<task>")
 
 
@@ -303,6 +375,10 @@ def run_task_pipeline(
     runtime_adapter: str | None = None,
     provider_name: str | None = None,
     base_url: str | None = None,
+    repo_path: str | None = None,
+    include_repo_status: bool = True,
+    include_repo_diff: bool = True,
+    max_repo_diff_chars: int = 8000,
     enforce_json: bool = True,
     fail_on_high: bool | None = None,
     config_path: str | None = None,
@@ -318,6 +394,10 @@ def run_task_pipeline(
         runtime_adapter=runtime_adapter,
         provider_name=provider_name,
         base_url=base_url,
+        repo_path=repo_path,
+        include_repo_status=include_repo_status,
+        include_repo_diff=include_repo_diff,
+        max_repo_diff_chars=max_repo_diff_chars,
         enforce_json=enforce_json,
         fail_on_high=fail_on_high,
     )

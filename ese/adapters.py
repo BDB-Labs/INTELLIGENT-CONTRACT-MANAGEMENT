@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Mapping
 
-from ese.local_runtime import ensure_local_runtime_ready, local_base_url
+from ese.local_runtime import ensure_local_runtime_ready, local_base_url, LocalRuntimeError
 
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_CUSTOM_API_KEY_ENV = "CUSTOM_API_KEY"
@@ -42,6 +42,7 @@ def dry_run_adapter(
             "summary": f"Dry-run placeholder output for role '{role}'.",
             "findings": [],
             "artifacts": [],
+            "code_suggestions": [],
             "next_steps": [
                 "Replace dry-run with a real adapter to execute this role against a model.",
             ],
@@ -453,7 +454,7 @@ def local_adapter(
 
     try:
         ensure_local_runtime_ready(cfg, auto_start=True, require_models=True)
-    except Exception as err:  # noqa: BLE001
+    except LocalRuntimeError as err:
         raise AdapterExecutionError(str(err)) from err
 
     payload = _openai_payload(

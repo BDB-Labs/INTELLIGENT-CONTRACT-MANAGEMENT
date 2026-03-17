@@ -192,16 +192,94 @@ def test_status_and_report_commands_summarize_artifacts(tmp_path: Path) -> None:
     assert "Roles:" in report_result.stdout
 
 
+def test_export_and_feedback_commands_write_outputs(tmp_path: Path) -> None:
+    cfg = _base_cfg()
+    config_path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
+    artifacts_dir = tmp_path / "artifacts"
+
+    start_result = runner.invoke(
+        app,
+        ["start", "--config", config_path, "--artifacts-dir", str(artifacts_dir)],
+    )
+    assert start_result.exit_code == 0
+
+    export_path = tmp_path / "report.sarif.json"
+    export_result = runner.invoke(
+        app,
+        ["export", "--artifacts-dir", str(artifacts_dir), "--format", "sarif", "--output-path", str(export_path)],
+    )
+    feedback_result = runner.invoke(
+        app,
+        [
+            "feedback",
+            "--artifacts-dir",
+            str(artifacts_dir),
+            "--role",
+            "architect",
+            "--title",
+            "Architect suggestion",
+            "--rating",
+            "useful",
+        ],
+    )
+
+    assert export_result.exit_code == 0
+    assert export_path.exists()
+    assert feedback_result.exit_code == 0
+    assert "Feedback recorded" in feedback_result.stdout
+
+
+def test_suggestions_command_renders_filtered_code_suggestions(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "ese.cli.collect_run_report",
+        lambda artifacts_dir: {
+            "artifacts_dir": artifacts_dir,
+            "scope": "Review the auth path",
+            "code_suggestions": [
+                {
+                    "role": "security_auditor",
+                    "source": "code_suggestion",
+                    "severity": "HIGH",
+                    "title": "Harden auth middleware",
+                    "suggestion": "Validate the tenant token before entering the handler.",
+                    "path": "src/auth.py",
+                    "kind": "patch",
+                    "snippet": "if not token:\n    raise AuthError()",
+                },
+            ],
+        },
+    )
+
+    result = runner.invoke(
+        app,
+        ["suggestions", "--artifacts-dir", "artifacts", "--path", "auth.py"],
+    )
+
+    assert result.exit_code == 0
+    assert "# Code Suggestions" in result.stdout
+    assert "src/auth.py" in result.stdout
+    assert "Validate the tenant token" in result.stdout
+
+
 def test_pr_command_runs_pull_request_review(monkeypatch) -> None:
-    def _fake_run_pr_review(**kwargs):  # noqa: ANN003
+    context = type("Context", (), {"head_ref": "feature", "base_ref": "origin/main"})()
+
+    def _fake_build_pr_review_config(**kwargs):  # noqa: ANN003
         return (
-            type("Context", (), {"head_ref": "feature", "base_ref": "origin/main"})(),
-            {"runtime": {"adapter": "dry-run"}},
-            "/tmp/artifacts/ese_summary.md",
-            "/tmp/artifacts/pr_review.md",
+            context,
+            {
+                "runtime": {"adapter": "dry-run"},
+                "output": {"artifacts_dir": "/tmp/artifacts"},
+            },
         )
 
-    monkeypatch.setattr("ese.cli.run_pr_review", _fake_run_pr_review)
+    monkeypatch.setattr("ese.cli.build_pr_review_config", _fake_build_pr_review_config)
+    monkeypatch.setattr("ese.cli.run_pipeline", lambda **kwargs: "/tmp/artifacts/ese_summary.md")
+    monkeypatch.setattr(
+        "ese.cli.collect_run_report",
+        lambda artifacts_dir: {"roles": [], "blockers": [], "next_steps": []},
+    )
+    monkeypatch.setattr("ese.cli.render_pull_request_review_markdown", lambda context, report: "# Review\n")
 
     result = runner.invoke(
         app,
