@@ -1,7 +1,8 @@
 # Ensemble Software Engineering (ESE) Manifesto
+A system cannot be an honest witness to its own work.
 
-ESE exists because no system should be trusted to validate its own work. AI-assisted software development often uses a single model to ideate, implement, review, and approve code. That structure invites self-confirmation and hidden risk.
+When a single intelligence ideates, implements, reviews, and approves, confirmation bias isn't a risk — it's a deliverable. ESE applies a principle as old as craft itself: no one hand should build, judge, and ship.
 
-**Principle:** distribute cognitive roles across an ensemble of intelligences, and ensure human engineers remain the final authority over risk and merges.
+Distribute cognitive roles across an ensemble of intelligences. Reserve final authority over risk and merges for human engineers.
 
-ESE is lightweight, reproducible, and pragmatic: roles are stable, model assignments are swappable, and artifacts flow from Architect → Implementer → Reviewers → Human decision.
+Roles are stable. Intelligence assignments are swappable. Artifacts flow in one direction — Architect → Implementer → Reviewers → Human decision — and every handoff is a deliberate act of accountability.
