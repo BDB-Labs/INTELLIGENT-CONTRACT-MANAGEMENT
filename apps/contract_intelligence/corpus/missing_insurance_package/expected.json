@@ -1,0 +1,18 @@
+{
+  "recommendation": "no_go",
+  "human_review_required": true,
+  "missing_required_documents": [
+    "general_conditions",
+    "insurance_requirements"
+  ],
+  "risk_categories": [
+    "payment_terms"
+  ],
+  "insurance_categories": [],
+  "compliance_categories": [],
+  "obligation_titles": [],
+  "hazard_fragments": [
+    "general_conditions",
+    "insurance_requirements"
+  ]
+}

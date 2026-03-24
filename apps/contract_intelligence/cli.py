@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from apps.contract_intelligence.evaluation.corpus import default_corpus_dir, evaluate_corpus
 from apps.contract_intelligence.orchestration.bid_review_runner import run_bid_review
 
 
@@ -35,6 +36,34 @@ def bid_review(
     for filename in sorted(result.artifact_paths):
         relative = Path(result.artifact_paths[filename]).resolve()
         typer.echo(f"  - {filename}: {relative}")
+
+
+@app.command("evaluate-corpus")
+def evaluate_corpus_command(
+    corpus_dir: str = typer.Option(
+        str(default_corpus_dir()),
+        "--corpus-dir",
+        help="Directory containing gold-corpus cases with expected.json and inputs/.",
+    ),
+    artifacts_dir: str | None = typer.Option(
+        None,
+        "--artifacts-dir",
+        help="Optional root directory where evaluation artifacts will be written.",
+    ),
+) -> None:
+    """Run the deterministic gold-corpus evaluation suite for the pilot."""
+    results = evaluate_corpus(corpus_dir=corpus_dir, artifacts_root=artifacts_dir)
+    passed = 0
+    for result in results:
+        status = "PASS" if result.passed else "FAIL"
+        typer.echo(f"{status} {result.case_id} -> {result.artifacts_dir}")
+        for failure in result.failures:
+            typer.echo(f"  - {failure}")
+        if result.passed:
+            passed += 1
+    typer.echo(f"Summary: {passed}/{len(results)} cases passed")
+    if passed != len(results):
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":

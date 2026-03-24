@@ -32,6 +32,12 @@ Or send artifacts somewhere specific:
 python -m apps.contract_intelligence bid-review ./sample_project --artifacts-dir ./tmp/bid_review
 ```
 
+Run the starter gold corpus:
+
+```bash
+python -m apps.contract_intelligence evaluate-corpus
+```
+
 The runner currently supports `.md`, `.txt`, `.json`, `.yaml`, `.docx`, and a
 lightweight PDF text fallback. PDF extraction is still intentionally basic, but
 the loader now preserves clause-like spans and uses them as evidence anchors in
@@ -43,6 +49,7 @@ the generated artifacts.
 - `ingestion/`: early document typing and intake helpers
 - `orchestration/`: role catalog, pipeline definition, and prompts
 - `schemas/`: JSON schema contracts for stable artifacts
+- `corpus/`: starter gold-corpus cases and expected outcomes
 - `api/`: placeholder API surface for the future product shell
 - `storage/`: placeholder persistence boundary
 - `ui/`: placeholder UI boundary

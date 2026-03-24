@@ -1,0 +1,24 @@
+{
+  "recommendation": "go_with_conditions",
+  "human_review_required": true,
+  "missing_required_documents": [],
+  "risk_categories": [
+    "payment_terms",
+    "indemnity",
+    "delay_exposure"
+  ],
+  "insurance_categories": [
+    "additional_insured",
+    "waiver_subrogation"
+  ],
+  "compliance_categories": [
+    "davis_bacon",
+    "certified_payroll",
+    "dbe_participation"
+  ],
+  "obligation_titles": [
+    "Provide required notice within 7 calendar days",
+    "Submit certified payroll reports",
+    "Provide certificates of insurance before starting work"
+  ]
+}
