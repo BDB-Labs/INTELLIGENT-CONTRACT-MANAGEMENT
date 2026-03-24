@@ -51,3 +51,6 @@ class ProjectDocumentRecord(BaseModel):
     filename: str
     document_type: str
     required_for_bid_review: bool
+    text_available: bool = False
+    text_source: str = "unavailable"
+    clause_count: int = 0

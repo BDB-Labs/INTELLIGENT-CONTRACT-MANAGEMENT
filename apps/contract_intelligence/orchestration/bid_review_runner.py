@@ -8,7 +8,7 @@ from pathlib import Path
 from apps.contract_intelligence.domain.enums import DocumentType, Recommendation, Severity
 from apps.contract_intelligence.domain.models import DecisionSummary, EvidenceRef, Finding, Obligation, ProjectDocumentRecord
 from apps.contract_intelligence.ingestion.document_classifier import REQUIRED_BID_REVIEW_DOCUMENTS, missing_required_documents
-from apps.contract_intelligence.ingestion.project_loader import LoadedDocument, iter_project_documents
+from apps.contract_intelligence.ingestion.project_loader import ClauseSpan, LoadedDocument, iter_project_documents
 
 
 SEVERITY_ORDER = {
@@ -192,15 +192,14 @@ def _project_id(project_dir: Path) -> str:
     return clean or "contract-project"
 
 
-def _evidence(document: LoadedDocument, match: re.Match[str]) -> EvidenceRef:
-    before = document.text[: match.start()]
-    line_no = before.count("\n") + 1
+def _clause_evidence(document: LoadedDocument, clause: ClauseSpan, match: re.Match[str]) -> EvidenceRef:
+    clause_text = clause.text
     start = max(0, match.start() - 100)
-    end = min(len(document.text), match.end() + 100)
-    excerpt = " ".join(document.text[start:end].split())
+    end = min(len(clause_text), match.end() + 100)
+    excerpt = " ".join(clause_text[start:end].split())
     return EvidenceRef(
         document_id=document.document_id,
-        location=f"{document.relative_path}:L{line_no}",
+        location=clause.location,
         excerpt=excerpt,
     )
 
@@ -212,10 +211,16 @@ def _finding_from_rule(rule: FindingRule, documents: list[LoadedDocument]) -> Fi
             continue
         if not document.text_available:
             continue
-        for pattern in rule.patterns:
-            match = re.search(pattern, document.text, flags=re.IGNORECASE)
-            if match:
-                evidence.append(_evidence(document, match))
+        clauses = document.clauses or ()
+        if not clauses:
+            continue
+        for clause in clauses:
+            for pattern in rule.patterns:
+                match = re.search(pattern, clause.text, flags=re.IGNORECASE)
+                if match:
+                    evidence.append(_clause_evidence(document, clause, match))
+                    break
+            if evidence:
                 break
     if not evidence:
         return None
@@ -245,6 +250,7 @@ def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
             continue
 
         for match in NOTICE_DEADLINE_PATTERN.finditer(document.text):
+            clause = next((item for item in document.clauses if match.group("context") in item.text), None)
             days = match.group("days")
             unit = match.group("unit") or "calendar"
             title = f"Provide required notice within {days} {unit} days"
@@ -261,12 +267,13 @@ def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
                     due_rule=f"within {days} {unit} days",
                     owner_role="project_manager",
                     severity_if_missed=Severity.HIGH,
-                    evidence=[_evidence(document, match)],
+                    evidence=[_clause_evidence(document, clause, match)] if clause else [],
                 )
             )
 
         certified_payroll = re.search(r"certified payroll", document.text, flags=re.IGNORECASE)
         if certified_payroll and "Submit certified payroll reports" not in seen_titles:
+            clause = next((item for item in document.clauses if "certified payroll" in item.text.lower()), None)
             seen_titles.add("Submit certified payroll reports")
             obligations.append(
                 Obligation(
@@ -278,12 +285,13 @@ def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
                     due_rule="weekly during covered work",
                     owner_role="payroll_compliance_manager",
                     severity_if_missed=Severity.HIGH,
-                    evidence=[_evidence(document, certified_payroll)],
+                    evidence=[_clause_evidence(document, clause, certified_payroll)] if clause else [],
                 )
             )
 
         certificates = re.search(r"certificate[s]? of insurance", document.text, flags=re.IGNORECASE)
         if certificates and "Provide certificates of insurance before starting work" not in seen_titles:
+            clause = next((item for item in document.clauses if "certificate" in item.text.lower()), None)
             seen_titles.add("Provide certificates of insurance before starting work")
             obligations.append(
                 Obligation(
@@ -295,7 +303,7 @@ def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
                     due_rule="before starting work",
                     owner_role="risk_manager",
                     severity_if_missed=Severity.HIGH,
-                    evidence=[_evidence(document, certificates)],
+                    evidence=[_clause_evidence(document, clause, certificates)] if clause else [],
                 )
             )
 
@@ -438,6 +446,9 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
                 filename=document.relative_path,
                 document_type=document.document_type.value,
                 required_for_bid_review=document.document_type in REQUIRED_BID_REVIEW_DOCUMENTS,
+                text_available=document.text_available,
+                text_source=document.text_source,
+                clause_count=len(document.clauses),
             ).model_dump()
             for document in documents
         ],

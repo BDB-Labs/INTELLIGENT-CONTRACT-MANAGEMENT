@@ -9,12 +9,23 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["document_id", "filename", "document_type", "required_for_bid_review"],
+        "required": [
+          "document_id",
+          "filename",
+          "document_type",
+          "required_for_bid_review",
+          "text_available",
+          "text_source",
+          "clause_count"
+        ],
         "properties": {
           "document_id": {"type": "string"},
           "filename": {"type": "string"},
           "document_type": {"type": "string"},
-          "required_for_bid_review": {"type": "boolean"}
+          "required_for_bid_review": {"type": "boolean"},
+          "text_available": {"type": "boolean"},
+          "text_source": {"type": "string"},
+          "clause_count": {"type": "integer", "minimum": 0}
         }
       }
     },

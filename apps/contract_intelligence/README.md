@@ -32,9 +32,10 @@ Or send artifacts somewhere specific:
 python -m apps.contract_intelligence bid-review ./sample_project --artifacts-dir ./tmp/bid_review
 ```
 
-The runner currently works best with plain-text inputs such as `.md`, `.txt`,
-`.json`, `.yaml`, and `.docx`. Binary PDFs are detected as files but are not yet
-parsed for text.
+The runner currently supports `.md`, `.txt`, `.json`, `.yaml`, `.docx`, and a
+lightweight PDF text fallback. PDF extraction is still intentionally basic, but
+the loader now preserves clause-like spans and uses them as evidence anchors in
+the generated artifacts.
 
 ## Folder map
 
