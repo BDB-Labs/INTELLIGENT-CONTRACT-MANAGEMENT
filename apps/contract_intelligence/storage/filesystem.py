@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - non-POSIX fallback
+    fcntl = None
 
 from apps.contract_intelligence.domain.models import (
     AcceptedRisk,
@@ -15,6 +22,7 @@ from apps.contract_intelligence.domain.models import (
     ContextProfile,
     CaseRunIndexEntry,
     DecisionSummary,
+    FindingDisposition,
     MonitoredObligation,
     MonitoringRunIndexEntry,
     MonitoringRunRecord,
@@ -23,6 +31,8 @@ from apps.contract_intelligence.domain.models import (
     OutcomeEvidenceBundle,
     ProjectDocumentRecord,
     ProcurementProfile,
+    ReviewActionEvent,
+    ReviewActionRecord,
 )
 
 
@@ -58,7 +68,13 @@ class PersistedMonitoringState:
 
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    rendered = json.dumps(payload, indent=2) + "\n"
+    with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+        handle.write(rendered)
+        handle.flush()
+        os.fsync(handle.fileno())
+        temp_name = handle.name
+    os.replace(temp_name, path)
 
 
 def _read_json(path: Path) -> object:
@@ -76,6 +92,22 @@ class FileSystemCaseStore:
 
     def case_record_path(self, project_id: str) -> Path:
         return self.case_dir(project_id) / "case_record.json"
+
+    def _lock_path(self, project_id: str) -> Path:
+        return self.case_dir(project_id) / ".case.lock"
+
+    def _lock_case(self, project_id: str):
+        lock_path = self._lock_path(project_id)
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = lock_path.open("a+", encoding="utf-8")
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        return handle
+
+    def _unlock_case(self, handle) -> None:
+        if fcntl is not None:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()
 
     def load_case_record(self, project_id: str) -> CaseRecord:
         path = self.case_record_path(project_id)
@@ -109,6 +141,108 @@ class FileSystemCaseStore:
             raise FileNotFoundError(f"No monitoring run exists for project '{project_id}'.")
         path = self.case_dir(project_id) / "monitoring" / "runs" / f"{case_record.latest_monitoring_run_id}.json"
         return MonitoringRunRecord.model_validate(_read_json(path))
+
+    def load_current_review_actions(self, project_id: str) -> list[ReviewActionRecord]:
+        path = self.case_dir(project_id) / "review_actions" / "current.json"
+        if not path.exists():
+            return []
+        payload = _read_json(path)
+        if not isinstance(payload, list):
+            raise ValueError(f"Review-action snapshot is malformed for project '{project_id}'.")
+        return [ReviewActionRecord.model_validate(item) for item in payload]
+
+    def persist_review_action(
+        self,
+        *,
+        project_id: str,
+        review_action: ReviewActionRecord,
+    ) -> ReviewActionRecord:
+        case_dir = self.case_dir(project_id)
+        current_path = case_dir / "review_actions" / "current.json"
+        history_dir = case_dir / "review_actions" / "history"
+        event_time = datetime.now(timezone.utc)
+        event_id = event_time.strftime("review_%Y%m%dT%H%M%S%fZ")
+        action_key = (review_action.kind, review_action.ui_id)
+
+        lock_handle = self._lock_case(project_id)
+        try:
+            current_actions = self.load_current_review_actions(project_id)
+            indexed = {(item.kind, item.ui_id): item for item in current_actions}
+            existing = indexed.get(action_key)
+            persisted = review_action.model_copy(
+                update={
+                    "created_at": existing.created_at if existing else review_action.created_at,
+                    "updated_at": review_action.updated_at,
+                }
+            )
+            indexed[action_key] = persisted
+            ordered = sorted(
+                indexed.values(),
+                key=lambda item: (item.kind, item.ui_id),
+            )
+            _write_json(current_path, [item.model_dump(mode="json") for item in ordered])
+            _write_json(
+                history_dir / f"{event_id}.json",
+                ReviewActionEvent(
+                    event_id=event_id,
+                    event_type="upsert",
+                    kind=persisted.kind,
+                    ui_id=persisted.ui_id,
+                    title=persisted.title,
+                    disposition=persisted.disposition,
+                    owner=persisted.owner,
+                    note=persisted.note,
+                    source_run_id=persisted.source_run_id,
+                    source_commit_id=persisted.source_commit_id,
+                    occurred_at=event_time,
+                ).model_dump(mode="json"),
+            )
+        finally:
+            self._unlock_case(lock_handle)
+        return persisted
+
+    def clear_review_action(self, project_id: str, *, kind: str, ui_id: str) -> bool:
+        case_dir = self.case_dir(project_id)
+        current_path = case_dir / "review_actions" / "current.json"
+        history_dir = case_dir / "review_actions" / "history"
+        event_time = datetime.now(timezone.utc)
+        event_id = event_time.strftime("review_%Y%m%dT%H%M%S%fZ")
+        action_key = (kind.strip().lower(), ui_id)
+        removed = False
+
+        lock_handle = self._lock_case(project_id)
+        try:
+            current_actions = self.load_current_review_actions(project_id)
+            remaining: list[ReviewActionRecord] = []
+            removed_action: ReviewActionRecord | None = None
+            for item in current_actions:
+                if (item.kind, item.ui_id) == action_key:
+                    removed = True
+                    removed_action = item
+                    continue
+                remaining.append(item)
+            if not removed:
+                return False
+            _write_json(current_path, [item.model_dump(mode="json") for item in remaining])
+            _write_json(
+                history_dir / f"{event_id}.json",
+                ReviewActionEvent(
+                    event_id=event_id,
+                    event_type="clear",
+                    kind=action_key[0],
+                    ui_id=ui_id,
+                    title=removed_action.title if removed_action else None,
+                    disposition=removed_action.disposition if removed_action else None,
+                    owner=removed_action.owner if removed_action else "",
+                    note=removed_action.note if removed_action else "",
+                    source_run_id=removed_action.source_run_id if removed_action else None,
+                    source_commit_id=removed_action.source_commit_id if removed_action else None,
+                    occurred_at=event_time,
+                ).model_dump(mode="json"),
+            )
+        finally:
+            self._unlock_case(lock_handle)
+        return True
 
     def persist_bid_review_run(
         self,
@@ -156,70 +290,74 @@ class FileSystemCaseStore:
             review_challenges=review_challenges,
             obligations_count=obligations_count,
         )
-        _write_json(run_record_path, run_record.model_dump(mode="json"))
+        lock_handle = self._lock_case(project_id)
+        try:
+            _write_json(run_record_path, run_record.model_dump(mode="json"))
 
-        existing_history: list[CaseRunIndexEntry] = []
-        if case_record_path.exists():
-            payload = _read_json(case_record_path)
-            existing_history = [
-                CaseRunIndexEntry.model_validate(item)
-                for item in payload.get("run_history", [])
-            ]
-            existing_commit_history = [
-                ContractCommitIndexEntry.model_validate(item)
-                for item in payload.get("commit_history", [])
-            ]
-            latest_commit_id = payload.get("latest_commit_id")
-            total_commits = int(payload.get("total_commits", 0))
-            latest_obligations_count = int(payload.get("latest_obligations_count", 0))
-            latest_monitoring_run_id = payload.get("latest_monitoring_run_id")
-            total_monitoring_runs = int(payload.get("total_monitoring_runs", 0))
-            monitoring_history = [
-                MonitoringRunIndexEntry.model_validate(item)
-                for item in payload.get("monitoring_history", [])
-            ]
-        else:
-            existing_commit_history = []
-            latest_commit_id = None
-            total_commits = 0
-            latest_obligations_count = 0
-            latest_monitoring_run_id = None
-            total_monitoring_runs = 0
-            monitoring_history = []
+            existing_history: list[CaseRunIndexEntry] = []
+            if case_record_path.exists():
+                payload = _read_json(case_record_path)
+                existing_history = [
+                    CaseRunIndexEntry.model_validate(item)
+                    for item in payload.get("run_history", [])
+                ]
+                existing_commit_history = [
+                    ContractCommitIndexEntry.model_validate(item)
+                    for item in payload.get("commit_history", [])
+                ]
+                latest_commit_id = payload.get("latest_commit_id")
+                total_commits = int(payload.get("total_commits", 0))
+                latest_obligations_count = int(payload.get("latest_obligations_count", 0))
+                latest_monitoring_run_id = payload.get("latest_monitoring_run_id")
+                total_monitoring_runs = int(payload.get("total_monitoring_runs", 0))
+                monitoring_history = [
+                    MonitoringRunIndexEntry.model_validate(item)
+                    for item in payload.get("monitoring_history", [])
+                ]
+            else:
+                existing_commit_history = []
+                latest_commit_id = None
+                total_commits = 0
+                latest_obligations_count = 0
+                latest_monitoring_run_id = None
+                total_monitoring_runs = 0
+                monitoring_history = []
 
-        existing_history.append(
-            CaseRunIndexEntry(
-                run_id=run_id,
-                run_type="bid_review",
-                created_at=timestamp,
-                recommendation=decision_summary.recommendation,
-                overall_risk=decision_summary.overall_risk,
-                artifacts_dir=artifacts_dir_str,
-                artifact_count=len(normalized_artifact_paths),
+            existing_history.append(
+                CaseRunIndexEntry(
+                    run_id=run_id,
+                    run_type="bid_review",
+                    created_at=timestamp,
+                    recommendation=decision_summary.recommendation,
+                    overall_risk=decision_summary.overall_risk,
+                    artifacts_dir=artifacts_dir_str,
+                    artifact_count=len(normalized_artifact_paths),
+                )
             )
-        )
 
-        case_record = CaseRecord(
-            project_id=project_id,
-            source_project_dir=source_dir,
-            storage_dir=str(case_dir),
-            latest_run_id=run_id,
-            latest_recommendation=decision_summary.recommendation,
-            latest_overall_risk=decision_summary.overall_risk,
-            latest_agreement_type=procurement_profile.agreement_type,
-            latest_project_sector=procurement_profile.project_sector,
-            latest_outcome_status=outcome_evidence.outcome_status,
-            total_runs=len(existing_history),
-            run_history=existing_history[-20:],
-            latest_commit_id=latest_commit_id,
-            total_commits=total_commits,
-            latest_obligations_count=latest_obligations_count,
-            commit_history=existing_commit_history[-20:],
-            latest_monitoring_run_id=latest_monitoring_run_id,
-            total_monitoring_runs=total_monitoring_runs,
-            monitoring_history=monitoring_history[-20:],
-        )
-        _write_json(case_record_path, case_record.model_dump(mode="json"))
+            case_record = CaseRecord(
+                project_id=project_id,
+                source_project_dir=source_dir,
+                storage_dir=str(case_dir),
+                latest_run_id=run_id,
+                latest_recommendation=decision_summary.recommendation,
+                latest_overall_risk=decision_summary.overall_risk,
+                latest_agreement_type=procurement_profile.agreement_type,
+                latest_project_sector=procurement_profile.project_sector,
+                latest_outcome_status=outcome_evidence.outcome_status,
+                total_runs=len(existing_history),
+                run_history=existing_history[-20:],
+                latest_commit_id=latest_commit_id,
+                total_commits=total_commits,
+                latest_obligations_count=latest_obligations_count,
+                commit_history=existing_commit_history[-20:],
+                latest_monitoring_run_id=latest_monitoring_run_id,
+                total_monitoring_runs=total_monitoring_runs,
+                monitoring_history=monitoring_history[-20:],
+            )
+            _write_json(case_record_path, case_record.model_dump(mode="json"))
+        finally:
+            self._unlock_case(lock_handle)
 
         return PersistedCaseState(
             storage_root=self.storage_root,
@@ -239,6 +377,7 @@ class FileSystemCaseStore:
         decision_summary: DecisionSummary,
         procurement_profile: ProcurementProfile,
         outcome_status: str,
+        finding_dispositions: list[FindingDisposition],
         accepted_risks: list[AcceptedRisk],
         negotiated_changes: list[NegotiatedChange],
         committed_documents: list[ProjectDocumentRecord],
@@ -251,49 +390,53 @@ class FileSystemCaseStore:
         commit_record_path = case_dir / "commits" / f"{commit_id}.json"
         obligations_path = case_dir / "obligations" / "by_commit" / f"{commit_id}.json"
         current_obligations_path = case_dir / "obligations" / "current.json"
+        lock_handle = self._lock_case(project_id)
+        try:
+            _write_json(obligations_path, [item.model_dump(mode="json") for item in obligations])
+            _write_json(current_obligations_path, [item.model_dump(mode="json") for item in obligations])
 
-        _write_json(obligations_path, [item.model_dump(mode="json") for item in obligations])
-        _write_json(current_obligations_path, [item.model_dump(mode="json") for item in obligations])
-
-        commit_record = ContractCommitRecord(
-            commit_id=commit_id,
-            project_id=project_id,
-            created_at=timestamp,
-            source_project_dir=str(Path(source_project_dir).expanduser().resolve()),
-            committed_contract_dir=str(Path(committed_contract_dir).expanduser().resolve()),
-            source_run_id=source_run_id,
-            decision_summary=decision_summary,
-            procurement_profile=procurement_profile,
-            outcome_status=outcome_status,
-            accepted_risks=accepted_risks,
-            negotiated_changes=negotiated_changes,
-            committed_documents=committed_documents,
-            obligations_path=str(obligations_path),
-            obligations_count=len(obligations),
-        )
-        _write_json(commit_record_path, commit_record.model_dump(mode="json"))
-
-        case_record = self.load_case_record(project_id)
-        commit_history = list(case_record.commit_history)
-        commit_history.append(
-            ContractCommitIndexEntry(
+            commit_record = ContractCommitRecord(
                 commit_id=commit_id,
+                project_id=project_id,
                 created_at=timestamp,
+                source_project_dir=str(Path(source_project_dir).expanduser().resolve()),
+                committed_contract_dir=str(Path(committed_contract_dir).expanduser().resolve()),
                 source_run_id=source_run_id,
+                decision_summary=decision_summary,
+                procurement_profile=procurement_profile,
+                outcome_status=outcome_status,
+                finding_dispositions=finding_dispositions,
+                accepted_risks=accepted_risks,
+                negotiated_changes=negotiated_changes,
+                committed_documents=committed_documents,
+                obligations_path=str(obligations_path),
                 obligations_count=len(obligations),
-                accepted_risks_count=len(accepted_risks),
-                negotiated_changes_count=len(negotiated_changes),
             )
-        )
-        updated_case_record = case_record.model_copy(
-            update={
-                "latest_commit_id": commit_id,
-                "total_commits": len(commit_history),
-                "latest_obligations_count": len(obligations),
-                "commit_history": commit_history[-20:],
-            }
-        )
-        _write_json(case_record_path, updated_case_record.model_dump(mode="json"))
+            _write_json(commit_record_path, commit_record.model_dump(mode="json"))
+
+            case_record = self.load_case_record(project_id)
+            commit_history = list(case_record.commit_history)
+            commit_history.append(
+                ContractCommitIndexEntry(
+                    commit_id=commit_id,
+                    created_at=timestamp,
+                    source_run_id=source_run_id,
+                    obligations_count=len(obligations),
+                    accepted_risks_count=len(accepted_risks),
+                    negotiated_changes_count=len(negotiated_changes),
+                )
+            )
+            updated_case_record = case_record.model_copy(
+                update={
+                    "latest_commit_id": commit_id,
+                    "total_commits": len(commit_history),
+                    "latest_obligations_count": len(obligations),
+                    "commit_history": commit_history[-20:],
+                }
+            )
+            _write_json(case_record_path, updated_case_record.model_dump(mode="json"))
+        finally:
+            self._unlock_case(lock_handle)
 
         return PersistedCommitState(
             storage_root=self.storage_root,
@@ -334,35 +477,39 @@ class FileSystemCaseStore:
             alerts=alerts,
         )
         run_payload = monitoring_run.model_dump(mode="json")
-        _write_json(monitoring_run_path, run_payload)
-        _write_json(monitoring_snapshot_path, run_payload)
-        _write_json(alerts_path, [item.model_dump(mode="json") for item in alerts])
-        _write_json(alerts_history_path, [item.model_dump(mode="json") for item in alerts])
+        lock_handle = self._lock_case(project_id)
+        try:
+            _write_json(monitoring_run_path, run_payload)
+            _write_json(monitoring_snapshot_path, run_payload)
+            _write_json(alerts_path, [item.model_dump(mode="json") for item in alerts])
+            _write_json(alerts_history_path, [item.model_dump(mode="json") for item in alerts])
 
-        case_record = self.load_case_record(project_id)
-        monitoring_history = list(case_record.monitoring_history)
-        due_count = sum(1 for item in monitored_obligations if item.status == "due")
-        late_count = sum(1 for item in monitored_obligations if item.status == "late")
-        satisfied_count = sum(1 for item in monitored_obligations if item.status == "satisfied")
-        monitoring_history.append(
-            MonitoringRunIndexEntry(
-                run_id=run_id,
-                created_at=timestamp,
-                source_commit_id=source_commit_id,
-                alerts_count=len(alerts),
-                due_count=due_count,
-                late_count=late_count,
-                satisfied_count=satisfied_count,
+            case_record = self.load_case_record(project_id)
+            monitoring_history = list(case_record.monitoring_history)
+            due_count = sum(1 for item in monitored_obligations if item.status == "due")
+            late_count = sum(1 for item in monitored_obligations if item.status == "late")
+            satisfied_count = sum(1 for item in monitored_obligations if item.status == "satisfied")
+            monitoring_history.append(
+                MonitoringRunIndexEntry(
+                    run_id=run_id,
+                    created_at=timestamp,
+                    source_commit_id=source_commit_id,
+                    alerts_count=len(alerts),
+                    due_count=due_count,
+                    late_count=late_count,
+                    satisfied_count=satisfied_count,
+                )
             )
-        )
-        updated_case_record = case_record.model_copy(
-            update={
-                "latest_monitoring_run_id": run_id,
-                "total_monitoring_runs": len(monitoring_history),
-                "monitoring_history": monitoring_history[-20:],
-            }
-        )
-        _write_json(case_record_path, updated_case_record.model_dump(mode="json"))
+            updated_case_record = case_record.model_copy(
+                update={
+                    "latest_monitoring_run_id": run_id,
+                    "total_monitoring_runs": len(monitoring_history),
+                    "monitoring_history": monitoring_history[-20:],
+                }
+            )
+            _write_json(case_record_path, updated_case_record.model_dump(mode="json"))
+        finally:
+            self._unlock_case(lock_handle)
 
         return PersistedMonitoringState(
             storage_root=self.storage_root,

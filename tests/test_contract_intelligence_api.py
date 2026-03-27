@@ -40,6 +40,29 @@ def _write_project_package(project_dir: Path) -> None:
     )
 
 
+def _write_finding_dispositions(project_dir: Path, destination: Path) -> Path:
+    project_id = project_dir.name
+    artifact_root = project_dir / "artifacts"
+    dispositions: list[dict[str, str]] = []
+    for artifact_name in ("risk_findings.json", "insurance_findings.json", "compliance_findings.json"):
+        payload = json.loads((artifact_root / artifact_name).read_text())
+        for item in payload:
+            dispositions.append(
+                {
+                    "source_finding_id": item["id"],
+                    "role": item["role"],
+                    "category": item["category"],
+                    "title": item["title"],
+                    "severity": item["severity"],
+                    "recommended_action": item["recommended_action"],
+                    "disposition": "accepted" if item["severity"] in {"high", "critical"} else "priced",
+                    "rationale": f"API test disposition for {project_id}.",
+                }
+            )
+    destination.write_text(json.dumps(dispositions), encoding="utf-8")
+    return destination
+
+
 def test_contract_intelligence_api_wraps_full_local_lifecycle(tmp_path: Path) -> None:
     project_dir = tmp_path / "api-bridge"
     _write_project_package(project_dir)
@@ -49,7 +72,11 @@ def test_contract_intelligence_api_wraps_full_local_lifecycle(tmp_path: Path) ->
     analyze_payload = analyze_response.json()
     assert analyze_payload["project_id"] == "api-bridge"
 
-    commit_response = client.post("/projects/commit", json={"project_dir": str(project_dir)})
+    dispositions_path = _write_finding_dispositions(project_dir, tmp_path / "finding_dispositions.json")
+    commit_response = client.post(
+        "/projects/commit",
+        json={"project_dir": str(project_dir), "finding_dispositions_file": str(dispositions_path)},
+    )
     assert commit_response.status_code == 200
     commit_payload = commit_response.json()
     assert commit_payload["obligations_count"] >= 1
@@ -104,3 +131,94 @@ def test_contract_intelligence_api_rejects_missing_project_directory(tmp_path: P
 def test_contract_intelligence_api_hides_docs_by_default() -> None:
     response = client.get("/docs")
     assert response.status_code == 404
+
+
+def test_contract_intelligence_api_rejects_forbidden_artifacts_dir(monkeypatch, tmp_path: Path) -> None:
+    project_dir = tmp_path / "api-artifacts-boundary"
+    _write_project_package(project_dir)
+    monkeypatch.setenv("CONTRACT_INTELLIGENCE_ALLOWED_ROOTS", str(tmp_path.resolve()))
+
+    forbidden = tmp_path.parent / "outside-artifacts"
+    response = client.post(
+        "/projects/analyze",
+        json={"project_dir": str(project_dir), "artifacts_dir": str(forbidden)},
+    )
+    assert response.status_code == 403
+
+
+def test_contract_intelligence_api_rejects_missing_committed_contract_dir(tmp_path: Path) -> None:
+    project_dir = tmp_path / "api-missing-commit-dir"
+    _write_project_package(project_dir)
+    analyze_response = client.post("/projects/analyze", json={"project_dir": str(project_dir)})
+    assert analyze_response.status_code == 200
+
+    dispositions_path = _write_finding_dispositions(project_dir, tmp_path / "finding_dispositions.json")
+    missing_dir = tmp_path / "missing-final"
+    commit_response = client.post(
+        "/projects/commit",
+        json={
+            "project_dir": str(project_dir),
+            "committed_contract_dir": str(missing_dir),
+            "finding_dispositions_file": str(dispositions_path),
+        },
+    )
+    assert commit_response.status_code == 400
+
+
+def test_contract_intelligence_api_persists_review_actions(tmp_path: Path) -> None:
+    project_dir = tmp_path / "api-review-actions"
+    _write_project_package(project_dir)
+
+    analyze_response = client.post("/projects/analyze", json={"project_dir": str(project_dir)})
+    assert analyze_response.status_code == 200
+
+    upsert_response = client.put(
+        "/projects/review-actions",
+        json={
+            "project_dir": str(project_dir),
+            "kind": "finding",
+            "ui_id": "finding_001",
+            "title": "Pay-if-paid cash flow exposure",
+            "disposition": "needs_legal",
+            "owner": "Legal",
+            "note": "Escalate before bid submission.",
+        },
+    )
+    assert upsert_response.status_code == 200
+    assert upsert_response.json()["disposition"] == "needs_legal"
+
+    get_response = client.get("/projects/review-actions", params={"project_dir": str(project_dir)})
+    assert get_response.status_code == 200
+    assert get_response.json()[0]["title"] == "Pay-if-paid cash flow exposure"
+
+    clear_response = client.post(
+        "/projects/review-actions/clear",
+        json={"project_dir": str(project_dir), "kind": "finding", "ui_id": "finding_001"},
+    )
+    assert clear_response.status_code == 200
+
+    get_after_clear = client.get("/projects/review-actions", params={"project_dir": str(project_dir)})
+    assert get_after_clear.status_code == 200
+    assert get_after_clear.json() == []
+
+
+def test_contract_intelligence_api_rejects_malformed_alert_snapshots(tmp_path: Path) -> None:
+    project_dir = tmp_path / "api-bad-alerts"
+    _write_project_package(project_dir)
+
+    analyze_response = client.post("/projects/analyze", json={"project_dir": str(project_dir)})
+    assert analyze_response.status_code == 200
+    dispositions_path = _write_finding_dispositions(project_dir, tmp_path / "finding_dispositions.json")
+    commit_response = client.post(
+        "/projects/commit",
+        json={"project_dir": str(project_dir), "finding_dispositions_file": str(dispositions_path)},
+    )
+    assert commit_response.status_code == 200
+
+    alerts_path = project_dir / ".contract_intelligence" / "api-bad-alerts" / "alerts" / "current.json"
+    alerts_path.parent.mkdir(parents=True, exist_ok=True)
+    alerts_path.write_text(json.dumps([{"alert_type": "late"}]), encoding="utf-8")
+
+    response = client.get("/projects/alerts", params={"project_dir": str(project_dir)})
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Alert snapshot failed validation."

@@ -141,3 +141,23 @@ Next likely extension:
 - true external artifact generation instead of presentation-only display mode
 - deeper context-source ingestion beyond package-local documents
 - explicit authentication and role-gated visibility if the local API is promoted beyond trusted local use
+
+## Remediation Control
+
+The full post-review remediation program now lives in
+`docs/CONTRACT_INTELLIGENCE_REMEDIATION_MATRIX.md`.
+
+Execution rule for remediation work:
+
+1. Work the matrix in priority order (`P0`, then `P1`, then `P2`, then `P3`).
+2. Do not close a bundled dependency item without updating the matrix status.
+3. Treat `CI-RM-001` through `CI-RM-015` as the minimum required closure set
+   before broader rollout beyond trusted local operator use.
+
+Current remediation state:
+
+- `P0` complete
+- `P1` complete
+- `P2` complete
+- `P3` complete
+- remediation matrix executed through `CI-RM-024`

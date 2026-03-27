@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from apps.contract_intelligence.domain.models import (
 )
 from apps.contract_intelligence.ingestion.document_classifier import REQUIRED_BID_REVIEW_DOCUMENTS, missing_required_documents
 from apps.contract_intelligence.ingestion.project_loader import ClauseSpan, LoadedDocument, iter_project_documents
+from apps.contract_intelligence.paths import resolve_existing_directory, resolve_output_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
@@ -901,70 +903,124 @@ def _outcome_evidence_bundle(
     )
 
 
+def _clause_for_match(document: LoadedDocument, match: re.Match[str]) -> ClauseSpan | None:
+    if not document.clauses:
+        return None
+    target_start = match.start()
+    search_start = 0
+    fallback: ClauseSpan | None = None
+    for clause in document.clauses:
+        position = document.text.find(clause.text, search_start)
+        if position < 0:
+            position = document.text.find(clause.text)
+        if position < 0:
+            continue
+        clause_end = position + len(clause.text)
+        if fallback is None:
+            fallback = clause
+        if position <= target_start < clause_end:
+            return clause
+        search_start = clause_end
+    return fallback
+
+
 def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
     obligations: list[Obligation] = []
-    seen_titles: set[str] = set()
+    seen_ids: set[str] = set()
+
+    def add_obligation(
+        *,
+        document: LoadedDocument,
+        clause: ClauseSpan | None,
+        title: str,
+        obligation_type: str,
+        trigger: str,
+        due_rule: str,
+        owner_role: str,
+        severity: Severity,
+        match: re.Match[str] | None,
+    ) -> None:
+        clause_location = clause.location if clause else "document"
+        signature = "|".join(
+            (
+                document.document_id,
+                clause_location,
+                obligation_type,
+                trigger,
+                due_rule,
+                title,
+            )
+        )
+        obligation_id = f"obl_{hashlib.sha1(signature.encode('utf-8')).hexdigest()[:12]}"
+        if obligation_id in seen_ids:
+            return
+        seen_ids.add(obligation_id)
+        evidence = [_clause_evidence(document, clause, match)] if clause and match else []
+        obligations.append(
+            Obligation(
+                id=obligation_id,
+                source_clause=f"{document.relative_path}::{clause_location}",
+                source_document_id=document.document_id,
+                source_excerpt=evidence[0].excerpt if evidence else None,
+                title=title,
+                obligation_type=obligation_type,
+                trigger=trigger,
+                due_rule=due_rule,
+                owner_role=owner_role,
+                severity_if_missed=severity,
+                evidence=evidence,
+            )
+        )
 
     for document in documents:
         if not document.text_available:
             continue
 
         for match in NOTICE_DEADLINE_PATTERN.finditer(document.text):
-            clause = next((item for item in document.clauses if match.group("context") in item.text), None)
+            clause = _clause_for_match(document, match)
             days = match.group("days")
             unit = match.group("unit") or "calendar"
             title = f"Provide required notice within {days} {unit} days"
-            if title in seen_titles:
-                continue
-            seen_titles.add(title)
-            obligations.append(
-                Obligation(
-                    id=f"obl_notice_{len(obligations) + 1}",
-                    source_clause=f"{document.relative_path}",
-                    title=title,
-                    obligation_type="notice_deadline",
-                    trigger="contractual notice event",
-                    due_rule=f"within {days} {unit} days",
-                    owner_role="project_manager",
-                    severity_if_missed=Severity.HIGH,
-                    evidence=[_clause_evidence(document, clause, match)] if clause else [],
-                )
+            add_obligation(
+                document=document,
+                clause=clause,
+                title=title,
+                obligation_type="notice_deadline",
+                trigger="contractual notice event",
+                due_rule=f"within {days} {unit} days",
+                owner_role="project_manager",
+                severity=Severity.HIGH,
+                match=match,
             )
 
         certified_payroll = re.search(r"certified payroll", document.text, flags=re.IGNORECASE)
-        if certified_payroll and "Submit certified payroll reports" not in seen_titles:
-            clause = next((item for item in document.clauses if "certified payroll" in item.text.lower()), None)
-            seen_titles.add("Submit certified payroll reports")
-            obligations.append(
-                Obligation(
-                    id=f"obl_compliance_{len(obligations) + 1}",
-                    source_clause=document.relative_path,
-                    title="Submit certified payroll reports",
-                    obligation_type="recurring_reporting",
-                    trigger="during covered work",
-                    due_rule="weekly during covered work",
-                    owner_role="payroll_compliance_manager",
-                    severity_if_missed=Severity.HIGH,
-                    evidence=[_clause_evidence(document, clause, certified_payroll)] if clause else [],
-                )
+        if certified_payroll:
+            clause = _clause_for_match(document, certified_payroll)
+            add_obligation(
+                document=document,
+                clause=clause,
+                title="Submit certified payroll reports",
+                obligation_type="recurring_reporting",
+                trigger="during covered work",
+                due_rule="weekly during covered work",
+                owner_role="payroll_compliance_manager",
+                severity=Severity.HIGH,
+                match=certified_payroll,
             )
 
         certificates = re.search(r"certificate[s]? of insurance", document.text, flags=re.IGNORECASE)
-        if certificates and "Provide certificates of insurance before starting work" not in seen_titles:
-            clause = next((item for item in document.clauses if "certificate" in item.text.lower()), None)
-            seen_titles.add("Provide certificates of insurance before starting work")
-            obligations.append(
-                Obligation(
-                    id=f"obl_insurance_{len(obligations) + 1}",
-                    source_clause=document.relative_path,
-                    title="Provide certificates of insurance before starting work",
-                    obligation_type="pre_start_requirement",
-                    trigger="before mobilization or notice to proceed",
-                    due_rule="before starting work",
-                    owner_role="risk_manager",
-                    severity_if_missed=Severity.HIGH,
-                    evidence=[_clause_evidence(document, clause, certificates)] if clause else [],
-                )
+        if certificates:
+            clause = _clause_for_match(document, certificates)
+            add_obligation(
+                document=document,
+                clause=clause,
+                title="Provide certificates of insurance before starting work",
+                obligation_type="pre_start_requirement",
+                trigger="before mobilization or notice to proceed",
+                due_rule="before starting work",
+                owner_role="risk_manager",
+                severity=Severity.HIGH,
+                match=certificates,
             )
 
         progress_reporting = re.search(
@@ -972,28 +1028,18 @@ def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
             document.text,
             flags=re.IGNORECASE,
         )
-        if progress_reporting and "Submit monthly progress reports by work breakdown structure" not in seen_titles:
-            clause = next(
-                (
-                    item
-                    for item in document.clauses
-                    if re.search(r"monthly progress report|work breakdown structure|\bwbs\b", item.text, flags=re.IGNORECASE)
-                ),
-                None,
-            )
-            seen_titles.add("Submit monthly progress reports by work breakdown structure")
-            obligations.append(
-                Obligation(
-                    id=f"obl_reporting_{len(obligations) + 1}",
-                    source_clause=document.relative_path,
-                    title="Submit monthly progress reports by work breakdown structure",
-                    obligation_type="recurring_reporting",
-                    trigger="during preconstruction or active delivery",
-                    due_rule="monthly, mapped to WBS elements when required",
-                    owner_role="project_controls_manager",
-                    severity_if_missed=Severity.MEDIUM,
-                    evidence=[_clause_evidence(document, clause, progress_reporting)] if clause else [],
-                )
+        if progress_reporting:
+            clause = _clause_for_match(document, progress_reporting)
+            add_obligation(
+                document=document,
+                clause=clause,
+                title="Submit monthly progress reports by work breakdown structure",
+                obligation_type="recurring_reporting",
+                trigger="during preconstruction or active delivery",
+                due_rule="monthly, mapped to WBS elements when required",
+                owner_role="project_controls_manager",
+                severity=Severity.MEDIUM,
+                match=progress_reporting,
             )
 
     return obligations
@@ -1058,6 +1104,29 @@ def _review_challenges(
     contradictions: list[str] = []
     if not findings:
         contradictions.append("No material findings were generated; verify that the supplied files contain extractable contract text.")
+    if outcome_evidence is not None:
+        outcome_status = outcome_evidence.outcome_status
+        high_or_worse = [finding for finding in findings if SEVERITY_ORDER[finding.severity] >= SEVERITY_ORDER[Severity.HIGH]]
+        stress_event_types = {
+            event.event_type
+            for event in outcome_evidence.events
+            if event.event_type in {"change_order", "scope_change", "settlement", "audit_finding", "litigation", "termination"}
+        }
+        if outcome_status != "unknown_publicly_documented" and not high_or_worse:
+            contradictions.append(
+                "Public outcome evidence indicates delivery or governance stress, but the current finding set did not surface matching high-severity contract issues."
+            )
+        if stress_event_types and not any(
+            finding.category in {"change_orders", "termination", "payment_terms", "delay_exposure", "appropriation_limit"}
+            for finding in findings
+        ):
+            contradictions.append(
+                "Outcome evidence shows scope, change-order, or dispute activity, but the current commercial findings do not yet explain the likely contract drivers."
+            )
+    if missing_docs and findings:
+        contradictions.append(
+            "Material findings were generated while required source documents are missing; confirm the package is complete before relying on the current posture."
+        )
 
     missed_hazards = [
         f"Missing required bid-review input: {document_type.value}"
@@ -1069,7 +1138,7 @@ def _review_challenges(
     )
     if outcome_evidence is not None:
         missed_hazards.extend(outcome_evidence.coverage_gaps)
-    human_review_required = bool(missed_hazards) or any(
+    human_review_required = bool(missed_hazards or contradictions) or any(
         SEVERITY_ORDER[finding.severity] >= SEVERITY_ORDER[Severity.HIGH] for finding in findings
     )
     return {
@@ -1088,6 +1157,14 @@ def _decision_summary(
     review_challenges: dict[str, object],
 ) -> DecisionSummary:
     high_or_worse = [finding for finding in findings if SEVERITY_ORDER[finding.severity] >= SEVERITY_ORDER[Severity.HIGH]]
+    critical_findings = [finding for finding in findings if finding.severity is Severity.CRITICAL]
+    contract_high_or_worse = [finding for finding in high_or_worse if finding.role == "contract_risk_analyst"]
+    unreadable_required = [
+        document
+        for document in unreadable_documents
+        if document.document_type in REQUIRED_BID_REVIEW_DOCUMENTS
+    ]
+    contradiction_count = len(review_challenges.get("contradictions", []))
     max_severity = max((SEVERITY_ORDER[finding.severity] for finding in findings), default=SEVERITY_ORDER[Severity.LOW])
     overall_risk = next(
         severity for severity, score in SEVERITY_ORDER.items() if score == max(max_severity, SEVERITY_ORDER[Severity.HIGH] if missing_docs else max_severity)
@@ -1102,9 +1179,20 @@ def _decision_summary(
 
     human_review_required = bool(review_challenges.get("human_review_required")) or confidence < 0.75
 
-    if any(finding.severity is Severity.CRITICAL for finding in findings) or len(missing_docs) >= 2:
+    if (
+        critical_findings
+        or len(missing_docs) >= 2
+        or (
+            len(high_or_worse) >= 3
+            and (missing_docs or unreadable_required or contradiction_count)
+        )
+        or (
+            len(contract_high_or_worse) >= 3
+            and (unreadable_required or contradiction_count)
+        )
+    ):
         recommendation = Recommendation.NO_GO
-    elif high_or_worse or missing_docs or human_review_required:
+    elif high_or_worse or missing_docs or unreadable_required or human_review_required:
         recommendation = Recommendation.GO_WITH_CONDITIONS
     else:
         recommendation = Recommendation.GO
@@ -1119,6 +1207,7 @@ def _decision_summary(
         f"Obtain and review the missing {document_type.value.replace('_', ' ')}."
         for document_type in missing_docs
     )
+    must_fix_before_bid.extend(str(item) for item in review_challenges.get("contradictions", [])[:2])
 
     return DecisionSummary(
         project_id=project_id,
@@ -1136,8 +1225,12 @@ def _write_json(path: Path, payload: object) -> None:
 
 
 def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = None) -> BidReviewRunResult:
-    project_path = Path(project_dir).expanduser().resolve()
-    output_dir = Path(artifacts_dir).expanduser().resolve() if artifacts_dir else project_path / "artifacts"
+    project_path = resolve_existing_directory(project_dir, label="Project directory")
+    output_dir = (
+        resolve_output_directory(artifacts_dir, label="Artifacts directory")
+        if artifacts_dir
+        else resolve_output_directory(project_path / "artifacts", label="Artifacts directory")
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
 
     project_id = _project_id(project_path)
@@ -1155,6 +1248,7 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
                 required_for_bid_review=document.document_type in REQUIRED_BID_REVIEW_DOCUMENTS,
                 text_available=document.text_available,
                 text_source=document.text_source,
+                text_quality=document.text_quality,
                 clause_count=len(document.clauses),
             ).model_dump()
             for document in documents

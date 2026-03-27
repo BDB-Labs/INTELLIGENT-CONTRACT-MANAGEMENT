@@ -67,6 +67,13 @@ def test_document_classifier_detects_common_contract_inputs() -> None:
     assert classify_document("Agency Audit Report.pdf") is DocumentType.AUDIT_REPORT
 
 
+def test_document_classifier_uses_content_when_filename_is_ambiguous() -> None:
+    assert classify_document(
+        "Attachment A.txt",
+        text="General Conditions AIA A201. Notice of claim must be provided within 7 calendar days.",
+    ) is DocumentType.GENERAL_CONDITIONS
+
+
 def test_missing_required_documents_flags_bid_review_gaps() -> None:
     missing = missing_required_documents([DocumentType.PRIME_CONTRACT, DocumentType.ADDENDUM])
     assert missing == [

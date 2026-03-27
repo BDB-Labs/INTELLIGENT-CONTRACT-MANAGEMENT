@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
+from apps.contract_intelligence.domain.models import AlertRecord, ReviewActionRecord
 from apps.contract_intelligence.monitoring.runner import monitor_contract
 from apps.contract_intelligence.orchestration.bid_review_runner import _project_id, run_bid_review
 from apps.contract_intelligence.orchestration.commit_runner import commit_contract
+from apps.contract_intelligence.paths import resolve_existing_directory, resolve_optional_existing_directory, resolve_output_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
@@ -34,6 +37,7 @@ class AnalyzeProjectRequest(BaseModel):
 class CommitProjectRequest(BaseModel):
     project_dir: str
     committed_contract_dir: str | None = None
+    finding_dispositions_file: str | None = None
     accepted_risks_file: str | None = None
     negotiated_changes_file: str | None = None
 
@@ -41,6 +45,24 @@ class CommitProjectRequest(BaseModel):
 class MonitorProjectRequest(BaseModel):
     project_dir: str
     status_inputs_file: str | None = None
+
+
+class ReviewActionUpsertRequest(BaseModel):
+    project_dir: str
+    kind: str
+    ui_id: str
+    title: str
+    disposition: str
+    owner: str = ""
+    note: str = ""
+    source_run_id: str | None = None
+    source_commit_id: str | None = None
+
+
+class ReviewActionClearRequest(BaseModel):
+    project_dir: str
+    kind: str
+    ui_id: str
 
 
 def _allowed_roots() -> tuple[Path, ...]:
@@ -62,12 +84,37 @@ def _validate_path_boundary(path: Path, *, kind: str) -> Path:
 
 
 def _validated_project_path(project_dir: str | Path) -> Path:
-    project_path = Path(project_dir).expanduser().resolve()
-    if not project_path.exists():
-        raise HTTPException(status_code=400, detail="Project directory does not exist.")
-    if not project_path.is_dir():
-        raise HTTPException(status_code=400, detail="Project directory must be a directory.")
+    try:
+        project_path = resolve_existing_directory(project_dir, label="Project directory")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail="Project directory does not exist.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return _validate_path_boundary(project_path, kind="Project directory")
+
+
+def _validated_directory(path: str | Path | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    try:
+        resolved = resolve_optional_existing_directory(path, label=label)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=f"{label} does not exist.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if resolved is None:
+        return None
+    return str(_validate_path_boundary(resolved, kind=label))
+
+
+def _validated_output_dir(path: str | Path | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    try:
+        resolved = resolve_output_directory(path, label=label)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return str(_validate_path_boundary(resolved, kind=label))
 
 
 def _validated_input_file(file_path: str | Path | None, *, label: str) -> str | None:
@@ -102,7 +149,10 @@ def health() -> dict[str, str]:
 @app.post("/projects/analyze")
 def analyze_project(request: AnalyzeProjectRequest) -> dict[str, object]:
     project_path = _validated_project_path(request.project_dir)
-    result = run_bid_review(project_dir=project_path, artifacts_dir=request.artifacts_dir)
+    result = run_bid_review(
+        project_dir=project_path,
+        artifacts_dir=_validated_output_dir(request.artifacts_dir, label="Artifacts directory"),
+    )
     return {
         "project_id": result.project_id,
         "artifacts_dir": str(result.artifacts_dir),
@@ -118,7 +168,11 @@ def commit_project(request: CommitProjectRequest) -> dict[str, object]:
     try:
         result = commit_contract(
             project_dir=_validated_project_path(request.project_dir),
-            committed_contract_dir=request.committed_contract_dir,
+            committed_contract_dir=_validated_directory(request.committed_contract_dir, label="Committed contract directory"),
+            finding_dispositions_file=_validated_input_file(
+                request.finding_dispositions_file,
+                label="Finding dispositions file",
+            ),
             accepted_risks_file=_validated_input_file(request.accepted_risks_file, label="Accepted risks file"),
             negotiated_changes_file=_validated_input_file(
                 request.negotiated_changes_file, label="Negotiated changes file"
@@ -126,6 +180,8 @@ def commit_project(request: CommitProjectRequest) -> dict[str, object]:
         )
     except FileNotFoundError as exc:
         raise _not_found(str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "project_id": result.project_id,
         "commit_id": result.commit_id,
@@ -145,6 +201,8 @@ def monitor_project(request: MonitorProjectRequest) -> dict[str, object]:
         )
     except FileNotFoundError as exc:
         raise _not_found(str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {
         "project_id": result.project_id,
         "run_id": result.run_id,
@@ -209,4 +267,49 @@ def current_alerts(project_dir: str = Query(..., description="Absolute or relati
     payload = _read_json(path)
     if not isinstance(payload, list):
         raise HTTPException(status_code=500, detail="Alert snapshot is malformed.")
-    return [item for item in payload if isinstance(item, dict)]
+    try:
+        return [AlertRecord.model_validate(item).model_dump(mode="json") for item in payload]
+    except ValidationError as exc:
+        raise HTTPException(status_code=500, detail="Alert snapshot failed validation.") from exc
+
+
+@app.get("/projects/review-actions")
+def current_review_actions(
+    project_dir: str = Query(..., description="Absolute or relative path to the project folder"),
+) -> list[dict[str, object]]:
+    store, project_id = _store_for(project_dir)
+    try:
+        return [item.model_dump(mode="json") for item in store.load_current_review_actions(project_id)]
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@app.put("/projects/review-actions")
+def upsert_review_action(request: ReviewActionUpsertRequest) -> dict[str, object]:
+    store, project_id = _store_for(request.project_dir)
+    now = datetime.now(timezone.utc)
+    record = ReviewActionRecord(
+        kind=request.kind,
+        ui_id=request.ui_id,
+        title=request.title,
+        disposition=request.disposition,
+        owner=request.owner,
+        note=request.note,
+        source_run_id=request.source_run_id,
+        source_commit_id=request.source_commit_id,
+        created_at=now,
+        updated_at=now,
+    )
+    persisted = store.persist_review_action(project_id=project_id, review_action=record)
+    return persisted.model_dump(mode="json")
+
+
+@app.post("/projects/review-actions/clear")
+def clear_review_action(request: ReviewActionClearRequest) -> dict[str, object]:
+    store, project_id = _store_for(request.project_dir)
+    cleared = store.clear_review_action(project_id, kind=request.kind, ui_id=request.ui_id)
+    if not cleared:
+        raise _not_found(
+            f"No persisted review action exists for '{request.kind}:{request.ui_id}' in project '{project_id}'."
+        )
+    return {"project_id": project_id, "kind": request.kind, "ui_id": request.ui_id, "status": "cleared"}

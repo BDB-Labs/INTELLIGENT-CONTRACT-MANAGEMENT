@@ -44,11 +44,33 @@ def _write_project_package(project_dir: Path) -> None:
     )
 
 
+def _write_finding_dispositions(result, destination: Path) -> Path:
+    dispositions: list[dict[str, str]] = []
+    for artifact_name in ("risk_findings.json", "insurance_findings.json", "compliance_findings.json"):
+        payload = json.loads(result.artifact_paths[artifact_name].read_text())
+        for item in payload:
+            dispositions.append(
+                {
+                    "source_finding_id": item["id"],
+                    "role": item["role"],
+                    "category": item["category"],
+                    "title": item["title"],
+                    "severity": item["severity"],
+                    "recommended_action": item["recommended_action"],
+                    "disposition": "accepted" if item["severity"] in {"high", "critical"} else "priced",
+                    "rationale": "Test fixture explicitly dispositioned this finding at commit time.",
+                }
+            )
+    destination.write_text(json.dumps(dispositions), encoding="utf-8")
+    return destination
+
+
 def test_render_project_dashboard_outputs_html_snapshot(tmp_path: Path) -> None:
     project_dir = tmp_path / "ui-bridge"
     _write_project_package(project_dir)
-    run_bid_review(project_dir)
-    commit_contract(project_dir)
+    bid_result = run_bid_review(project_dir)
+    dispositions_path = _write_finding_dispositions(bid_result, tmp_path / "finding_dispositions.json")
+    commit_contract(project_dir, finding_dispositions_file=dispositions_path)
 
     obligations = json.loads(
         (project_dir / ".contract_intelligence" / "ui-bridge" / "obligations" / "current.json").read_text()
@@ -81,3 +103,41 @@ def test_render_project_dashboard_outputs_html_snapshot(tmp_path: Path) -> None:
     assert "Findings Workspace" in html
     assert "Lifecycle Timeline" in html
     assert "go_with_conditions" in html
+
+
+def test_render_project_dashboard_external_mode_omits_internal_payload(tmp_path: Path) -> None:
+    project_dir = tmp_path / "ui-external"
+    _write_project_package(project_dir)
+    bid_result = run_bid_review(project_dir)
+    dispositions_path = _write_finding_dispositions(bid_result, tmp_path / "finding_dispositions.json")
+    commit_contract(project_dir, finding_dispositions_file=dispositions_path)
+
+    output_path = tmp_path / "dashboard-external.html"
+    dashboard_path = render_project_dashboard(project_dir, output_path=output_path, report_mode="external")
+    html = dashboard_path.read_text(encoding="utf-8")
+
+    assert dashboard_path == output_path
+    assert "Internal mode keeps strategy-only signals" not in html
+    assert str(project_dir.resolve()) not in html
+    assert "source_project_dir" not in html
+    assert "storage_dir" not in html
+    assert "Internal-only context is intentionally omitted from the external artifact." in html
+
+
+def test_render_project_dashboard_surfaces_artifact_diagnostics_and_cache_controls(tmp_path: Path) -> None:
+    project_dir = tmp_path / "ui-diagnostics"
+    _write_project_package(project_dir)
+    bid_result = run_bid_review(project_dir)
+    dispositions_path = _write_finding_dispositions(bid_result, tmp_path / "finding_dispositions.json")
+    commit_contract(project_dir, finding_dispositions_file=dispositions_path)
+
+    bid_result.artifact_paths["risk_findings.json"].unlink()
+
+    output_path = tmp_path / "dashboard-diagnostics.html"
+    dashboard_path = render_project_dashboard(project_dir, output_path=output_path)
+    html = dashboard_path.read_text(encoding="utf-8")
+
+    assert "Artifact Diagnostics" in html
+    assert "Artifact file missing for risk findings" in html
+    assert "local-cache-warning" in html
+    assert "data-reset-local-review-cache" in html

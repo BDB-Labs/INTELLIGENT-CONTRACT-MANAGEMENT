@@ -53,3 +53,30 @@ def test_run_bid_review_with_ese_executes_through_pipeline(tmp_path: Path) -> No
     first_role_output = json.loads((artifacts_dir / "01_document_intake_analyst.json").read_text(encoding="utf-8"))
     prompt_excerpt = first_role_output["metadata"]["prompt_excerpt"]
     assert "contractor-side construction bid review" in prompt_excerpt
+
+
+def test_build_bid_review_ese_config_prioritizes_salient_clauses_in_prompt(tmp_path: Path) -> None:
+    project_dir = tmp_path / "ese-salience"
+    project_dir.mkdir()
+    prime_lines = [f"Section {index}.0 Administrative Filler\nRoutine coordination language only." for index in range(1, 15)]
+    prime_lines.extend(
+        [
+            "Section 99.1 Commercial Risk",
+            "Subcontractor shall be paid on a pay-if-paid basis and no damages for delay shall be allowed.",
+        ]
+    )
+    (project_dir / "Prime Contract Agreement.md").write_text("\n".join(prime_lines), encoding="utf-8")
+    (project_dir / "General Conditions.md").write_text(
+        "Section 2 Claims\nNotice of claim must be provided within 7 calendar days.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "Section 3 Insurance\nAdditional insured status is required.",
+        encoding="utf-8",
+    )
+
+    cfg = build_bid_review_ese_config(project_dir=project_dir)
+    prompt = cfg["input"]["prompt"]
+
+    assert "pay-if-paid basis" in prompt
+    assert "no damages for delay" in prompt

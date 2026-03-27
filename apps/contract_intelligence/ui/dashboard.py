@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from apps.contract_intelligence.orchestration.bid_review_runner import _project_id
+from apps.contract_intelligence.paths import resolve_existing_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
@@ -15,6 +16,21 @@ def _read_json(path: str | Path | None) -> Any:
     if not target.exists():
         return None
     return json.loads(target.read_text(encoding="utf-8"))
+
+
+def _load_json_artifact(path: str | Path | None, *, label: str, diagnostics: list[str]) -> Any:
+    if not path:
+        diagnostics.append(f"Artifact path missing for {label}.")
+        return None
+    target = Path(path)
+    if not target.exists():
+        diagnostics.append(f"Artifact file missing for {label}: {target}")
+        return None
+    try:
+        return json.loads(target.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        diagnostics.append(f"Artifact file is not valid JSON for {label}: {target}")
+        return None
 
 
 def _severity_counts(findings: list[dict[str, Any]]) -> dict[str, int]:
@@ -70,10 +86,23 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
     case_record = store.load_case_record(project_id).model_dump(mode="json")
     latest_run = store.load_latest_run_record(project_id).model_dump(mode="json")
 
+    diagnostics: list[str] = []
     artifact_paths = latest_run.get("artifact_paths", {})
-    risk_findings = _read_json(artifact_paths.get("risk_findings.json")) or []
-    insurance_findings = _read_json(artifact_paths.get("insurance_findings.json")) or []
-    compliance_findings = _read_json(artifact_paths.get("compliance_findings.json")) or []
+    risk_findings = _load_json_artifact(
+        artifact_paths.get("risk_findings.json"),
+        label="risk findings",
+        diagnostics=diagnostics,
+    ) or []
+    insurance_findings = _load_json_artifact(
+        artifact_paths.get("insurance_findings.json"),
+        label="insurance findings",
+        diagnostics=diagnostics,
+    ) or []
+    compliance_findings = _load_json_artifact(
+        artifact_paths.get("compliance_findings.json"),
+        label="compliance findings",
+        diagnostics=diagnostics,
+    ) or []
 
     findings: list[dict[str, Any]] = []
     for source_name, payload in (
@@ -100,10 +129,14 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
     )
     obligations = []
     if case_record.get("latest_commit_id"):
-        for index, item in enumerate(store.load_current_obligations(project_id), start=1):
-            payload = item.model_dump(mode="json")
-            payload["ui_id"] = str(payload.get("id") or f"obligation_{index}")
-            obligations.append(payload)
+        try:
+            for index, item in enumerate(store.load_current_obligations(project_id), start=1):
+                payload = item.model_dump(mode="json")
+                payload["ui_id"] = str(payload.get("id") or f"obligation_{index}")
+                obligations.append(payload)
+        except (FileNotFoundError, ValueError):
+            diagnostics.append("Committed obligations could not be loaded from the current lifecycle snapshot.")
+    review_actions = [item.model_dump(mode="json") for item in store.load_current_review_actions(project_id)]
 
     alerts = latest_monitoring.get("alerts", []) if latest_monitoring else []
     for index, item in enumerate(alerts, start=1):
@@ -133,6 +166,8 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
         "obligations": obligations,
         "monitored_obligations": monitored_obligations,
         "alerts": alerts,
+        "review_actions": review_actions,
+        "diagnostics": diagnostics,
         "severity_counts": severity_counts,
         "obligation_status_counts": obligation_status_counts,
         "timeline": _lifecycle_timeline(case_record),
@@ -149,10 +184,123 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
     }
 
 
-def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path | None = None) -> Path:
-    project_path = Path(project_dir).expanduser().resolve()
+def _external_dashboard_data(data: dict[str, Any]) -> dict[str, Any]:
+    case_record = dict(data.get("case_record") or {})
+    case_record.pop("source_project_dir", None)
+    case_record.pop("storage_dir", None)
+    case_record["run_history"] = [
+        {
+            key: value
+            for key, value in dict(item).items()
+            if key != "artifacts_dir"
+        }
+        for item in case_record.get("run_history", [])
+        if isinstance(item, dict)
+    ]
+
+    latest_run = dict(data.get("latest_run") or {})
+    latest_run = {
+        "run_id": latest_run.get("run_id"),
+        "project_id": latest_run.get("project_id"),
+        "created_at": latest_run.get("created_at"),
+        "decision_summary": latest_run.get("decision_summary", {}),
+        "document_inventory": latest_run.get("document_inventory", {}),
+        "procurement_profile": latest_run.get("procurement_profile", {}),
+        "outcome_evidence": latest_run.get("outcome_evidence", {}),
+        "obligations_count": latest_run.get("obligations_count", 0),
+        "context_profile": {
+            "signals": [],
+            "notes": ["Internal-only context is intentionally omitted from the external artifact."],
+            "internal_only": False,
+        },
+    }
+
+    latest_commit_raw = data.get("latest_commit") or {}
+    latest_commit = None
+    if latest_commit_raw:
+        latest_commit = {
+            "commit_id": latest_commit_raw.get("commit_id"),
+            "project_id": latest_commit_raw.get("project_id"),
+            "created_at": latest_commit_raw.get("created_at"),
+            "source_run_id": latest_commit_raw.get("source_run_id"),
+            "decision_summary": latest_commit_raw.get("decision_summary", {}),
+            "procurement_profile": latest_commit_raw.get("procurement_profile", {}),
+            "outcome_status": latest_commit_raw.get("outcome_status"),
+            "negotiated_changes": latest_commit_raw.get("negotiated_changes", []),
+            "obligations_count": latest_commit_raw.get("obligations_count", 0),
+        }
+
+    latest_monitoring_raw = data.get("latest_monitoring") or {}
+    latest_monitoring = None
+    if latest_monitoring_raw:
+        latest_monitoring = {
+            "run_id": latest_monitoring_raw.get("run_id"),
+            "project_id": latest_monitoring_raw.get("project_id"),
+            "created_at": latest_monitoring_raw.get("created_at"),
+            "source_commit_id": latest_monitoring_raw.get("source_commit_id"),
+            "as_of_date": latest_monitoring_raw.get("as_of_date"),
+            "monitored_obligations": latest_monitoring_raw.get("monitored_obligations", []),
+            "alerts": latest_monitoring_raw.get("alerts", []),
+        }
+
+    return {
+        "project_id": data.get("project_id"),
+        "project_path": None,
+        "case_record": case_record,
+        "latest_run": latest_run,
+        "latest_commit": latest_commit,
+        "latest_monitoring": latest_monitoring,
+        "documents": data.get("documents", []),
+        "findings": data.get("findings", []),
+        "obligations": data.get("obligations", []),
+        "monitored_obligations": data.get("monitored_obligations", []),
+        "alerts": data.get("alerts", []),
+        "review_actions": [],
+        "diagnostics": data.get("diagnostics", []),
+        "severity_counts": data.get("severity_counts", {}),
+        "obligation_status_counts": data.get("obligation_status_counts", {}),
+        "timeline": data.get("timeline", []),
+        "summary_metrics": data.get("summary_metrics", {}),
+    }
+
+
+def render_project_dashboard(
+    project_dir: str | Path,
+    *,
+    output_path: str | Path | None = None,
+    report_mode: str = "internal",
+) -> Path:
+    project_path = resolve_existing_directory(project_dir, label="Project directory")
+    mode = "external" if str(report_mode).lower() == "external" else "internal"
     data = _load_dashboard_data(project_path)
+    if mode == "external":
+        data = _external_dashboard_data(data)
     payload = json.dumps(data).replace("</", "<\\/")
+    mode_switch_markup = (
+        '<button class="mode-button is-active" data-report-mode-control="internal">Internal</button>'
+        '<button class="mode-button" data-report-mode-control="external">External</button>'
+        if mode == "internal"
+        else '<button class="mode-button is-active" data-report-mode-control="external">External</button>'
+    )
+    report_mode_copy = json.dumps(
+        {
+            "internal": {
+                "lead": "A project command surface for review decisions, committed baselines, internal context, operational obligations, and live alert posture.",
+                "caption": "Internal mode keeps strategy-only signals, review controls, and human triage visible.",
+            },
+            "external": {
+                "lead": "A shareable contract-operating summary for decision posture, committed obligations, procurement structure, and current project readiness.",
+                "caption": "External mode suppresses internal strategy panels and leaves a cleaner client-facing operational surface.",
+            },
+        }
+        if mode == "internal"
+        else {
+            "external": {
+                "lead": "A shareable contract-operating summary for decision posture, committed obligations, procurement structure, and current project readiness.",
+                "caption": "External mode suppresses internal strategy panels and leaves a cleaner client-facing operational surface.",
+            }
+        }
+    )
 
     html_template = """<!DOCTYPE html>
 <html lang="en">
@@ -864,6 +1012,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
             operational obligations, and live alert posture.
           </p>
           <div class="badge-row" id="hero-badges"></div>
+          <div id="local-cache-warning" style="margin-top:14px;"></div>
           <div class="confidence-wrap">
             <div class="eyebrow" style="margin-bottom:8px;">Decision Confidence</div>
             <div class="confidence-track"><div class="confidence-fill" id="confidence-fill"></div></div>
@@ -877,8 +1026,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
             </div>
           </div>
           <div class="mode-switch" id="report-mode-switch">
-            <button class="mode-button is-active" data-report-mode-control="internal">Internal</button>
-            <button class="mode-button" data-report-mode-control="external">External</button>
+            __REPORT_MODE_SWITCH__
           </div>
           <p class="mode-caption" id="mode-caption"></p>
           <div class="summary-strip" id="review-snapshot"></div>
@@ -903,7 +1051,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
             </div>
           </div>
           <div class="grid-3" id="overview-stats"></div>
-          <div class="grid-2" style="margin-top:16px;">
+          <div class="grid-3" style="margin-top:16px;">
             <div class="subpanel" style="padding:18px;">
               <div class="eyebrow">Top Reasons</div>
               <div class="stack" id="top-reasons"></div>
@@ -911,6 +1059,10 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
             <div class="subpanel" style="padding:18px;">
               <div class="eyebrow">Must Fix Before Bid</div>
               <div class="stack" id="must-fix"></div>
+            </div>
+            <div class="subpanel" style="padding:18px;">
+              <div class="eyebrow">Artifact Diagnostics</div>
+              <div class="stack" id="artifact-diagnostics"></div>
             </div>
           </div>
         </div>
@@ -938,9 +1090,10 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
           <div class="section-head">
             <div>
               <h2>Human Review Board</h2>
-              <p>Capture operator dispositions, triage unresolved items, and keep a local review log alongside the generated analysis.</p>
+              <p>Capture operator dispositions, triage unresolved items, and keep a durable review log alongside the generated analysis.</p>
             </div>
           </div>
+          <p class="mode-caption" id="review-sync-note"></p>
           <div class="grid-3" id="review-stats"></div>
           <div class="grid-2" style="margin-top:16px;">
             <div class="subpanel" style="padding:18px;">
@@ -1074,6 +1227,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
                 <th>Document</th>
                 <th>Type</th>
                 <th>Text source</th>
+                <th>Text quality</th>
                 <th>Clauses</th>
                 <th>Required</th>
               </tr>
@@ -1097,7 +1251,11 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
 
   <script>
     const dashboardData = __DASHBOARD_PAYLOAD__;
+    const initialReportMode = "__INITIAL_REPORT_MODE__";
+    const fixedReportMode = initialReportMode === "external";
     const reviewStorageKey = `contract-intelligence-review-actions:${dashboardData.project_id}`;
+    const serverReviewActionsEnabled = !fixedReportMode && Boolean(dashboardData.project_path) && window.location.protocol !== "file:";
+    let localCacheWarning = "";
 
     const navItems = [
       { key: "overview", label: "Overview", detail: "Executive posture" },
@@ -1111,19 +1269,10 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
       { key: "history", label: "History", detail: "Lifecycle events" },
     ];
 
-    const reportModeCopy = {
-      internal: {
-        lead: "A project command surface for review decisions, committed baselines, internal context, operational obligations, and live alert posture.",
-        caption: "Internal mode keeps strategy-only signals, review controls, and human triage visible.",
-      },
-      external: {
-        lead: "A shareable contract-operating summary for decision posture, committed obligations, procurement structure, and current project readiness.",
-        caption: "External mode suppresses internal strategy panels and leaves a cleaner client-facing operational surface.",
-      },
-    };
+    const reportModeCopy = __REPORT_MODE_COPY__;
 
     const uiState = {
-      reportMode: "internal",
+      reportMode: initialReportMode,
       activeView: "overview",
       selectedFindingId: null,
       selectedObligationId: null,
@@ -1169,6 +1318,30 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
       return `<div class="empty">${escapeHtml(message)}</div>`;
     }
 
+    function setReviewSyncNote(message) {
+      const node = el("review-sync-note");
+      if (!node) return;
+      node.textContent = message || "";
+    }
+
+    function renderLocalCacheWarning() {
+      const node = el("local-cache-warning");
+      if (!node) return;
+      if (!localCacheWarning) {
+        node.innerHTML = "";
+        return;
+      }
+      node.innerHTML = `
+        <div class="summary-pill" style="align-items:flex-start; gap:12px; background:rgba(201,107,44,0.12); border-color:rgba(201,107,44,0.24);">
+          <div>
+            <strong>Local review cache reset</strong>
+            <div class="note" style="margin-top:6px;">${safe(localCacheWarning)}</div>
+          </div>
+          <button type="button" class="action-button subtle" data-reset-local-review-cache="true">Clear local cache</button>
+        </div>
+      `;
+    }
+
     function evidenceList(items) {
       if (!items || !items.length) {
         return '<p class="note">No evidence references were recorded.</p>';
@@ -1185,14 +1358,48 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
       `;
     }
 
+    function normalizeReviewActionRecord(record) {
+      if (!record || typeof record !== "object") return null;
+      const kind = record.kind ? String(record.kind).toLowerCase() : "";
+      const uiId = record.ui_id || record.uiId;
+      if (!kind || !uiId) return null;
+      return {
+        kind,
+        ui_id: String(uiId),
+        title: String(record.title || uiId),
+        disposition: String(record.disposition || ""),
+        owner: String(record.owner || ""),
+        note: String(record.note || ""),
+        sourceRunId: record.source_run_id || record.sourceRunId || null,
+        sourceCommitId: record.source_commit_id || record.sourceCommitId || null,
+        createdAt: record.created_at || record.createdAt || null,
+        updatedAt: record.updated_at || record.updatedAt || null,
+      };
+    }
+
+    function reviewActionsFromPayload(payload) {
+      const records = Array.isArray(payload) ? payload : [];
+      return records.reduce((acc, item) => {
+        const normalized = normalizeReviewActionRecord(item);
+        if (!normalized) return acc;
+        acc[reviewKey(normalized.kind, normalized.ui_id)] = normalized;
+        return acc;
+      }, {});
+    }
+
     function loadReviewActions() {
+      const seeded = reviewActionsFromPayload(dashboardData.review_actions || []);
+      if (fixedReportMode) return seeded;
       try {
         const raw = window.localStorage.getItem(reviewStorageKey);
-        if (!raw) return {};
+        if (!raw) return seeded;
         const payload = JSON.parse(raw);
-        return payload && typeof payload === "object" ? payload : {};
+        if (!payload || typeof payload !== "object") return seeded;
+        return serverReviewActionsEnabled ? seeded : { ...seeded, ...payload };
       } catch (error) {
-        return {};
+        localCacheWarning = "Saved browser review actions were unreadable and were discarded.";
+        window.localStorage.removeItem(reviewStorageKey);
+        return seeded;
       }
     }
 
@@ -1200,8 +1407,62 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
       window.localStorage.setItem(reviewStorageKey, JSON.stringify(uiState.reviewActions));
     }
 
+    function resetLocalReviewCache() {
+      window.localStorage.removeItem(reviewStorageKey);
+      if (serverReviewActionsEnabled) {
+        uiState.reviewActions = reviewActionsFromPayload(dashboardData.review_actions || []);
+      } else {
+        uiState.reviewActions = {};
+      }
+      localCacheWarning = "Local browser review cache was cleared. Persisted server-side review actions remain available when this dashboard is served through the API.";
+      renderAll();
+    }
+
     function reviewKey(kind, id) {
       return `${kind}:${id}`;
+    }
+
+    function projectScopedReviewPayload(record) {
+      return {
+        project_dir: dashboardData.project_path,
+        kind: record.kind,
+        ui_id: record.ui_id,
+        title: record.title,
+        disposition: record.disposition,
+        owner: record.owner,
+        note: record.note,
+        source_run_id: record.sourceRunId,
+        source_commit_id: record.sourceCommitId,
+      };
+    }
+
+    async function persistReviewActionToServer(record) {
+      if (!serverReviewActionsEnabled) return null;
+      const response = await fetch("/projects/review-actions", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(projectScopedReviewPayload(record)),
+      });
+      if (!response.ok) {
+        throw new Error(`Review-action persistence failed (${response.status})`);
+      }
+      return normalizeReviewActionRecord(await response.json());
+    }
+
+    async function clearReviewActionFromServer(kind, id) {
+      if (!serverReviewActionsEnabled) return;
+      const response = await fetch("/projects/review-actions/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_dir: dashboardData.project_path,
+          kind,
+          ui_id: id,
+        }),
+      });
+      if (!response.ok && response.status !== 404) {
+        throw new Error(`Review-action clear failed (${response.status})`);
+      }
     }
 
     function getReviewRecord(kind, id) {
@@ -1263,6 +1524,9 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
     }
 
     function setReportMode(mode) {
+      if (fixedReportMode && mode !== "external") {
+        return;
+      }
       uiState.reportMode = mode === "external" ? "external" : "internal";
       document.body.dataset.reportMode = uiState.reportMode;
       document.querySelectorAll("[data-report-mode-control]").forEach((button) => {
@@ -1281,6 +1545,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
 
     function renderHero() {
       const metrics = dashboardData.summary_metrics;
+      renderLocalCacheWarning();
       el("project-title").textContent = dashboardData.project_id;
       el("hero-badges").innerHTML = [
         `<span class="badge risk">${safeTitle(metrics.recommendation)}</span>`,
@@ -1346,6 +1611,13 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
           <h3>${safe(item)}</h3>
         </div>
       `).join("") : emptyState("No must-fix items were recorded.");
+
+      const diagnostics = dashboardData.diagnostics || [];
+      el("artifact-diagnostics").innerHTML = diagnostics.length ? diagnostics.map((item) => `
+        <div class="finding">
+          <h3>${safe(item)}</h3>
+        </div>
+      `).join("") : emptyState("No artifact integrity issues are currently recorded.");
     }
 
     function renderDecision() {
@@ -1702,10 +1974,11 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
           <td>${safe(item.filename)}</td>
           <td>${safeTitle(item.document_type)}</td>
           <td>${safeTitle(item.text_source)}</td>
+          <td>${safeTitle(item.text_quality)}</td>
           <td>${safe(item.clause_count)}</td>
           <td>${item.required_for_bid_review ? "Yes" : "No"}</td>
         </tr>
-      `).join("") : `<tr><td colspan="5">No documents were recorded.</td></tr>`;
+      `).join("") : `<tr><td colspan="6">No documents were recorded.</td></tr>`;
     }
 
     function renderHistory() {
@@ -1728,6 +2001,13 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
     }
 
     function renderReviewBoard() {
+      if (fixedReportMode) {
+        setReviewSyncNote("");
+      } else if (serverReviewActionsEnabled) {
+        setReviewSyncNote("Review actions are persisted to the project case store and cached locally in this browser.");
+      } else {
+        setReviewSyncNote("This dashboard is running as a standalone artifact, so review actions are cached locally in this browser.");
+      }
       const records = Object.values(uiState.reviewActions).sort((left, right) => String(right.updatedAt || "").localeCompare(String(left.updatedAt || "")));
       const counts = reviewSummary();
       const candidates = [
@@ -1787,7 +2067,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
       `).join("") : emptyState("The current high-signal queue already has a saved disposition.");
     }
 
-    function saveReviewAction(kind, id) {
+    async function saveReviewAction(kind, id) {
       const form = document.querySelector(`.review-form[data-review-kind="${kind}"][data-review-id="${id}"]`);
       if (!form) return;
       const disposition = form.querySelector('[data-field="disposition"]').value;
@@ -1795,22 +2075,41 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
       const note = form.querySelector('[data-field="note"]').value.trim();
       const source = kind === "finding" ? lookupFinding(id) : lookupObligation(id);
       if (!disposition && !owner && !note) return;
-      uiState.reviewActions[reviewKey(kind, id)] = {
+      const existing = getReviewRecord(kind, id);
+      const nextRecord = {
         kind,
         ui_id: id,
         title: source ? source.title : id,
         disposition,
         owner,
         note,
+        sourceRunId: dashboardData.case_record.latest_run_id || null,
+        sourceCommitId: dashboardData.case_record.latest_commit_id || null,
+        createdAt: existing && existing.createdAt ? existing.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
+      uiState.reviewActions[reviewKey(kind, id)] = nextRecord;
       persistReviewActions();
+      try {
+        const persisted = await persistReviewActionToServer(nextRecord);
+        if (persisted) {
+          uiState.reviewActions[reviewKey(kind, id)] = persisted;
+          persistReviewActions();
+        }
+      } catch (error) {
+        setReviewSyncNote("Review action saved locally, but server persistence failed for this browser session.");
+      }
       renderAll();
     }
 
-    function clearReviewAction(kind, id) {
+    async function clearReviewAction(kind, id) {
       delete uiState.reviewActions[reviewKey(kind, id)];
       persistReviewActions();
+      try {
+        await clearReviewActionFromServer(kind, id);
+      } catch (error) {
+        setReviewSyncNote("Review action was cleared locally, but the server copy could not be updated.");
+      }
       renderAll();
     }
 
@@ -1868,6 +2167,12 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
         const clearTarget = event.target.closest("[data-clear-review]");
         if (clearTarget) {
           clearReviewAction(clearTarget.dataset.reviewKind, clearTarget.dataset.reviewId);
+          return;
+        }
+
+        const resetCacheTarget = event.target.closest("[data-reset-local-review-cache]");
+        if (resetCacheTarget) {
+          resetLocalReviewCache();
         }
       });
     }
@@ -1887,7 +2192,7 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
 
     function init() {
       initNav();
-      setReportMode("internal");
+      setReportMode(initialReportMode);
       bindControls();
     }
 
@@ -1898,7 +2203,13 @@ def render_project_dashboard(project_dir: str | Path, *, output_path: str | Path
 """
 
     html_output = (
-        html_template.replace("__DASHBOARD_PAYLOAD__", payload).replace("{{", "{").replace("}}", "}")
+        html_template
+        .replace("__DASHBOARD_PAYLOAD__", payload)
+        .replace("__REPORT_MODE_SWITCH__", mode_switch_markup)
+        .replace("__REPORT_MODE_COPY__", report_mode_copy)
+        .replace("__INITIAL_REPORT_MODE__", mode)
+        .replace("{{", "{")
+        .replace("}}", "}")
     )
 
     destination = (

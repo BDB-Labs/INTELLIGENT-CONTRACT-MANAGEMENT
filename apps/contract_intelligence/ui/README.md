@@ -9,10 +9,13 @@ Current dashboard characteristics:
 - left-rail navigation across overview, decision, review board, findings, obligations, context, procurement, documents, and lifecycle history
 - internal vs external report mode switching for audience-aware presentation
 - interactive filtering plus drill-down detail panels for findings and obligations
-- local human-review actions and disposition tracking stored in the browser
+- server-backed human-review actions with browser caching when the dashboard is served through the local API
 - committed baseline, monitoring state, and alert visibility in one surface
 - internal context and procurement/outcome artifacts rendered without exposing them as external-facing report language
 - escaped rendering of contract-derived content before it is inserted into dynamic HTML fragments
+- artifact diagnostics that surface missing or corrupt lifecycle files instead of silently flattening them into empty panels
+- visible local-cache recovery warning with a reset path when browser review state becomes unreadable
+- text-quality visibility in the document inventory for higher-trust ingestion review
 
 Primary entry point:
 
@@ -26,6 +29,5 @@ Current workflow:
 
 Near-term UI follow-on work:
 
-- server-backed persistence for human review dispositions instead of local browser storage
 - exportable external report snapshots derived from the selected report mode
 - deeper action workflows that tie review decisions back into the lifecycle store

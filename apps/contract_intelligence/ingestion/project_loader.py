@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 import re
 import zlib
 import zipfile
@@ -44,6 +45,7 @@ class LoadedDocument:
     text: str
     text_available: bool
     text_source: str
+    text_quality: str
     clauses: tuple["ClauseSpan", ...]
 
 
@@ -79,7 +81,7 @@ def _decode_pdf_literal_string(raw: str) -> str:
     return re.sub(r"\s+", " ", raw).strip()
 
 
-def _extract_pdf_text(path: Path) -> str:
+def _extract_pdf_stream_text(path: Path) -> str:
     pdf_bytes = path.read_bytes()
     fragments: list[str] = []
     for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", pdf_bytes, flags=re.DOTALL):
@@ -97,6 +99,24 @@ def _extract_pdf_text(path: Path) -> str:
                 if text:
                     fragments.append(text)
     return "\n".join(fragments).strip()
+
+
+def _extract_pdf_spotlight_text(path: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["/usr/bin/mdls", "-raw", "-name", "kMDItemTextContent", str(path)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    text = result.stdout.strip()
+    if not text or text == "(null)":
+        return ""
+    return text
 
 
 def _clause_id(relative_path: str, location: str, heading: str) -> str:
@@ -171,18 +191,80 @@ def extract_clause_spans(relative_path: str, text: str) -> tuple[ClauseSpan, ...
     return _paragraph_clauses(relative_path, text)
 
 
-def _load_text(path: Path) -> tuple[str, str]:
+SUPPORTED_TEXT_SUFFIXES = PLAIN_TEXT_SUFFIXES | {".pdf", ".docx"}
+MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
+TEXT_SAMPLE_BYTES = 4096
+
+
+def _is_probably_binary(path: Path) -> bool:
+    sample = path.read_bytes()[:TEXT_SAMPLE_BYTES]
+    if not sample:
+        return False
+    if b"\x00" in sample:
+        return True
+    control_bytes = sum(1 for byte in sample if byte < 9 or (13 < byte < 32))
+    return control_bytes / max(len(sample), 1) > 0.20
+
+
+def _extract_text_quality(text: str) -> str:
+    normalized = re.sub(r"\s+", " ", text).strip()
+    if not normalized:
+        return "none"
+    if len(normalized) < 20:
+        return "low"
+    alpha_chars = sum(1 for char in normalized if char.isalnum())
+    suspicious_chars = sum(
+        1
+        for char in normalized
+        if not (char.isalnum() or char.isspace() or char in ".,;:!?()[]{}-_/&%'\"$#@")
+    )
+    words = re.findall(r"[A-Za-z]{2,}", normalized)
+    if len(words) < 4 or alpha_chars < 24:
+        return "low"
+    if suspicious_chars / max(len(normalized), 1) > 0.12:
+        return "low"
+    if len(words) >= 40 and len(normalized) >= 300:
+        return "high"
+    return "medium"
+
+
+def _load_pdf_text(path: Path) -> tuple[str, str, str]:
+    candidates = [
+        (_extract_pdf_spotlight_text(path), "pdf_spotlight"),
+        (_extract_pdf_stream_text(path), "pdf_stream"),
+    ]
+    ranked_quality = {"high": 3, "medium": 2, "low": 1, "none": 0}
+    best_text = ""
+    best_source = "unavailable"
+    best_quality = "none"
+    for text, source in candidates:
+        quality = _extract_text_quality(text)
+        if ranked_quality[quality] > ranked_quality[best_quality] or (
+            ranked_quality[quality] == ranked_quality[best_quality] and len(text) > len(best_text)
+        ):
+            best_text = text
+            best_source = source
+            best_quality = quality
+    return best_text, best_source, best_quality
+
+
+def _load_text(path: Path) -> tuple[str, str, str]:
     suffix = path.suffix.lower()
     if suffix in PLAIN_TEXT_SUFFIXES:
-        return path.read_text(encoding="utf-8", errors="ignore").strip(), "plain_text"
+        text = path.read_text(encoding="utf-8", errors="ignore").strip()
+        return text, "plain_text", _extract_text_quality(text)
     if suffix == ".docx":
         try:
-            return _extract_docx_text(path), "docx_xml"
+            text = _extract_docx_text(path)
+            return text, "docx_xml", _extract_text_quality(text)
         except (KeyError, ValueError, zipfile.BadZipFile, ElementTree.ParseError):
-            return "", "unavailable"
+            return "", "unavailable", "none"
     if suffix == ".pdf":
-        return _extract_pdf_text(path), "pdf_stream"
-    return "", "unavailable"
+        return _load_pdf_text(path)
+    if not _is_probably_binary(path):
+        text = path.read_text(encoding="utf-8", errors="ignore").strip()
+        return text, "plain_text_fallback", _extract_text_quality(text)
+    return "", "unavailable", "none"
 
 
 def iter_project_documents(project_dir: Path) -> list[LoadedDocument]:
@@ -193,16 +275,30 @@ def iter_project_documents(project_dir: Path) -> list[LoadedDocument]:
         relative_path = path.relative_to(project_dir).as_posix()
         if any(part in IGNORED_PATH_PARTS for part in path.relative_to(project_dir).parts):
             continue
-        text, text_source = _load_text(path)
-        clauses = extract_clause_spans(relative_path, text) if text else ()
+        suffix = path.suffix.lower()
+        classified_from_name = classify_document(path.name)
+        if path.stat().st_size > MAX_DOCUMENT_BYTES:
+            if suffix not in SUPPORTED_TEXT_SUFFIXES and classified_from_name is DocumentType.OTHER:
+                continue
+            text, text_source, text_quality = "", "skipped_oversize", "none"
+        elif suffix not in SUPPORTED_TEXT_SUFFIXES and _is_probably_binary(path):
+            if classified_from_name is DocumentType.OTHER:
+                continue
+            text, text_source, text_quality = "", "unsupported_binary", "none"
+        else:
+            text, text_source, text_quality = _load_text(path)
+        text_available = bool(text) and text_quality != "low"
+        clauses = extract_clause_spans(relative_path, text) if text_available else ()
+        document_type = classify_document(path.name, text=text)
         documents.append(
             LoadedDocument(
                 document_id=_document_id(relative_path),
                 relative_path=relative_path,
-                document_type=classify_document(path.name),
+                document_type=document_type,
                 text=text,
-                text_available=bool(text),
-                text_source=text_source if text else "unavailable",
+                text_available=text_available,
+                text_source=text_source if text else text_source,
+                text_quality=text_quality,
                 clauses=clauses,
             )
         )

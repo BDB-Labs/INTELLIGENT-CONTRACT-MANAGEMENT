@@ -16,6 +16,7 @@
           "required_for_bid_review",
           "text_available",
           "text_source",
+          "text_quality",
           "clause_count"
         ],
         "properties": {
@@ -25,6 +26,7 @@
           "required_for_bid_review": {"type": "boolean"},
           "text_available": {"type": "boolean"},
           "text_source": {"type": "string"},
+          "text_quality": {"type": "string"},
           "clause_count": {"type": "integer", "minimum": 0}
         }
       }

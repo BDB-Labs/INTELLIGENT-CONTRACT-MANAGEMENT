@@ -3,10 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from apps.contract_intelligence.domain.enums import DocumentType
 from apps.contract_intelligence.ingestion.document_classifier import missing_required_documents
 from apps.contract_intelligence.ingestion.project_loader import iter_project_documents
 from apps.contract_intelligence.orchestration.pipeline import bid_review_pipeline
 from apps.contract_intelligence.orchestration.role_catalog import BID_REVIEW_ROLE_CATALOG
+from apps.contract_intelligence.paths import resolve_existing_directory, resolve_output_directory
 from ese.config import validate_config, write_config
 from ese.pipeline import run_pipeline
 from ese.provider_runtime import builtin_runtime_adapter, default_api_key_env
@@ -114,6 +116,56 @@ def _prompt_for_role(role_key: str, output_artifact: str) -> str:
     )
 
 
+def _document_priority(document) -> int:
+    required_bonus = 30 if document.document_type in {
+        DocumentType.PRIME_CONTRACT,
+        DocumentType.GENERAL_CONDITIONS,
+        DocumentType.INSURANCE_REQUIREMENTS,
+    } else 0
+    type_priority = {
+        DocumentType.PRIME_CONTRACT: 24,
+        DocumentType.GENERAL_CONDITIONS: 20,
+        DocumentType.INSURANCE_REQUIREMENTS: 18,
+        DocumentType.SPECIAL_PROVISIONS: 16,
+        DocumentType.FUNDING_DOCUMENT: 14,
+        DocumentType.PROCUREMENT_DOCUMENT: 14,
+        DocumentType.BUDGET_DOCUMENT: 12,
+        DocumentType.BOARD_RECORD: 12,
+        DocumentType.PROJECT_STATUS: 10,
+    }.get(document.document_type, 0)
+    text_bonus = 4 if document.text_available else -8
+    return required_bonus + type_priority + text_bonus
+
+
+def _clause_salience(document, clause) -> int:
+    normalized = clause.text.lower()
+    score = _document_priority(document)
+    signal_terms = (
+        "pay-if-paid",
+        "pay if paid",
+        "no damages for delay",
+        "indemnify",
+        "termination for convenience",
+        "certified payroll",
+        "davis-bacon",
+        "notice of claim",
+        "additional insured",
+        "primary and noncontributory",
+        "waiver of subrogation",
+        "change order",
+        "appropriation",
+        "cmgc",
+        "guaranteed maximum price",
+        "independent cost estimator",
+        "work breakdown structure",
+        "wbs",
+    )
+    score += sum(6 for term in signal_terms if term in normalized)
+    if clause.heading and clause.heading != "document":
+        score += 2
+    return score
+
+
 def _render_project_context(project_dir: Path, *, max_clauses: int = 18, max_clause_chars: int = 400) -> str:
     documents = iter_project_documents(project_dir)
     missing_docs = missing_required_documents([document.document_type for document in documents])
@@ -121,27 +173,37 @@ def _render_project_context(project_dir: Path, *, max_clauses: int = 18, max_cla
     lines = [
         "Document Inventory:",
     ]
-    for document in documents:
+    for document in sorted(documents, key=_document_priority, reverse=True):
         lines.append(
             "- "
             f"{document.relative_path} "
-            f"(type={document.document_type.value}, text_source={document.text_source}, clauses={len(document.clauses)})"
+            f"(type={document.document_type.value}, text_source={document.text_source}, text_quality={document.text_quality}, clauses={len(document.clauses)})"
         )
     if missing_docs:
         lines.append("Missing required documents: " + ", ".join(item.value for item in missing_docs))
 
     lines.extend(["", "Clause Excerpts:"])
-    emitted = 0
+    ranked_clauses: list[tuple[int, str, str, str]] = []
     for document in documents:
-        for clause in document.clauses[:3]:
+        for clause in document.clauses:
             excerpt = " ".join(clause.text.split())
             if len(excerpt) > max_clause_chars:
                 excerpt = excerpt[: max_clause_chars - 3] + "..."
-            lines.append(f"- {clause.location} [{document.document_type.value}] {excerpt}")
-            emitted += 1
-            if emitted >= max_clauses:
-                lines.append("- Additional clauses omitted for brevity.")
-                return "\n".join(lines)
+            ranked_clauses.append(
+                (
+                    _clause_salience(document, clause),
+                    clause.location,
+                    document.document_type.value,
+                    excerpt,
+                )
+            )
+    for _, location, document_type, excerpt in sorted(
+        ranked_clauses,
+        key=lambda item: (-item[0], item[1]),
+    )[:max_clauses]:
+        lines.append(f"- {location} [{document_type}] {excerpt}")
+    if len(ranked_clauses) > max_clauses:
+        lines.append("- Additional clauses omitted for brevity.")
     return "\n".join(lines)
 
 
@@ -158,7 +220,8 @@ def build_bid_review_ese_config(
     base_url: str | None = None,
     fail_on_high: bool = False,
 ) -> dict[str, Any]:
-    project_path = Path(project_dir).expanduser().resolve()
+    project_path = resolve_existing_directory(project_dir, label="Project directory")
+    artifacts_path = resolve_output_directory(artifacts_dir, label="Artifacts directory")
     clean_provider = (provider or "local").strip().lower()
     effective_mode = resolve_execution_mode(
         provider=clean_provider,
@@ -204,7 +267,7 @@ def build_bid_review_ese_config(
         "project_dir": str(project_path),
     },
         "output": {
-            "artifacts_dir": artifacts_dir,
+            "artifacts_dir": str(artifacts_path),
             "enforce_json": True,
         },
         "gating": {
@@ -287,5 +350,5 @@ def run_bid_review_with_ese(
     )
     if config_path:
         write_config(config_path, cfg)
-    summary_path = run_pipeline(cfg=cfg, artifacts_dir=artifacts_dir)
+    summary_path = run_pipeline(cfg=cfg, artifacts_dir=str(cfg["output"]["artifacts_dir"]))
     return cfg, summary_path

@@ -4,7 +4,19 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from apps.contract_intelligence.domain.enums import Recommendation, Severity
+from apps.contract_intelligence.domain.enums import (
+    AlertStatus,
+    AlertType,
+    ObligationStatus,
+    ObligationType,
+    OutcomeStatus,
+    OwnerRole,
+    Recommendation,
+    ReviewActionEventType,
+    ReviewTargetKind,
+    Severity,
+    TextQuality,
+)
 
 
 class EvidenceRef(BaseModel):
@@ -39,11 +51,13 @@ class DecisionSummary(BaseModel):
 class Obligation(BaseModel):
     id: str
     source_clause: str
+    source_document_id: str | None = None
+    source_excerpt: str | None = None
     title: str
-    obligation_type: str
+    obligation_type: ObligationType
     trigger: str
     due_rule: str
-    owner_role: str
+    owner_role: OwnerRole
     severity_if_missed: Severity
     evidence: list[EvidenceRef] = Field(default_factory=list)
 
@@ -92,7 +106,7 @@ class OutcomeEvent(BaseModel):
 
 class OutcomeEvidenceBundle(BaseModel):
     project_id: str
-    outcome_status: str
+    outcome_status: OutcomeStatus
     governance_artifacts_present: list[str] = Field(default_factory=list)
     events: list[OutcomeEvent] = Field(default_factory=list)
     coverage_gaps: list[str] = Field(default_factory=list)
@@ -106,6 +120,7 @@ class ProjectDocumentRecord(BaseModel):
     required_for_bid_review: bool
     text_available: bool = False
     text_source: str = "unavailable"
+    text_quality: TextQuality = TextQuality.NONE
     clause_count: int = 0
 
 
@@ -127,6 +142,17 @@ class AcceptedRisk(BaseModel):
     severity: Severity
     recommended_action: str
     carry_forward_reason: str
+
+
+class FindingDisposition(BaseModel):
+    source_finding_id: str
+    role: str
+    category: str
+    title: str
+    severity: Severity
+    recommended_action: str
+    disposition: str
+    rationale: str = ""
 
 
 class NegotiatedChange(BaseModel):
@@ -183,7 +209,8 @@ class ContractCommitRecord(BaseModel):
     source_run_id: str
     decision_summary: DecisionSummary
     procurement_profile: ProcurementProfile
-    outcome_status: str
+    outcome_status: OutcomeStatus
+    finding_dispositions: list[FindingDisposition] = Field(default_factory=list)
     accepted_risks: list[AcceptedRisk] = Field(default_factory=list)
     negotiated_changes: list[NegotiatedChange] = Field(default_factory=list)
     committed_documents: list[ProjectDocumentRecord] = Field(default_factory=list)
@@ -197,21 +224,55 @@ class MonitoredObligation(BaseModel):
     source_clause: str
     owner_role: str
     severity_if_missed: Severity
-    status: str
+    status: ObligationStatus
     summary: str
     next_due_at: datetime | None = None
     last_satisfied_at: datetime | None = None
     notes: list[str] = Field(default_factory=list)
 
 
+class MonitoringStatusInput(BaseModel):
+    obligation_id: str
+    status: ObligationStatus | None = None
+    summary: str | None = None
+    next_due_at: datetime | None = None
+    last_satisfied_at: datetime | None = None
+    notes: list[str] = Field(default_factory=list)
+
 class AlertRecord(BaseModel):
     alert_id: str
     obligation_id: str
     created_at: datetime
     severity: Severity
-    alert_type: str
-    status: str
+    alert_type: AlertType
+    status: AlertStatus
     summary: str
+
+
+class ReviewActionRecord(BaseModel):
+    kind: ReviewTargetKind
+    ui_id: str
+    title: str
+    disposition: str
+    owner: str = ""
+    note: str = ""
+    source_run_id: str | None = None
+    source_commit_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+class ReviewActionEvent(BaseModel):
+    event_id: str
+    event_type: ReviewActionEventType
+    kind: ReviewTargetKind
+    ui_id: str
+    title: str | None = None
+    disposition: str | None = None
+    owner: str = ""
+    note: str = ""
+    source_run_id: str | None = None
+    source_commit_id: str | None = None
+    occurred_at: datetime
 
 
 class MonitoringRunRecord(BaseModel):
@@ -234,7 +295,7 @@ class CaseRecord(BaseModel):
     latest_overall_risk: Severity
     latest_agreement_type: str
     latest_project_sector: str
-    latest_outcome_status: str
+    latest_outcome_status: OutcomeStatus
     total_runs: int
     run_history: list[CaseRunIndexEntry] = Field(default_factory=list)
     latest_commit_id: str | None = None

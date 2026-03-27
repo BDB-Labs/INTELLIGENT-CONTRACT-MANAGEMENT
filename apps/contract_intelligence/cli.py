@@ -115,10 +115,15 @@ def commit_command(
         "--committed-contract-dir",
         help="Optional path to the final committed contract package if it differs from the original project folder.",
     ),
+    finding_dispositions_file: str | None = typer.Option(
+        None,
+        "--finding-dispositions-file",
+        help="Optional JSON list describing explicit commit-time dispositions for findings.",
+    ),
     accepted_risks_file: str | None = typer.Option(
         None,
         "--accepted-risks-file",
-        help="Optional JSON list overriding the default accepted-risk carry-forward set.",
+        help="Legacy JSON list of accepted risks. Prefer --finding-dispositions-file for explicit commit intent.",
     ),
     negotiated_changes_file: str | None = typer.Option(
         None,
@@ -130,6 +135,7 @@ def commit_command(
     result = commit_contract(
         project_dir=project_dir,
         committed_contract_dir=committed_contract_dir,
+        finding_dispositions_file=finding_dispositions_file,
         accepted_risks_file=accepted_risks_file,
         negotiated_changes_file=negotiated_changes_file,
     )
@@ -178,6 +184,7 @@ def monitor_command(
 @app.command("render-dashboard")
 def render_dashboard_command(
     project_dir: str = typer.Argument(..., help="Path to the project folder with persisted lifecycle state"),
+    mode: str = typer.Option("internal", "--mode", help="internal or external dashboard output"),
     output_path: str | None = typer.Option(
         None,
         "--output-path",
@@ -185,7 +192,7 @@ def render_dashboard_command(
     ),
 ) -> None:
     """Render a self-contained HTML dashboard over the persisted contract lifecycle state."""
-    path = render_project_dashboard(project_dir=project_dir, output_path=output_path)
+    path = render_project_dashboard(project_dir=project_dir, output_path=output_path, report_mode=mode)
     typer.echo(f"Dashboard: {path}")
 
 

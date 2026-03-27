@@ -105,6 +105,61 @@ def test_bid_review_runner_flags_missing_required_documents(tmp_path: Path) -> N
     assert any("insurance_requirements" in item for item in challenges["missed_hazards"])
 
 
+def test_bid_review_runner_escalates_multiple_high_findings_to_no_go(tmp_path: Path) -> None:
+    project_dir = tmp_path / "multi-high-no-go"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Subcontractor shall be paid on a pay-if-paid basis.",
+                "No damages for delay shall be allowed.",
+                "Contractor shall defend, indemnify, and hold harmless the owner.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "Notice of claim must be provided within 7 calendar days.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.pdf").write_bytes(b"%PDF-1.4\x00\x00corrupt")
+    (project_dir / "Board Resolution.md").write_text(
+        "Resolution approving Change Order No. 7 because of scope revisions and cost escalation.",
+        encoding="utf-8",
+    )
+
+    result = run_bid_review(project_dir)
+    decision = json.loads((result.artifacts_dir / "decision_summary.json").read_text())
+
+    assert decision["recommendation"] == "no_go"
+
+
+def test_bid_review_runner_surfaces_outcome_contradictions(tmp_path: Path) -> None:
+    project_dir = tmp_path / "outcome-contradictions"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "Section 1 Scope\nContractor shall perform the work shown in the plans.",
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "Section 2 Coordination\nProject meetings will occur weekly.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "Certificates of insurance are required before starting work.",
+        encoding="utf-8",
+    )
+    (project_dir / "Board Resolution.md").write_text(
+        "Resolution approving Change Order No. 4 because of cost escalation and scope revisions.",
+        encoding="utf-8",
+    )
+
+    result = run_bid_review(project_dir)
+    challenges = json.loads((result.artifacts_dir / "review_challenges.json").read_text())
+
+    assert any("Public outcome evidence indicates delivery or governance stress" in item for item in challenges["contradictions"])
+
+
 def test_bid_review_runner_profiles_transport_procurement_and_outcomes(tmp_path: Path) -> None:
     project_dir = tmp_path / "caltrans-cmgc"
     project_dir.mkdir()
@@ -188,6 +243,90 @@ def test_bid_review_runner_profiles_transport_procurement_and_outcomes(tmp_path:
     assert context_profile["schedule_pressure"] == "high"
     assert context_profile["oversight_intensity"] == "high"
     assert context_profile["internal_only"] is True
+
+
+def test_bid_review_runner_rejects_missing_project_directory(tmp_path: Path) -> None:
+    missing_dir = tmp_path / "does-not-exist"
+    try:
+        run_bid_review(missing_dir)
+    except FileNotFoundError as exc:
+        assert "Project directory does not exist" in str(exc)
+    else:  # pragma: no cover - defensive
+        raise AssertionError("run_bid_review should fail for a missing project directory.")
+
+
+def test_bid_review_obligations_are_stable_and_traceable(tmp_path: Path) -> None:
+    project_dir = tmp_path / "stable-obligations"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Section 5.1 Payment",
+                "Certified payroll must be submitted weekly.",
+                "Section 5.2 Insurance",
+                "Certificates of insurance are required before starting work.",
+                "Section 5.3 Claims",
+                "Notice of claim must be provided within 7 calendar days.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "No damages for delay shall be allowed.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "Additional insured status is required.",
+        encoding="utf-8",
+    )
+
+    first = run_bid_review(project_dir)
+    second = run_bid_review(project_dir)
+
+    first_obligations = json.loads((first.artifacts_dir / "obligations_register.json").read_text())
+    second_obligations = json.loads((second.artifacts_dir / "obligations_register.json").read_text())
+
+    first_by_title = {item["title"]: item for item in first_obligations}
+    second_by_title = {item["title"]: item for item in second_obligations}
+
+    assert first_by_title["Submit certified payroll reports"]["id"] == second_by_title["Submit certified payroll reports"]["id"]
+    assert "::" in first_by_title["Submit certified payroll reports"]["source_clause"]
+    assert first_by_title["Submit certified payroll reports"]["source_document_id"]
+    assert first_by_title["Submit certified payroll reports"]["source_excerpt"]
+
+
+def test_bid_review_preserves_distinct_obligations_with_repeated_wording(tmp_path: Path) -> None:
+    project_dir = tmp_path / "distinct-obligations"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Section 5.1 Claims",
+                "Notice of claim must be provided within 7 calendar days.",
+                "Section 5.2 Utility Delays",
+                "Notice of claim must be provided within 7 calendar days.",
+                "Section 5.3 Payroll",
+                "Certified payroll must be submitted weekly.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "No damages for delay shall be allowed.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "Certificates of insurance are required before starting work.",
+        encoding="utf-8",
+    )
+
+    result = run_bid_review(project_dir)
+    obligations = json.loads((result.artifacts_dir / "obligations_register.json").read_text())
+    notice_obligations = [item for item in obligations if item["obligation_type"] == "notice_deadline"]
+
+    assert len(notice_obligations) == 2
+    assert len({item["id"] for item in notice_obligations}) == 2
+    assert len({item["source_clause"] for item in notice_obligations}) == 2
 
 
 def test_bid_review_runner_persists_case_and_run_records(tmp_path: Path) -> None:

@@ -64,10 +64,12 @@ def test_iter_project_documents_extracts_docx_and_pdf_text(tmp_path: Path) -> No
 
     assert by_name["Insurance Requirements.docx"].text_available is True
     assert by_name["Insurance Requirements.docx"].text_source == "docx_xml"
+    assert by_name["Insurance Requirements.docx"].text_quality in {"medium", "high"}
     assert len(by_name["Insurance Requirements.docx"].clauses) >= 1
 
     assert by_name["Funding Memo.pdf"].text_available is True
-    assert by_name["Funding Memo.pdf"].text_source == "pdf_stream"
+    assert by_name["Funding Memo.pdf"].text_source in {"pdf_stream", "pdf_spotlight"}
+    assert by_name["Funding Memo.pdf"].text_quality in {"medium", "high"}
     assert "Davis-Bacon" in by_name["Funding Memo.pdf"].text
 
 
@@ -83,3 +85,38 @@ def test_iter_project_documents_ignores_internal_contract_intelligence_store(tmp
     documents = iter_project_documents(project_dir)
 
     assert [item.relative_path for item in documents] == ["Prime Contract Agreement.md"]
+
+
+def test_iter_project_documents_uses_content_aware_classification_and_binary_guards(tmp_path: Path) -> None:
+    project_dir = tmp_path / "ingestion-guards"
+    project_dir.mkdir()
+    (project_dir / "Attachment A.txt").write_text(
+        "General Conditions AIA A201\nNotice of claim must be provided within 7 calendar days.",
+        encoding="utf-8",
+    )
+    (project_dir / "archive.bin").write_bytes(b"\x00" * 256)
+
+    documents = iter_project_documents(project_dir)
+    by_name = {item.relative_path: item for item in documents}
+
+    assert by_name["Attachment A.txt"].document_type.value == "general_conditions"
+    assert "archive.bin" not in by_name
+
+
+def test_iter_project_documents_marks_low_quality_pdf_text_unavailable(tmp_path: Path) -> None:
+    project_dir = tmp_path / "ingestion-low-quality-pdf"
+    project_dir.mkdir()
+    pdf_path = project_dir / "Scanned Funding Memo.pdf"
+    pdf_path.write_bytes(
+        b"%PDF-1.4\n"
+        b"1 0 obj << /Length 48 >> stream\n"
+        b"BT /F1 12 Tf 72 720 Td (() ) Tj ET\n"
+        b"endstream\nendobj\n"
+    )
+
+    documents = iter_project_documents(project_dir)
+    document = documents[0]
+
+    assert document.relative_path == "Scanned Funding Memo.pdf"
+    assert document.text_available is False
+    assert document.text_quality in {"none", "low"}
