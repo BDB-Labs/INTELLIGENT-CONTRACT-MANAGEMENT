@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -12,7 +13,17 @@ from apps.contract_intelligence.orchestration.commit_runner import commit_contra
 from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
-app = FastAPI(title="Contract Intelligence API", version="0.1.0")
+def _docs_enabled() -> bool:
+    return os.getenv("CONTRACT_INTELLIGENCE_EXPOSE_DOCS", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+app = FastAPI(
+    title="Contract Intelligence API",
+    version="0.1.0",
+    docs_url="/docs" if _docs_enabled() else None,
+    redoc_url="/redoc" if _docs_enabled() else None,
+    openapi_url="/openapi.json" if _docs_enabled() else None,
+)
 
 
 class AnalyzeProjectRequest(BaseModel):
@@ -32,8 +43,46 @@ class MonitorProjectRequest(BaseModel):
     status_inputs_file: str | None = None
 
 
-def _store_for(project_dir: str | Path) -> tuple[FileSystemCaseStore, str]:
+def _allowed_roots() -> tuple[Path, ...]:
+    raw = os.getenv("CONTRACT_INTELLIGENCE_ALLOWED_ROOTS", "").strip()
+    if not raw:
+        return ()
+    return tuple(
+        Path(part).expanduser().resolve()
+        for part in raw.split(os.pathsep)
+        if part.strip()
+    )
+
+
+def _validate_path_boundary(path: Path, *, kind: str) -> Path:
+    allowed_roots = _allowed_roots()
+    if allowed_roots and not any(path == root or root in path.parents for root in allowed_roots):
+        raise HTTPException(status_code=403, detail=f"{kind} is outside the configured allowed roots.")
+    return path
+
+
+def _validated_project_path(project_dir: str | Path) -> Path:
     project_path = Path(project_dir).expanduser().resolve()
+    if not project_path.exists():
+        raise HTTPException(status_code=400, detail="Project directory does not exist.")
+    if not project_path.is_dir():
+        raise HTTPException(status_code=400, detail="Project directory must be a directory.")
+    return _validate_path_boundary(project_path, kind="Project directory")
+
+
+def _validated_input_file(file_path: str | Path | None, *, label: str) -> str | None:
+    if not file_path:
+        return None
+    path = Path(file_path).expanduser().resolve()
+    if not path.exists():
+        raise HTTPException(status_code=400, detail=f"{label} does not exist.")
+    if not path.is_file():
+        raise HTTPException(status_code=400, detail=f"{label} must be a file.")
+    return str(_validate_path_boundary(path, kind=label))
+
+
+def _store_for(project_dir: str | Path) -> tuple[FileSystemCaseStore, str]:
+    project_path = _validated_project_path(project_dir)
     return FileSystemCaseStore(project_path / ".contract_intelligence"), _project_id(project_path)
 
 
@@ -52,7 +101,8 @@ def health() -> dict[str, str]:
 
 @app.post("/projects/analyze")
 def analyze_project(request: AnalyzeProjectRequest) -> dict[str, object]:
-    result = run_bid_review(project_dir=request.project_dir, artifacts_dir=request.artifacts_dir)
+    project_path = _validated_project_path(request.project_dir)
+    result = run_bid_review(project_dir=project_path, artifacts_dir=request.artifacts_dir)
     return {
         "project_id": result.project_id,
         "artifacts_dir": str(result.artifacts_dir),
@@ -67,10 +117,12 @@ def analyze_project(request: AnalyzeProjectRequest) -> dict[str, object]:
 def commit_project(request: CommitProjectRequest) -> dict[str, object]:
     try:
         result = commit_contract(
-            project_dir=request.project_dir,
+            project_dir=_validated_project_path(request.project_dir),
             committed_contract_dir=request.committed_contract_dir,
-            accepted_risks_file=request.accepted_risks_file,
-            negotiated_changes_file=request.negotiated_changes_file,
+            accepted_risks_file=_validated_input_file(request.accepted_risks_file, label="Accepted risks file"),
+            negotiated_changes_file=_validated_input_file(
+                request.negotiated_changes_file, label="Negotiated changes file"
+            ),
         )
     except FileNotFoundError as exc:
         raise _not_found(str(exc)) from exc
@@ -88,8 +140,8 @@ def commit_project(request: CommitProjectRequest) -> dict[str, object]:
 def monitor_project(request: MonitorProjectRequest) -> dict[str, object]:
     try:
         result = monitor_contract(
-            project_dir=request.project_dir,
-            status_inputs_file=request.status_inputs_file,
+            project_dir=_validated_project_path(request.project_dir),
+            status_inputs_file=_validated_input_file(request.status_inputs_file, label="Status inputs file"),
         )
     except FileNotFoundError as exc:
         raise _not_found(str(exc)) from exc

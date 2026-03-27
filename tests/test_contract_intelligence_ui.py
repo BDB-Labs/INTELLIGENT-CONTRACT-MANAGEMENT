@@ -73,7 +73,11 @@ def test_render_project_dashboard_outputs_html_snapshot(tmp_path: Path) -> None:
     html = dashboard_path.read_text(encoding="utf-8")
 
     assert dashboard_path == output_path
-    assert "Lifecycle dashboard for contract review, commitment, monitoring, and internal context tracking." in html
-    assert "Current Obligations" in html
-    assert "Current Alerts" in html
+    assert "A project command surface for review decisions, committed baselines, internal context," in html
+    assert "Audience-Aware Surface" in html
+    assert "Human Review Board" in html
+    assert "Selected Finding" in html
+    assert "Selected Obligation" in html
+    assert "Findings Workspace" in html
+    assert "Lifecycle Timeline" in html
     assert "go_with_conditions" in html

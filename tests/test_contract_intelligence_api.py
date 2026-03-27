@@ -92,3 +92,15 @@ def test_contract_intelligence_api_wraps_full_local_lifecycle(tmp_path: Path) ->
     assert state_response.json()["latest_commit_id"] == latest_commit_response.json()["commit_id"]
     assert state_response.json()["latest_monitoring_run_id"] == latest_monitoring_response.json()["run_id"]
     assert any(item["alert_type"] == "late" for item in alerts_response.json())
+
+
+def test_contract_intelligence_api_rejects_missing_project_directory(tmp_path: Path) -> None:
+    missing_dir = tmp_path / "missing-project"
+    response = client.post("/projects/analyze", json={"project_dir": str(missing_dir)})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Project directory does not exist."
+
+
+def test_contract_intelligence_api_hides_docs_by_default() -> None:
+    response = client.get("/docs")
+    assert response.status_code == 404
