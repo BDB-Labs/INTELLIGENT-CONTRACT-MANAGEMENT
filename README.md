@@ -1,6 +1,14 @@
 # Ensemble Software Engineering (ESE)
 
-ESE is a lightweight CLI framework for orchestrated AI ensembles. The core engine stays generic, while config packs can ship fixed role catalogs for specific domains.
+ESE is a lightweight CLI framework for orchestrated AI ensembles. The core
+engine stays generic, while config packs and application layers can ship fixed
+role catalogs for specific domains.
+
+This repository now contains both:
+
+- the published `ese` orchestration engine and local dashboard
+- an incubating `apps/contract_intelligence` product for construction contract
+  compliance, monitoring, and lifecycle review
 
 ## Core pipeline
 
@@ -168,6 +176,37 @@ ese dashboard --artifacts-dir artifacts
 
 The dashboard now supports both task-first runs and PR review runs.
 
+## Contract Intelligence Application
+
+The repository also includes a full-lifecycle contract-intelligence product
+prototype aimed at public-infrastructure and roadway contract packages.
+
+Current contract-intelligence lifecycle:
+
+- bid review with contractor, insurance, compliance, procurement, outcome, and
+  internal-only context artifacts
+- committed contract state with accepted risks and negotiated changes
+- obligation extraction and current/by-commit snapshots
+- monitoring runs with due, late, satisfied, and alert state
+- generated operator dashboard with internal/external display modes and local
+  human review actions
+- thin local API over projects, runs, commits, obligations, monitoring, and
+  alerts
+
+Common commands:
+
+```bash
+python -m apps.contract_intelligence bid-review ./sample_project
+python -m apps.contract_intelligence commit ./sample_project
+python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
+python -m apps.contract_intelligence render-dashboard ./sample_project
+```
+
+The contract-intelligence dashboard escapes rendered contract-derived content
+before inserting it into dynamic HTML. Its external mode is presentation-only,
+not a true data-segregated export, so generated HTML should still be treated as
+internal unless a separate external artifact is rendered.
+
 ## Framework role drafting
 
 Use `ese roles` to print the built-in starter role examples for framework installs.
@@ -259,6 +298,10 @@ runtime:
 
 - Config schema + version policy: [`docs/CONFIG_CONTRACT.md`](docs/CONFIG_CONTRACT.md)
 - Pipeline state schema + deterministic role ordering: [`docs/PIPELINE_STATE.md`](docs/PIPELINE_STATE.md)
+- Contract-intelligence product overview: [`apps/contract_intelligence/README.md`](apps/contract_intelligence/README.md)
+- Case-intelligence platform design: [`docs/CASE_INTELLIGENCE_PLATFORM.md`](docs/CASE_INTELLIGENCE_PLATFORM.md)
+- Contract-intelligence initiative and current extension targets: [`docs/CONTRACT_INTELLIGENCE_INITIATIVE.md`](docs/CONTRACT_INTELLIGENCE_INITIATIVE.md)
+- Security posture and current advisory notes: [`docs/SECURITY_NOTES.md`](docs/SECURITY_NOTES.md)
 - Troubleshooting: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
 - Contributor CI requirements: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Release checklist for 1.0.0: [`MILESTONE_1_0_0.md`](MILESTONE_1_0_0.md)

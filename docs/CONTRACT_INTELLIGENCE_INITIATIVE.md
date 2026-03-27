@@ -124,8 +124,20 @@ Work this initiative sequentially:
 
 Current sequence complete for this roadmap.
 
+Completed foundation:
+
+- durable case and run persistence
+- committed contract and obligation lifecycle
+- monitoring and alert engine
+- product API layer
+- context intelligence ingestion
+- corpus expansion and evaluation
+- operator dashboard with human review actions and internal/external display modes
+- API and dashboard hardening for safer local operation
+
 Next likely extension:
 
-- richer human-review actions and overrides
-- external/internal report-mode separation
+- server-backed persistence for human-review actions and overrides
+- true external artifact generation instead of presentation-only display mode
 - deeper context-source ingestion beyond package-local documents
+- explicit authentication and role-gated visibility if the local API is promoted beyond trusted local use

@@ -1,17 +1,28 @@
-# Contract Intelligence Pilot
+# Contract Intelligence Product
 
-This directory contains the starter scaffold for a domain-specific application
-layer built on top of ESE.
+This directory contains the incubating contract-intelligence application layer
+built on top of ESE.
 
-The goal is to validate a reusable case-intelligence platform using a first
-vertical pack: construction contract management, evaluation, and tracking.
-The current emphasis is public-infrastructure procurement, especially roadway
-and transportation work where delivery method, funding overlays, governance
-records, and post-award outcomes materially affect bid decisions.
+The current vertical is construction contract compliance and lifecycle
+monitoring for public-infrastructure work, with a particular emphasis on
+roadway and transportation packages where procurement method, funding overlays,
+governance records, and post-award outcomes materially affect bid decisions.
 
-## Current scope
+## Current lifecycle
 
-The first slice is a `bid_review` workflow that turns a contract package into:
+The product now covers a real end-to-end local lifecycle:
+
+1. ingest project documents from a folder
+2. run bid review and emit typed artifacts
+3. persist durable case and run records
+4. commit the latest reviewed package into committed-contract state
+5. extract current obligations from committed state
+6. monitor those obligations against status inputs
+7. render an operator dashboard over the persisted lifecycle state
+
+## Current artifacts and records
+
+Bid review emits:
 
 - document inventory
 - contractor-side risk findings
@@ -24,32 +35,52 @@ The first slice is a `bid_review` workflow that turns a contract package into:
 - obligations preview
 - adversarial review challenges
 
-The next lifecycle slice adds:
+Persistent lifecycle state now includes:
 
+- durable case records
+- bid-review run records
 - committed contract records
-- carried-forward accepted risks
-- negotiated-change capture
-- current obligation snapshots tied to the committed contract baseline
-- monitoring snapshots and alert records
+- accepted risks and negotiated changes
+- current and by-commit obligation snapshots
+- monitoring runs
+- current and historical alert snapshots
 
 ## Local usage
 
-Run the deterministic pilot over a project folder from the repo root:
+Run the deterministic bid review over a project folder:
 
 ```bash
 python -m apps.contract_intelligence bid-review ./sample_project
 ```
 
-Or send artifacts somewhere specific:
-
-```bash
-python -m apps.contract_intelligence bid-review ./sample_project --artifacts-dir ./tmp/bid_review
-```
-
-Run the same project through ESE's real orchestration path:
+Run the same project through ESE's orchestration path:
 
 ```bash
 python -m apps.contract_intelligence ensemble-bid-review ./sample_project
+```
+
+Commit the latest reviewed package into committed state:
+
+```bash
+python -m apps.contract_intelligence commit ./sample_project
+```
+
+Reload the current obligation snapshot:
+
+```bash
+python -m apps.contract_intelligence extract-obligations ./sample_project
+```
+
+Apply operational status inputs and emit alerts:
+
+```bash
+python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
+```
+
+Render the generated operator dashboard:
+
+```bash
+python -m apps.contract_intelligence render-dashboard ./sample_project
 ```
 
 Run the starter gold corpus:
@@ -58,62 +89,44 @@ Run the starter gold corpus:
 python -m apps.contract_intelligence evaluate-corpus
 ```
 
-Commit the latest reviewed package into committed-contract state:
+## Product behavior notes
 
-```bash
-python -m apps.contract_intelligence commit ./sample_project
-```
+- supported source types currently include `.md`, `.txt`, `.json`, `.yaml`,
+  `.docx`, and a lightweight PDF text fallback
+- transportation-specific heuristics now tag CMGC off-ramps, appropriation
+  limits, Public Records Act handling, WBS reporting, governance artifacts, and
+  outcome/status evidence when those materials are present
+- budget, board, audit, funding, and status materials feed an internal-only
+  `context_profile.json` artifact used for strategy and relationship-aware
+  reasoning
+- the generated dashboard supports internal and external display modes, but the
+  external mode is presentation-only and does not remove internal data from the
+  underlying HTML payload
 
-Reload the current obligation snapshot from committed state:
+## Local API safety defaults
 
-```bash
-python -m apps.contract_intelligence extract-obligations ./sample_project
-```
+The thin FastAPI layer in `api/` now:
 
-Apply operational status inputs and emit current alerts:
+- disables interactive docs by default
+- validates project directories before lifecycle actions run
+- validates optional input files before commit and monitoring actions
+- supports boundary enforcement through `CONTRACT_INTELLIGENCE_ALLOWED_ROOTS`
 
-```bash
-python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
-```
-
-The runner currently supports `.md`, `.txt`, `.json`, `.yaml`, `.docx`, and a
-lightweight PDF text fallback. PDF extraction is still intentionally basic, but
-the loader now preserves clause-like spans and uses them as evidence anchors in
-the generated artifacts. The deterministic path now also tags transportation
-procurement signals such as CMGC off-ramps, appropriation limits, Public Records
-Act handling, WBS reporting, governance artifacts, and outcome/status evidence
-when those materials are present in the package.
-
-Budget, board, audit, funding, and status materials now also feed an
-internal-only `context_profile.json` artifact so relationship and bid decisions
-can consider funding flexibility, schedule pressure, oversight intensity, and
-public visibility without turning those inputs into outward-facing report prose.
-
-Each run also writes a durable case record under
-`.contract_intelligence/<project_id>/` so later lifecycle stages can attach to a
-stable project/run identity instead of treating every analysis as a one-off
-artifact dump.
-
-Committed contract and monitoring stages extend that same store with:
-
-- `commits/` for committed contract records
-- `obligations/` for current and by-commit obligation snapshots
-- `monitoring/` for current and historical monitoring runs
-- `alerts/` for current and historical alert snapshots
+Set `CONTRACT_INTELLIGENCE_EXPOSE_DOCS=1` only when you explicitly want the API
+docs enabled in a trusted local environment.
 
 ## Folder map
 
-- `domain/`: shared pilot models and enums
-- `ingestion/`: early document typing and intake helpers
-- `orchestration/`: role catalog, pipeline definition, and prompts
+- `domain/`: shared models and enums
+- `ingestion/`: document typing and intake helpers
+- `orchestration/`: role catalog, deterministic heuristics, prompts, and ESE bridge
 - `schemas/`: JSON schema contracts for stable artifacts
-- `corpus/`: starter gold-corpus cases and expected outcomes
-- `api/`: thin FastAPI surface over the local lifecycle store and runners
-- `storage/`: filesystem-backed persistence boundary for case, run, commit, and obligation records
-- `ui/`: placeholder UI boundary
+- `corpus/`: gold-corpus cases and expected outcomes
+- `storage/`: filesystem-backed lifecycle persistence
+- `api/`: thin FastAPI surface over projects, runs, commits, monitoring, and alerts
+- `ui/`: generated operator dashboard surface
 
 ## Design rule
 
-This package is intentionally not part of the published `ese` distribution yet.
-It is a starter layer for product incubation while `ese` remains the generic
-execution engine.
+This package remains outside the published `ese` distribution. It is the
+product incubation layer while `ese` stays the generic execution engine.

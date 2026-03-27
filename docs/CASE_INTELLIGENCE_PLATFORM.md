@@ -119,6 +119,13 @@ The product shell should be shared across packs:
 - audit views
 - operator feedback workflow
 
+The construction pilot now has a thin but real version of that shell:
+
+- filesystem-backed case, commit, obligation, monitoring, and alert records
+- a thin local FastAPI surface over the lifecycle store
+- a generated operator dashboard with internal and external display modes
+- local human review actions in the dashboard pending server-backed persistence
+
 ## Universal Workflow
 
 The base workflow should be fixed even when the role names change:
@@ -144,9 +151,11 @@ The base workflow should be fixed even when the role names change:
 8. Monitor
    - alert on deadlines, drift, or changed source material
 
-The current pilot now implements the first half of that lifecycle with durable
-run records and committed-contract obligation snapshots. Monitoring remains the
-next product step rather than an implied future state.
+The current pilot now implements the full local lifecycle through monitoring,
+including durable run records, committed-contract state, obligation snapshots,
+monitoring runs, alert records, and a generated operator dashboard over the
+persisted state. Human review actions are present in the dashboard today, but
+they are not yet persisted as product records.
 
 ## Artifact Contract
 
@@ -222,5 +231,6 @@ The platform base is good enough when:
 1. Define the base casework entities and artifact contract.
 2. Define the pack interface and construction pilot role catalog.
 3. Scaffold the first pilot under `apps/contract_intelligence/`.
-4. Keep persistence and UI thin until the artifact contract settles.
+4. Keep persistence and UI honest to the lifecycle model while the artifact
+   contract settles.
 5. Add a second vertical only after the first pack proves the abstraction.
