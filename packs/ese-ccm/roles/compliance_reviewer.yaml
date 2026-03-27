@@ -1,0 +1,16 @@
+name: compliance_reviewer
+role: regulatory_analysis
+orientation: compliance
+weights:
+  federal_compliance: 0.40
+  state_compliance: 0.30
+  local_compliance: 0.30
+bias:
+  strictness: very_high
+focus_areas:
+  - davis_bacon
+  - dbe_requirements
+  - dir_registration
+  - prompt_payment
+  - buy_america
+  - caltrans_standards

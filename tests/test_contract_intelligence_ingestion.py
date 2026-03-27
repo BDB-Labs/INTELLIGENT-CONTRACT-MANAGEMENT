@@ -69,3 +69,17 @@ def test_iter_project_documents_extracts_docx_and_pdf_text(tmp_path: Path) -> No
     assert by_name["Funding Memo.pdf"].text_available is True
     assert by_name["Funding Memo.pdf"].text_source == "pdf_stream"
     assert "Davis-Bacon" in by_name["Funding Memo.pdf"].text
+
+
+def test_iter_project_documents_ignores_internal_contract_intelligence_store(tmp_path: Path) -> None:
+    project_dir = tmp_path / "ingestion-ignore-fixtures"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text("Section 1 Scope", encoding="utf-8")
+
+    internal_store = project_dir / ".contract_intelligence" / "sample-project" / "runs"
+    internal_store.mkdir(parents=True)
+    (internal_store / "run_001.json").write_text('{"ignored": true}', encoding="utf-8")
+
+    documents = iter_project_documents(project_dir)
+
+    assert [item.relative_path for item in documents] == ["Prime Contract Agreement.md"]

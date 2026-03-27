@@ -70,6 +70,33 @@ _CONSTRUCTION_ROLES = (
         ),
     ),
     PackRoleDefinition(
+        key="context_intelligence_analyst",
+        responsibility="Extract internal-only budget, oversight, schedule, and visibility signals from context documents in the package.",
+        prompt=(
+            "You are the context_intelligence_analyst for a public-infrastructure contract review. "
+            "Assess funding flexibility, schedule pressure, oversight intensity, and public visibility from budgets, board records, audits, and status materials. "
+            "Use findings only for evidence gaps and contribute to context_profile.json."
+        ),
+    ),
+    PackRoleDefinition(
+        key="procurement_structure_analyst",
+        responsibility="Profile delivery method, procurement method, payment mechanism, governance traces, and transport-procurement clause families in the package.",
+        prompt=(
+            "You are the procurement_structure_analyst for a public-infrastructure contract review. "
+            "Identify delivery method, procurement method, payment mechanism, governance artifacts, and clause families such as GMP off-ramps, appropriation limits, Public Records Act handling, ICE, and WBS reporting. "
+            "Use findings for metadata ambiguity and contribute to procurement_profile.json."
+        ),
+    ),
+    PackRoleDefinition(
+        key="outcome_evidence_analyst",
+        responsibility="Extract outcome and governance evidence such as awards, status updates, change orders, settlements, audits, closeout, and terminations.",
+        prompt=(
+            "You are the outcome_evidence_analyst for a public-infrastructure contract review. "
+            "Look for award, status, change-order, settlement, audit, litigation, closeout, termination, takeover, or bankruptcy signals. "
+            "Do not invent outcomes; make missing evidence explicit and contribute to outcome_evidence.json."
+        ),
+    ),
+    PackRoleDefinition(
         key="adversarial_reviewer",
         responsibility="Challenge optimistic assumptions, surface contradictions across analysts, and hunt for missed hazards before a bid decision is made.",
         prompt=(

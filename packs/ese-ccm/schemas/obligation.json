@@ -1,0 +1,10 @@
+{
+  "obligation_id": "string",
+  "clause_reference": "string",
+  "description": "string",
+  "responsible_party": "Contractor|Owner",
+  "due_date": "string",
+  "frequency": "string",
+  "status": "Pending|Completed|Late|At Risk",
+  "risk_level": "Low|Moderate|High"
+}

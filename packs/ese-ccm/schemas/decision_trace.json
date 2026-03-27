@@ -1,0 +1,8 @@
+{
+  "decision_id": "string",
+  "inputs": ["array"],
+  "reasoning": ["array"],
+  "outcome": "GO|GO WITH CONDITIONS|NO-GO",
+  "omissions": ["array"],
+  "conditions": ["array"]
+}

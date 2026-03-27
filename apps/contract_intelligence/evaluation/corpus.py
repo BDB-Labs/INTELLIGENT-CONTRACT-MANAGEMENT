@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,9 @@ def _artifact_payloads(artifacts_dir: Path) -> dict[str, Any]:
         "risk_findings": _read_json(artifacts_dir / "risk_findings.json"),
         "insurance_findings": _read_json(artifacts_dir / "insurance_findings.json"),
         "compliance_findings": _read_json(artifacts_dir / "compliance_findings.json"),
+        "context_profile": _read_json(artifacts_dir / "context_profile.json"),
+        "procurement_profile": _read_json(artifacts_dir / "procurement_profile.json"),
+        "outcome_evidence": _read_json(artifacts_dir / "outcome_evidence.json"),
         "obligations_register": _read_json(artifacts_dir / "obligations_register.json"),
         "review_challenges": _read_json(artifacts_dir / "review_challenges.json"),
     }
@@ -44,8 +48,14 @@ def evaluate_corpus_case(case_dir: str | Path, artifacts_root: str | Path | None
     inputs_dir = case_path / "inputs"
     run_artifacts_root = Path(artifacts_root).expanduser().resolve() if artifacts_root else default_artifacts_root()
     artifacts_dir = run_artifacts_root / case_path.name
+    workspace_dir = run_artifacts_root / "_workspace" / case_path.name
 
-    result = run_bid_review(project_dir=inputs_dir, artifacts_dir=artifacts_dir)
+    if workspace_dir.exists():
+        shutil.rmtree(workspace_dir)
+    workspace_dir.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(inputs_dir, workspace_dir)
+
+    result = run_bid_review(project_dir=workspace_dir, artifacts_dir=artifacts_dir)
     payloads = _artifact_payloads(result.artifacts_dir)
 
     failures: list[str] = []
@@ -56,6 +66,9 @@ def evaluate_corpus_case(case_dir: str | Path, artifacts_root: str | Path | None
     compliance_categories = {item["category"] for item in payloads["compliance_findings"]}
     obligation_titles = {item["title"] for item in payloads["obligations_register"]}
     challenge_hazards = payloads["review_challenges"]["missed_hazards"]
+    context_profile = payloads["context_profile"]
+    procurement_profile = payloads["procurement_profile"]
+    outcome_evidence = payloads["outcome_evidence"]
 
     if decision["recommendation"] != expected["recommendation"]:
         failures.append(
@@ -81,6 +94,23 @@ def evaluate_corpus_case(case_dir: str | Path, artifacts_root: str | Path | None
     for fragment in expected_hazard_fragments:
         if not any(fragment in item for item in challenge_hazards):
             failures.append(f"review_challenges missing hazard fragment: {fragment}")
+
+    expected_context = expected.get("context_profile", {})
+    for key, value in expected_context.items():
+        if context_profile.get(key) != value:
+            failures.append(f"context_profile mismatch for {key}: expected {value}, got {context_profile.get(key)}")
+
+    expected_procurement = expected.get("procurement_profile", {})
+    for key, value in expected_procurement.items():
+        if procurement_profile.get(key) != value:
+            failures.append(
+                f"procurement_profile mismatch for {key}: expected {value}, got {procurement_profile.get(key)}"
+            )
+
+    expected_outcome = expected.get("outcome_evidence", {})
+    for key, value in expected_outcome.items():
+        if outcome_evidence.get(key) != value:
+            failures.append(f"outcome_evidence mismatch for {key}: expected {value}, got {outcome_evidence.get(key)}")
 
     return CorpusEvaluationResult(
         case_id=case_path.name,

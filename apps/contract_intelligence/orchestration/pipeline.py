@@ -29,12 +29,18 @@ def bid_review_pipeline() -> tuple[PipelineStage, ...]:
                 "insurance_requirements_analyst",
                 "funding_compliance_analyst",
                 "relationship_strategy_analyst",
+                "context_intelligence_analyst",
+                "procurement_structure_analyst",
+                "outcome_evidence_analyst",
             ),
             outputs=(
                 "risk_findings.json",
                 "insurance_findings.json",
                 "compliance_findings.json",
                 "relationship_strategy.json",
+                "context_profile.json",
+                "procurement_profile.json",
+                "outcome_evidence.json",
             ),
         ),
         PipelineStage(

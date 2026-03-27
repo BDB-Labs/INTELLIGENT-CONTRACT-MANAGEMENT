@@ -1,0 +1,75 @@
+================================================================================
+TEST CONTRACT — ESE-CCM Pack v1.1
+Southern California Roadway Infrastructure Agreement (Abbreviated Sample)
+================================================================================
+
+ARTICLE 5 — PAYMENT TERMS
+
+Section 5.3 Payment:
+Payment is contingent upon receipt of funds from the agency. Owner shall have
+no obligation to make payment to Contractor until Owner has received payment
+from the awarding authority. Contractor waives any right to assert a claim for
+interest, penalties, or damages arising from delayed payment due to funding
+delays outside Owner's control.
+
+Section 5.7 Retainage:
+Owner shall withhold ten percent (10%) retainage from each progress payment.
+Retainage shall not be reduced below five percent (5%) regardless of project
+completion percentage unless expressly authorized in writing by the agency.
+
+--------------------------------------------------------------------------------
+
+ARTICLE 8 — TIME AND DELAYS
+
+Section 8.6 Delay:
+Contractor shall not be entitled to compensation for delays, including delays
+caused by Owner, agency, or third parties. Time extensions, if granted, shall
+be the sole and exclusive remedy for any delay, impact, or disruption to the
+work. Contractor expressly waives any claim for lost productivity, extended
+general conditions, escalation, or loss of efficiency.
+
+Section 8.9 Liquidated Damages:
+Liquidated damages shall accrue at $5,000 per calendar day for each day beyond
+the Contract Completion Date. Liquidated damages shall apply regardless of
+cause, except Force Majeure events as defined herein.
+
+--------------------------------------------------------------------------------
+
+ARTICLE 10 — INSURANCE
+
+Section 10.1 Required Coverage:
+Contractor must carry the following insurance at all times during performance:
+  - Commercial General Liability: $2,000,000 per occurrence / $4,000,000 aggregate
+  - Automobile Liability: $1,000,000 combined single limit
+  - Workers Compensation: Statutory limits
+  - Umbrella/Excess Liability: $10,000,000 per occurrence and aggregate
+
+Contractor shall name the Owner, Agency, and all Consultants as additional
+insureds for ongoing and completed operations on a primary and non-contributory
+basis. Waiver of subrogation is required on all policies.
+
+--------------------------------------------------------------------------------
+
+ARTICLE 12 — INDEMNIFICATION
+
+Section 12.1 Broad Indemnity:
+Contractor shall defend, indemnify, and hold harmless Owner, Agency, and their
+officers, directors, employees, and agents from and against any and all claims,
+damages, losses, and expenses, including attorneys' fees, arising out of or
+resulting from performance of the Work, regardless of whether such claim is
+caused in part by a party indemnified hereunder.
+
+--------------------------------------------------------------------------------
+
+ARTICLE 15 — TERMINATION
+
+Section 15.2 Termination for Convenience:
+Owner may terminate this Contract for convenience at any time upon seven (7)
+days written notice. Upon termination for convenience, Contractor shall be
+entitled to payment for Work completed to the date of termination plus
+reasonable demobilization costs. Contractor shall not be entitled to
+anticipated profits on unperformed work or overhead on unperformed work.
+
+================================================================================
+END OF TEST CONTRACT
+================================================================================

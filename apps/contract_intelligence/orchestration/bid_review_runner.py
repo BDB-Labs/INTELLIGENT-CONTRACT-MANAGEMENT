@@ -6,9 +6,21 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from apps.contract_intelligence.domain.enums import DocumentType, Recommendation, Severity
-from apps.contract_intelligence.domain.models import DecisionSummary, EvidenceRef, Finding, Obligation, ProjectDocumentRecord
+from apps.contract_intelligence.domain.models import (
+    ContextProfile,
+    ContextSignal,
+    DecisionSummary,
+    EvidenceRef,
+    Finding,
+    Obligation,
+    OutcomeEvent,
+    OutcomeEvidenceBundle,
+    ProcurementProfile,
+    ProjectDocumentRecord,
+)
 from apps.contract_intelligence.ingestion.document_classifier import REQUIRED_BID_REVIEW_DOCUMENTS, missing_required_documents
 from apps.contract_intelligence.ingestion.project_loader import ClauseSpan, LoadedDocument, iter_project_documents
+from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
 SEVERITY_ORDER = {
@@ -50,6 +62,31 @@ class BidReviewRunResult:
     artifacts_dir: Path
     artifact_paths: dict[str, Path]
     decision_summary: DecisionSummary
+    case_record_path: Path
+    run_record_path: Path
+
+
+@dataclass(frozen=True)
+class LabelRule:
+    label: str
+    patterns: tuple[str, ...]
+    document_types: tuple[DocumentType, ...] = ()
+
+
+@dataclass(frozen=True)
+class ClauseFamilyRule:
+    tag: str
+    patterns: tuple[str, ...]
+    document_types: tuple[DocumentType, ...] = ()
+
+
+@dataclass(frozen=True)
+class OutcomeEventRule:
+    event_type: str
+    summary: str
+    impact_types: tuple[str, ...]
+    patterns: tuple[str, ...]
+    document_types: tuple[DocumentType, ...] = ()
 
 
 CONTRACT_RISK_RULES: tuple[FindingRule, ...] = (
@@ -194,6 +231,245 @@ COMPLIANCE_RULES: tuple[FindingRule, ...] = (
 )
 
 
+TRANSPORT_CONTRACT_RISK_RULES: tuple[FindingRule, ...] = (
+    FindingRule(
+        role="contract_risk_analyst",
+        category="cmgc_offramp",
+        severity=Severity.HIGH,
+        title="CMGC pricing off-ramp may leave preconstruction effort stranded",
+        summary="The package appears to let the owner reject GMP pricing or decline a later construction award.",
+        recommended_action="Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.",
+        patterns=(
+            r"(?:guaranteed maximum price|\bgmp\b)[\s\S]{0,180}(?:not accepted|re-?advertis|not obligated to award)",
+            r"no promise of construction award",
+        ),
+        document_types=(DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT, DocumentType.ADDENDUM),
+    ),
+    FindingRule(
+        role="contract_risk_analyst",
+        category="appropriation_limit",
+        severity=Severity.MEDIUM,
+        title="Appropriation contingency can trigger downscope or cancellation risk",
+        summary="Public funding language appears to limit enforceability to appropriated or available funds.",
+        recommended_action="Tie any non-appropriation exit to payment for work performed, demobilization, and orderly scope reduction.",
+        patterns=(
+            r"subject to availability of funds",
+            r"funds are appropriated",
+            r"non-appropriation",
+            r"budget act",
+        ),
+        document_types=(DocumentType.PRIME_CONTRACT, DocumentType.FUNDING_DOCUMENT, DocumentType.PROCUREMENT_DOCUMENT),
+    ),
+)
+
+
+TRANSPORT_COMPLIANCE_RULES: tuple[FindingRule, ...] = (
+    FindingRule(
+        role="funding_compliance_analyst",
+        category="conflict_of_interest",
+        severity=Severity.MEDIUM,
+        title="Conflict-of-interest disclosures may create bid-stage eligibility risk",
+        summary="The package appears to impose conflict-of-interest certification or disclosure obligations tied to award or termination rights.",
+        recommended_action="Confirm the disclosure workflow, affected affiliates, and any cure period before bid submission.",
+        patterns=(r"conflict of interest", r"organizational conflict"),
+        document_types=(DocumentType.PROCUREMENT_DOCUMENT, DocumentType.PRIME_CONTRACT, DocumentType.ADDENDUM),
+    ),
+)
+
+
+TRANSPORT_INSURANCE_RULES: tuple[FindingRule, ...] = (
+    FindingRule(
+        role="insurance_requirements_analyst",
+        category="umbrella_drop_down",
+        severity=Severity.MEDIUM,
+        title="Umbrella drop-down wording may exceed standard market terms",
+        summary="The package appears to require umbrella or excess coverage to drop down if primary limits are impaired or exhausted.",
+        recommended_action="Confirm market availability, price impact, and whether the drop-down feature can be limited to commercially available forms.",
+        patterns=(r"drop[-\s]+down", r"umbrella", r"exhausted"),
+        document_types=(DocumentType.INSURANCE_REQUIREMENTS, DocumentType.PRIME_CONTRACT, DocumentType.SPECIAL_PROVISIONS),
+    ),
+)
+
+
+AGREEMENT_TYPE_RULES: tuple[LabelRule, ...] = (
+    LabelRule("predevelopment_agreement", (r"predevelopment agreement",)),
+    LabelRule(
+        "cmgc_preconstruction_services",
+        (r"construction manager/general contractor", r"\bcmgc\b", r"preconstruction services contract"),
+    ),
+    LabelRule("progressive_design_build", (r"progressive design[-\s]+build", r"phase one[\s\S]{0,80}design[-\s]+build")),
+    LabelRule("design_build", (r"design[-\s]+build",)),
+    LabelRule("toll_concession", (r"toll concession", r"facility concession", r"toll revenue")),
+    LabelRule("dbfom_availability_payment", (r"\bdbfom\b", r"availability payment[\s\S]{0,120}(?:operate|maintain)")),
+    LabelRule("dbfm_availability_payment", (r"\bdbfm\b", r"availability payment")),
+    LabelRule("on_call", (r"on[-\s]+call", r"task order")),
+    LabelRule("design_bid_build", (r"low bid", r"sealed bid", r"lowest responsible bidder")),
+)
+
+
+PROJECT_SECTOR_RULES: tuple[LabelRule, ...] = (
+    LabelRule("bridges", (r"bridge", r"viaduct")),
+    LabelRule("roads_highways", (r"highway", r"road", r"interchange", r"managed lanes", r"street", r"pavement")),
+    LabelRule("stormwater", (r"storm drain", r"stormwater")),
+    LabelRule("wastewater", (r"wastewater", r"sewer")),
+    LabelRule("transit", (r"transit", r"bus", r"rail", r"yard modernization", r"station")),
+    LabelRule("water_utilities", (r"water main", r"reservoir", r"outlet tower")),
+    LabelRule("parking", (r"parking structure", r"parking")),
+    LabelRule("buildings_facilities", (r"facility", r"building")),
+)
+
+
+PAYMENT_MECHANISM_RULES: tuple[LabelRule, ...] = (
+    LabelRule("toll_revenue", (r"toll revenue", r"toll concession")),
+    LabelRule("availability_payment", (r"availability payment", r"availability deductions")),
+    LabelRule("reimbursable_rates", (r"reimbursable", r"hourly rates", r"actual costs")),
+    LabelRule("guaranteed_maximum_price", (r"guaranteed maximum price", r"\bgmp\b")),
+    LabelRule("phased_funding", (r"phased funding",)),
+    LabelRule("milestone_payments", (r"milestone payment", r"progress milestone")),
+    LabelRule("unit_price", (r"unit price",)),
+    LabelRule("lump_sum", (r"lump sum", r"fixed price")),
+)
+
+
+PROCUREMENT_METHOD_RULES: tuple[LabelRule, ...] = (
+    LabelRule("qbs_or_rfq", (r"\brfq\b", r"qualifications[-\s]+based", r"\bqbs\b")),
+    LabelRule("best_value", (r"best value",)),
+    LabelRule("low_bid", (r"low bid", r"sealed bid", r"lowest responsible bidder")),
+    LabelRule("negotiated", (r"negotiated", r"sole source")),
+)
+
+
+CLAUSE_FAMILY_RULES: tuple[ClauseFamilyRule, ...] = (
+    ClauseFamilyRule(
+        "gmp_offramp",
+        (
+            r"(?:guaranteed maximum price|\bgmp\b)[\s\S]{0,180}(?:not accepted|re-?advertis|not obligated to award)",
+            r"no promise of construction award",
+        ),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT, DocumentType.ADDENDUM),
+    ),
+    ClauseFamilyRule(
+        "appropriation_limit",
+        (r"subject to availability of funds", r"funds are appropriated", r"non-appropriation", r"budget act"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.FUNDING_DOCUMENT, DocumentType.PROCUREMENT_DOCUMENT),
+    ),
+    ClauseFamilyRule(
+        "open_book_cost_model",
+        (r"open[-\s]+book", r"cost model", r"gmp documentation"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT, DocumentType.ADDENDUM),
+    ),
+    ClauseFamilyRule(
+        "public_records_handling",
+        (r"public records request", r"public records act"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT, DocumentType.ADDENDUM),
+    ),
+    ClauseFamilyRule(
+        "independent_cost_estimator",
+        (r"independent cost estimator", r"\bice\b"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT),
+    ),
+    ClauseFamilyRule(
+        "reporting_wbs",
+        (r"monthly progress report", r"work breakdown structure", r"\bwbs\b"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT),
+    ),
+    ClauseFamilyRule(
+        "change_order_dispute_use",
+        (r"change order[\s\S]{0,100}(?:resolve|dispute|claim)", r"dispute[\s\S]{0,100}change order"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.GENERAL_CONDITIONS, DocumentType.CHANGE_ORDER, DocumentType.BOARD_RECORD),
+    ),
+    ClauseFamilyRule(
+        "availability_deductions",
+        (r"availability payment", r"performance deductions", r"unavailability"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT),
+    ),
+    ClauseFamilyRule(
+        "community_benefits_schedule",
+        (r"community benefits",),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT, DocumentType.AMENDMENT),
+    ),
+    ClauseFamilyRule(
+        "sustainability_schedule",
+        (r"sustainability", r"energy management"),
+        (DocumentType.PRIME_CONTRACT, DocumentType.PROCUREMENT_DOCUMENT, DocumentType.AMENDMENT),
+    ),
+)
+
+
+OUTCOME_EVENT_RULES: tuple[OutcomeEventRule, ...] = (
+    OutcomeEventRule(
+        "award",
+        "Award activity appears documented in the supplied package.",
+        (),
+        (r"contract award", r"notice of award", r"\bawarded\b"),
+        (DocumentType.BOARD_RECORD, DocumentType.PROJECT_STATUS, DocumentType.AMENDMENT),
+    ),
+    OutcomeEventRule(
+        "project_status_update",
+        "A project status or progress update appears documented in the supplied package.",
+        (),
+        (r"percent complete", r"estimated completion", r"status update", r"progress report"),
+        (DocumentType.PROJECT_STATUS, DocumentType.BOARD_RECORD),
+    ),
+    OutcomeEventRule(
+        "change_order",
+        "Change-order activity appears documented in the supplied package.",
+        ("scope_change",),
+        (r"change order",),
+        (DocumentType.CHANGE_ORDER, DocumentType.BOARD_RECORD, DocumentType.AMENDMENT),
+    ),
+    OutcomeEventRule(
+        "settlement",
+        "Settlement or release activity appears documented in the supplied package.",
+        ("scope_change", "cost_overrun"),
+        (r"settlement agreement", r"\bsettlement\b", r"\brelease\b", r"mediation"),
+        (DocumentType.BOARD_RECORD, DocumentType.LITIGATION_RECORD),
+    ),
+    OutcomeEventRule(
+        "closeout",
+        "Closeout or final acceptance activity appears documented in the supplied package.",
+        (),
+        (r"closeout", r"final acceptance", r"substantial completion", r"\bcompleted\b"),
+        (DocumentType.PROJECT_STATUS, DocumentType.BOARD_RECORD),
+    ),
+    OutcomeEventRule(
+        "termination",
+        "Termination activity appears documented in the supplied package.",
+        ("scope_change",),
+        (r"termination", r"\bterminated\b"),
+        (DocumentType.BOARD_RECORD, DocumentType.LITIGATION_RECORD, DocumentType.AMENDMENT),
+    ),
+    OutcomeEventRule(
+        "takeover",
+        "Takeover or step-in activity appears documented in the supplied package.",
+        ("governance_noncompliance",),
+        (r"takeover", r"step[-\s]+in"),
+        (DocumentType.BOARD_RECORD, DocumentType.LITIGATION_RECORD),
+    ),
+    OutcomeEventRule(
+        "bankruptcy",
+        "Bankruptcy or insolvency activity appears documented in the supplied package.",
+        ("financing_refinance",),
+        (r"bankruptcy", r"insolvenc"),
+        (DocumentType.LITIGATION_RECORD, DocumentType.BOARD_RECORD),
+    ),
+    OutcomeEventRule(
+        "scope_change",
+        "Rescoping or cost-escalation activity appears documented in the supplied package.",
+        ("scope_change", "cost_overrun"),
+        (r"rescoped?", r"scope change", r"cost escalation", r"budget shortfall"),
+        (DocumentType.BOARD_RECORD, DocumentType.AUDIT_REPORT, DocumentType.AMENDMENT),
+    ),
+    OutcomeEventRule(
+        "audit_finding",
+        "Audit or oversight findings appear documented in the supplied package.",
+        ("governance_noncompliance",),
+        (r"audit finding", r"internal control", r"overrun", r"finding"),
+        (DocumentType.AUDIT_REPORT,),
+    ),
+)
+
+
 NOTICE_DEADLINE_PATTERN = re.compile(
     r"(?P<context>(?:notice|claim|request)[^.:\n]{0,80}?within\s+(?P<days>\d+)\s+(?P<unit>business|calendar)?\s*days)",
     re.IGNORECASE,
@@ -251,6 +527,377 @@ def _finding_from_rule(rule: FindingRule, documents: list[LoadedDocument]) -> Fi
         confidence=confidence,
         evidence=evidence[:3],
         uncertainty_notes=[],
+    )
+
+
+def _find_clause_match(
+    document: LoadedDocument,
+    patterns: tuple[str, ...],
+) -> tuple[ClauseSpan, re.Match[str]] | None:
+    if not document.text_available:
+        return None
+    for clause in document.clauses:
+        for pattern in patterns:
+            match = re.search(pattern, clause.text, flags=re.IGNORECASE)
+            if match:
+                return clause, match
+    return None
+
+
+def _iter_readable_documents(
+    documents: list[LoadedDocument],
+    allowed_types: tuple[DocumentType, ...] = (),
+) -> list[LoadedDocument]:
+    return [
+        document
+        for document in documents
+        if document.text_available and (not allowed_types or document.document_type in allowed_types)
+    ]
+
+
+def _first_label_match(documents: list[LoadedDocument], rules: tuple[LabelRule, ...], default: str) -> str:
+    for rule in rules:
+        for document in _iter_readable_documents(documents, rule.document_types):
+            combined = f"{document.relative_path}\n{document.text}"
+            if any(re.search(pattern, combined, flags=re.IGNORECASE) for pattern in rule.patterns):
+                return rule.label
+    return default
+
+
+def _governance_artifacts_present(documents: list[LoadedDocument]) -> list[str]:
+    artifacts: set[str] = set()
+    for document in documents:
+        if document.document_type is DocumentType.AMENDMENT:
+            artifacts.add("amendments")
+        if document.document_type is DocumentType.CHANGE_ORDER:
+            artifacts.add("change_orders")
+        if document.document_type is DocumentType.BOARD_RECORD:
+            artifacts.add("board_minutes")
+            if re.search(r"settlement|resolution", document.text, flags=re.IGNORECASE):
+                artifacts.add("settlement_resolution")
+        if document.document_type is DocumentType.AUDIT_REPORT:
+            artifacts.add("audit_report")
+        if document.document_type is DocumentType.LITIGATION_RECORD:
+            artifacts.add("litigation_record")
+        if document.document_type is DocumentType.PROJECT_STATUS:
+            artifacts.add("project_status")
+    return sorted(artifacts)
+
+
+def _public_text_quality(documents: list[LoadedDocument]) -> str:
+    available_count = sum(1 for document in documents if document.text_available)
+    if documents and available_count == len(documents):
+        return "structured_or_searchable"
+    if available_count:
+        return "mixed"
+    return "portal_only_or_scanned"
+
+
+def _detect_clause_families(documents: list[LoadedDocument]) -> tuple[list[str], list[EvidenceRef]]:
+    detected: list[str] = []
+    evidence: list[EvidenceRef] = []
+    seen_locations: set[tuple[str, str]] = set()
+
+    for rule in CLAUSE_FAMILY_RULES:
+        for document in _iter_readable_documents(documents, rule.document_types):
+            result = _find_clause_match(document, rule.patterns)
+            if result is None:
+                continue
+            clause, match = result
+            detected.append(rule.tag)
+            ref = _clause_evidence(document, clause, match)
+            key = (ref.document_id, ref.location)
+            if key not in seen_locations:
+                evidence.append(ref)
+                seen_locations.add(key)
+            break
+
+    return sorted(set(detected)), evidence[:6]
+
+
+def _procurement_profile(project_id: str, documents: list[LoadedDocument]) -> ProcurementProfile:
+    agreement_type = _first_label_match(documents, AGREEMENT_TYPE_RULES, "unknown_agreement_type")
+    project_sector = _first_label_match(documents, PROJECT_SECTOR_RULES, "unknown_project_sector")
+    payment_mechanism = _first_label_match(documents, PAYMENT_MECHANISM_RULES, "unknown_payment_mechanism")
+    procurement_method = _first_label_match(documents, PROCUREMENT_METHOD_RULES, "unknown_procurement_method")
+    governance_artifacts = _governance_artifacts_present(documents)
+    clause_families, evidence = _detect_clause_families(documents)
+
+    notes: list[str] = []
+    if governance_artifacts:
+        notes.append("Package includes governance or status records that can support outcome-aware contract analysis.")
+    if not governance_artifacts:
+        notes.append("No board, change-order, audit, or project-status artifacts were supplied with the contract package.")
+    if agreement_type == "cmgc_preconstruction_services":
+        notes.append("CMGC-style preconstruction language was detected; later GMP and construction-award decisions should be tracked separately.")
+
+    return ProcurementProfile(
+        project_id=project_id,
+        agreement_type=agreement_type,
+        project_sector=project_sector,
+        payment_mechanism=payment_mechanism,
+        procurement_method=procurement_method,
+        public_text_quality=_public_text_quality(documents),
+        governance_artifacts_present=governance_artifacts,
+        detected_clause_families=clause_families,
+        evidence=evidence,
+        notes=notes,
+    )
+
+
+def _intensity_score(value: str) -> int:
+    return {"low": 1, "medium": 2, "high": 3}.get(value, 0)
+
+
+def _max_intensity(current: str, candidate: str) -> str:
+    return candidate if _intensity_score(candidate) > _intensity_score(current) else current
+
+
+def _find_first_context_signal(
+    documents: list[LoadedDocument],
+    *,
+    signal_type: str,
+    intensity: str,
+    summary: str,
+    patterns: tuple[str, ...],
+    document_types: tuple[DocumentType, ...],
+) -> ContextSignal | None:
+    for document in _iter_readable_documents(documents, document_types):
+        result = _find_clause_match(document, patterns)
+        if result is None:
+            continue
+        clause, match = result
+        return ContextSignal(
+            signal_type=signal_type,
+            intensity=intensity,
+            summary=summary,
+            evidence=[_clause_evidence(document, clause, match)],
+        )
+    return None
+
+
+def _context_profile(project_id: str, documents: list[LoadedDocument]) -> ContextProfile:
+    funding_flexibility = "medium"
+    schedule_pressure = "medium"
+    oversight_intensity = "low"
+    public_visibility = "low"
+    signals: list[ContextSignal] = []
+
+    signal_definitions = (
+        (
+            "funding_flexibility",
+            "high",
+            "Budget or funding language suggests constrained financial flexibility or reimbursement dependence.",
+            (
+                r"budget shortfall",
+                r"subject to availability of funds",
+                r"appropriat",
+                r"phased funding",
+                r"reimbursement",
+                r"deficit",
+                r"grant deadline",
+            ),
+            (DocumentType.BUDGET_DOCUMENT, DocumentType.FUNDING_DOCUMENT, DocumentType.BOARD_RECORD),
+        ),
+        (
+            "schedule_pressure",
+            "high",
+            "Status or budget materials suggest accelerated delivery expectations or deadline pressure.",
+            (
+                r"accelerated delivery",
+                r"expedite",
+                r"deadline",
+                r"use[-\s]+it[-\s]+or[-\s]+lose[-\s]+it",
+                r"estimated completion",
+                r"critical path",
+            ),
+            (DocumentType.BUDGET_DOCUMENT, DocumentType.PROJECT_STATUS, DocumentType.BOARD_RECORD),
+        ),
+        (
+            "oversight_intensity",
+            "high",
+            "Audit, board, or oversight materials suggest heightened review or governance sensitivity.",
+            (
+                r"audit finding",
+                r"inspector general",
+                r"internal control",
+                r"settlement",
+                r"board resolution",
+                r"finding",
+            ),
+            (DocumentType.AUDIT_REPORT, DocumentType.BOARD_RECORD, DocumentType.LITIGATION_RECORD),
+        ),
+        (
+            "public_visibility",
+            "medium",
+            "Board, agenda, or public status materials indicate a visible project with external reporting cadence.",
+            (
+                r"board",
+                r"council",
+                r"agenda",
+                r"status update",
+                r"percent complete",
+            ),
+            (DocumentType.BOARD_RECORD, DocumentType.PROJECT_STATUS, DocumentType.BUDGET_DOCUMENT),
+        ),
+    )
+
+    for signal_type, intensity, summary, patterns, document_types in signal_definitions:
+        signal = _find_first_context_signal(
+            documents,
+            signal_type=signal_type,
+            intensity=intensity,
+            summary=summary,
+            patterns=patterns,
+            document_types=document_types,
+        )
+        if signal is None:
+            continue
+        signals.append(signal)
+        if signal_type == "funding_flexibility":
+            funding_flexibility = "low" if intensity == "high" else funding_flexibility
+        elif signal_type == "schedule_pressure":
+            schedule_pressure = _max_intensity(schedule_pressure, intensity)
+        elif signal_type == "oversight_intensity":
+            oversight_intensity = _max_intensity(oversight_intensity, intensity)
+        elif signal_type == "public_visibility":
+            public_visibility = _max_intensity(public_visibility, intensity)
+
+    notes: list[str] = []
+    if not signals:
+        notes.append("No budget, board, audit, or status materials supplied enough evidence for a distinct internal-only context signal.")
+    else:
+        notes.append("Context profile is internal-only and should inform strategy without being exposed directly in shareable reports.")
+    if any(document.document_type is DocumentType.BUDGET_DOCUMENT for document in documents):
+        notes.append("Budget materials were supplied and incorporated into internal negotiation-context scoring.")
+
+    return ContextProfile(
+        project_id=project_id,
+        funding_flexibility=funding_flexibility,
+        schedule_pressure=schedule_pressure,
+        oversight_intensity=oversight_intensity,
+        public_visibility=public_visibility,
+        signals=signals,
+        notes=notes,
+    )
+
+
+def _evidence_source_type(document_type: DocumentType) -> str:
+    mapping = {
+        DocumentType.BOARD_RECORD: "council_resolution",
+        DocumentType.PROJECT_STATUS: "project_dashboard",
+        DocumentType.AUDIT_REPORT: "audit_report",
+        DocumentType.LITIGATION_RECORD: "litigation_record",
+        DocumentType.CHANGE_ORDER: "change_order_record",
+        DocumentType.AMENDMENT: "agency_contract_record",
+    }
+    return mapping.get(document_type, "contract_document")
+
+
+def _outcome_events(documents: list[LoadedDocument]) -> list[OutcomeEvent]:
+    events: list[OutcomeEvent] = []
+    seen: set[tuple[str, str]] = set()
+
+    for rule in OUTCOME_EVENT_RULES:
+        for document in _iter_readable_documents(documents, rule.document_types):
+            result = _find_clause_match(document, rule.patterns)
+            if result is None:
+                continue
+            clause, match = result
+            key = (rule.event_type, clause.location)
+            if key in seen:
+                continue
+            seen.add(key)
+            events.append(
+                OutcomeEvent(
+                    event_type=rule.event_type,
+                    impact_types=list(rule.impact_types),
+                    summary=rule.summary,
+                    confidence=_PUBLIC_OVERLAY_CONFIDENCE if document.document_type in {DocumentType.BOARD_RECORD, DocumentType.PROJECT_STATUS, DocumentType.AUDIT_REPORT} else _NO_OVERLAY_CONFIDENCE,
+                    source_document_type=document.document_type.value,
+                    evidence_source_type=_evidence_source_type(document.document_type),
+                    evidence=[_clause_evidence(document, clause, match)],
+                )
+            )
+            break
+
+    return events
+
+
+def _outcome_status(events: list[OutcomeEvent]) -> str:
+    event_types = {event.event_type for event in events}
+    if {"termination", "takeover"} & event_types:
+        return "termination_takeover"
+    if "bankruptcy" in event_types:
+        return "bankruptcy_restructuring"
+    if "scope_change" in event_types:
+        return "scope_rescope"
+    if {"settlement", "change_order"} & event_types:
+        return "dispute_or_change_documented"
+    if "closeout" in event_types:
+        return "completion_documented"
+    if "project_status_update" in event_types:
+        return "active_delivery_documented"
+    if "award" in event_types:
+        return "award_documented"
+    return "unknown_publicly_documented"
+
+
+def _monitoring_recommendations(
+    procurement_profile: ProcurementProfile,
+    outcome_status: str,
+    governance_artifacts: list[str],
+) -> list[str]:
+    recommendations: list[str] = []
+    if outcome_status == "unknown_publicly_documented":
+        recommendations.append("Collect at least one board action, project status, or audit source so the package has a documented public outcome baseline.")
+    if procurement_profile.agreement_type == "cmgc_preconstruction_services":
+        recommendations.append("Track GMP acceptance, independent cost-estimate reconciliation, and any owner decision to re-advertise or defer construction award.")
+    if procurement_profile.payment_mechanism == "availability_payment":
+        recommendations.append("Track availability deductions, performance notices, and amendment activity throughout operations and maintenance.")
+    if "change_orders" not in governance_artifacts:
+        recommendations.append("Preserve later change-order and settlement records because those documents are often the best public evidence of delivery stress.")
+    return recommendations[:4]
+
+
+def _outcome_evidence_bundle(
+    project_id: str,
+    documents: list[LoadedDocument],
+    procurement_profile: ProcurementProfile,
+) -> OutcomeEvidenceBundle:
+    governance_artifacts = procurement_profile.governance_artifacts_present
+    events = _outcome_events(documents)
+    coverage_gaps: list[str] = []
+
+    if not governance_artifacts:
+        coverage_gaps.append("No governance or status documents were supplied, so public outcome evidence is incomplete.")
+
+    unreadable_governance_docs = [
+        document.relative_path
+        for document in documents
+        if not document.text_available
+        and document.document_type in {
+            DocumentType.AMENDMENT,
+            DocumentType.CHANGE_ORDER,
+            DocumentType.BOARD_RECORD,
+            DocumentType.PROJECT_STATUS,
+            DocumentType.AUDIT_REPORT,
+            DocumentType.LITIGATION_RECORD,
+        }
+    ]
+    coverage_gaps.extend(
+        f"Outcome source supplied but unreadable: {path}"
+        for path in unreadable_governance_docs[:3]
+    )
+
+    status = _outcome_status(events)
+    return OutcomeEvidenceBundle(
+        project_id=project_id,
+        outcome_status=status,
+        governance_artifacts_present=governance_artifacts,
+        events=events,
+        coverage_gaps=coverage_gaps,
+        monitoring_recommendations=_monitoring_recommendations(procurement_profile, status, governance_artifacts),
     )
 
 
@@ -320,12 +967,43 @@ def _extract_obligations(documents: list[LoadedDocument]) -> list[Obligation]:
                 )
             )
 
+        progress_reporting = re.search(
+            r"(monthly progress report|progress reports?)[\s\S]{0,120}(work breakdown structure|\bwbs\b)",
+            document.text,
+            flags=re.IGNORECASE,
+        )
+        if progress_reporting and "Submit monthly progress reports by work breakdown structure" not in seen_titles:
+            clause = next(
+                (
+                    item
+                    for item in document.clauses
+                    if re.search(r"monthly progress report|work breakdown structure|\bwbs\b", item.text, flags=re.IGNORECASE)
+                ),
+                None,
+            )
+            seen_titles.add("Submit monthly progress reports by work breakdown structure")
+            obligations.append(
+                Obligation(
+                    id=f"obl_reporting_{len(obligations) + 1}",
+                    source_clause=document.relative_path,
+                    title="Submit monthly progress reports by work breakdown structure",
+                    obligation_type="recurring_reporting",
+                    trigger="during preconstruction or active delivery",
+                    due_rule="monthly, mapped to WBS elements when required",
+                    owner_role="project_controls_manager",
+                    severity_if_missed=Severity.MEDIUM,
+                    evidence=[_clause_evidence(document, clause, progress_reporting)] if clause else [],
+                )
+            )
+
     return obligations
 
 
 def _relationship_strategy(
     documents: list[LoadedDocument],
     all_findings: list[Finding],
+    context_profile: ContextProfile,
+    procurement_profile: ProcurementProfile,
 ) -> dict[str, object]:
     has_public_overlay = any(
         document.document_type in {DocumentType.FUNDING_DOCUMENT, DocumentType.PROCUREMENT_DOCUMENT}
@@ -333,6 +1011,7 @@ def _relationship_strategy(
     )
     has_addenda = any(document.document_type is DocumentType.ADDENDUM for document in documents)
     insurance_pressure = any(finding.role == "insurance_requirements_analyst" for finding in all_findings)
+    governance_material = bool(procurement_profile.governance_artifacts_present)
 
     sensitive_issues = [finding.title for finding in all_findings if SEVERITY_ORDER[finding.severity] >= SEVERITY_ORDER[Severity.HIGH]][:3]
     leverage_points: list[str] = []
@@ -342,12 +1021,24 @@ def _relationship_strategy(
         leverage_points.append("Push broker-to-broker on endorsement wording rather than arguing abstract insurance concepts in principal-only terms.")
     if has_public_overlay:
         leverage_points.append("Focus negotiation on commercial allocation and notice mechanics rather than statutory funding terms that are likely rigid.")
+    if context_profile.funding_flexibility == "low":
+        leverage_points.append("Budget or reimbursement constraints appear tight, so price cash-flow risk and avoid assuming payment-term flexibility.")
+    if context_profile.oversight_intensity == "high":
+        leverage_points.append("Heightened oversight signals suggest pushing hardest on clarity and administrability, not on public-accountability provisions.")
+    if context_profile.schedule_pressure == "high":
+        leverage_points.append("Schedule pressure appears elevated, so protect delay-cost recovery and notice mechanics instead of challenging milestone urgency directly.")
+    if procurement_profile.agreement_type == "cmgc_preconstruction_services":
+        leverage_points.append("Separate preconstruction compensation from later GMP or construction-award risk so the owner cannot strand unrecovered effort.")
+    if governance_material:
+        leverage_points.append("Use available board, status, or change-order records to understand which terms appear politically or operationally rigid before pushing on them.")
 
     posture = (
         "Expect limited flexibility on funding-driven or public-agency compliance terms; prioritize commercial allocation, notice windows, and insurable-risk cleanup."
         if has_public_overlay
         else "Commercial terms may be negotiable, but the current package still needs structured human review before a bid commitment."
     )
+    if context_profile.oversight_intensity == "high":
+        posture += " Oversight signals suggest keeping outward-facing negotiation framing operational and evidence-based."
     confidence = _PUBLIC_OVERLAY_CONFIDENCE if has_public_overlay else _NO_OVERLAY_CONFIDENCE
     return {
         "negotiation_posture": posture,
@@ -362,6 +1053,7 @@ def _review_challenges(
     missing_docs: list[DocumentType],
     unreadable_documents: list[LoadedDocument],
     findings: list[Finding],
+    outcome_evidence: OutcomeEvidenceBundle | None = None,
 ) -> dict[str, object]:
     contradictions: list[str] = []
     if not findings:
@@ -375,6 +1067,8 @@ def _review_challenges(
         f"Unreadable source file requires manual review: {document.relative_path}"
         for document in unreadable_documents
     )
+    if outcome_evidence is not None:
+        missed_hazards.extend(outcome_evidence.coverage_gaps)
     human_review_required = bool(missed_hazards) or any(
         SEVERITY_ORDER[finding.severity] >= SEVERITY_ORDER[Severity.HIGH] for finding in findings
     )
@@ -468,15 +1162,31 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
         "missing_required_documents": [document_type.value for document_type in missing_docs],
     }
 
-    risk_findings = [finding for rule in CONTRACT_RISK_RULES if (finding := _finding_from_rule(rule, documents))]
-    insurance_findings = [finding for rule in INSURANCE_RULES if (finding := _finding_from_rule(rule, documents))]
-    compliance_findings = [finding for rule in COMPLIANCE_RULES if (finding := _finding_from_rule(rule, documents))]
+    risk_findings = [
+        finding
+        for rule in (*CONTRACT_RISK_RULES, *TRANSPORT_CONTRACT_RISK_RULES)
+        if (finding := _finding_from_rule(rule, documents))
+    ]
+    insurance_findings = [
+        finding
+        for rule in (*INSURANCE_RULES, *TRANSPORT_INSURANCE_RULES)
+        if (finding := _finding_from_rule(rule, documents))
+    ]
+    compliance_findings = [
+        finding
+        for rule in (*COMPLIANCE_RULES, *TRANSPORT_COMPLIANCE_RULES)
+        if (finding := _finding_from_rule(rule, documents))
+    ]
     all_findings = [*risk_findings, *insurance_findings, *compliance_findings]
-    relationship_strategy = _relationship_strategy(documents, all_findings)
+    context_profile = _context_profile(project_id, documents)
+    procurement_profile = _procurement_profile(project_id, documents)
+    outcome_evidence = _outcome_evidence_bundle(project_id, documents, procurement_profile)
+    relationship_strategy = _relationship_strategy(documents, all_findings, context_profile, procurement_profile)
     review_challenges = _review_challenges(
         missing_docs=missing_docs,
         unreadable_documents=unreadable_documents,
         findings=all_findings,
+        outcome_evidence=outcome_evidence,
     )
     obligations = _extract_obligations(documents)
     decision_summary = _decision_summary(
@@ -493,6 +1203,9 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
         "insurance_findings.json": [finding.model_dump() for finding in insurance_findings],
         "compliance_findings.json": [finding.model_dump() for finding in compliance_findings],
         "relationship_strategy.json": relationship_strategy,
+        "context_profile.json": context_profile.model_dump(),
+        "procurement_profile.json": procurement_profile.model_dump(),
+        "outcome_evidence.json": outcome_evidence.model_dump(),
         "review_challenges.json": review_challenges,
         "decision_summary.json": decision_summary.model_dump(),
         "obligations_register.json": [obligation.model_dump() for obligation in obligations],
@@ -504,9 +1217,26 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
         _write_json(path, payload)
         artifact_paths[filename] = path
 
+    persisted = FileSystemCaseStore(project_path / ".contract_intelligence").persist_bid_review_run(
+        project_id=project_id,
+        source_project_dir=project_path,
+        artifacts_dir=output_dir,
+        artifact_paths=artifact_paths,
+        document_inventory=document_inventory,
+        decision_summary=decision_summary,
+        context_profile=context_profile,
+        procurement_profile=procurement_profile,
+        outcome_evidence=outcome_evidence,
+        relationship_strategy=relationship_strategy,
+        review_challenges=review_challenges,
+        obligations_count=len(obligations),
+    )
+
     return BidReviewRunResult(
         project_id=project_id,
         artifacts_dir=output_dir,
         artifact_paths=artifact_paths,
         decision_summary=decision_summary,
+        case_record_path=persisted.case_record_path,
+        run_record_path=persisted.run_record_path,
     )

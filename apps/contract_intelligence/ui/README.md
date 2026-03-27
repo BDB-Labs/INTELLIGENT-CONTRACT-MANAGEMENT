@@ -10,3 +10,4 @@ Expected views:
 - decision summary
 - obligations
 - monitoring and alerts
+- committed contract history

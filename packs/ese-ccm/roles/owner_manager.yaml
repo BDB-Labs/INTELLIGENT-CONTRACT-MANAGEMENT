@@ -1,0 +1,7 @@
+name: owner_manager
+role: aggregation
+orientation: owner_feasibility
+weights:
+  enforceability: 0.35
+  bid_impact: 0.35
+  dispute_risk: 0.30

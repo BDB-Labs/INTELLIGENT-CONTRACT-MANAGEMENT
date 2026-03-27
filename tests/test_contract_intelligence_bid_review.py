@@ -76,6 +76,16 @@ def test_bid_review_runner_emits_core_artifacts(tmp_path: Path) -> None:
     assert any(item["obligation_type"] == "notice_deadline" for item in obligations)
     assert any(item["title"] == "Submit certified payroll reports" for item in obligations)
 
+    procurement_profile = json.loads((result.artifacts_dir / "procurement_profile.json").read_text())
+    assert procurement_profile["project_id"] == "riverside-bridge"
+
+    context_profile = json.loads((result.artifacts_dir / "context_profile.json").read_text())
+    assert context_profile["project_id"] == "riverside-bridge"
+    assert context_profile["internal_only"] is True
+
+    outcome_evidence = json.loads((result.artifacts_dir / "outcome_evidence.json").read_text())
+    assert outcome_evidence["outcome_status"] == "unknown_publicly_documented"
+
 
 def test_bid_review_runner_flags_missing_required_documents(tmp_path: Path) -> None:
     project_dir = tmp_path / "missing-insurance-package"
@@ -93,3 +103,135 @@ def test_bid_review_runner_flags_missing_required_documents(tmp_path: Path) -> N
     assert decision["recommendation"] == "no_go"
     assert any("general_conditions" in item for item in challenges["missed_hazards"])
     assert any("insurance_requirements" in item for item in challenges["missed_hazards"])
+
+
+def test_bid_review_runner_profiles_transport_procurement_and_outcomes(tmp_path: Path) -> None:
+    project_dir = tmp_path / "caltrans-cmgc"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Section 1 Delivery Method",
+                "This Construction Manager/General Contractor (CMGC) Preconstruction Services Contract does not obligate the owner to award construction services.",
+                "If the guaranteed maximum price is not accepted, the owner may re-advertise the work.",
+                "Section 2 Funding",
+                "This agreement is subject to availability of funds appropriated through the Budget Act.",
+                "Section 3 Open Book",
+                "Contractor shall maintain open-book cost model records. If the agency receives a Public Records Act request, it shall notify contractor.",
+                "Section 4 Estimate Reconciliation",
+                "Owner may retain an Independent Cost Estimator (ICE) to reconcile estimates.",
+                "Section 5 Reporting",
+                "Contractor shall provide monthly progress reports by Work Breakdown Structure (WBS).",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "Notice of claim must be provided within 10 business days.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "\n".join(
+            [
+                "Additional insured status is required.",
+                "Umbrella coverage shall drop down if primary insurance is exhausted.",
+                "Certificates of insurance are required before starting work.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "RFQ Procurement Package.md").write_text(
+        "Qualifications-based selection under RFQ for this bridge rehabilitation project.",
+        encoding="utf-8",
+    )
+    (project_dir / "Board Resolution.md").write_text(
+        "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall.",
+        encoding="utf-8",
+    )
+    (project_dir / "Proposed Budget FY2027.md").write_text(
+        "Capital budget reflects accelerated delivery expectations, grant deadline pressure, and phased funding tied to reimbursements.",
+        encoding="utf-8",
+    )
+    (project_dir / "Project Status Dashboard.md").write_text(
+        "Project awarded in 2025. Estimated completion 2026. 45 percent complete.",
+        encoding="utf-8",
+    )
+
+    result = run_bid_review(project_dir)
+
+    risk_findings = json.loads((result.artifacts_dir / "risk_findings.json").read_text())
+    assert any(item["category"] == "cmgc_offramp" for item in risk_findings)
+    assert any(item["category"] == "appropriation_limit" for item in risk_findings)
+
+    insurance_findings = json.loads((result.artifacts_dir / "insurance_findings.json").read_text())
+    assert any(item["category"] == "umbrella_drop_down" for item in insurance_findings)
+
+    procurement_profile = json.loads((result.artifacts_dir / "procurement_profile.json").read_text())
+    assert procurement_profile["agreement_type"] == "cmgc_preconstruction_services"
+    assert procurement_profile["procurement_method"] == "qbs_or_rfq"
+    assert "gmp_offramp" in procurement_profile["detected_clause_families"]
+    assert "reporting_wbs" in procurement_profile["detected_clause_families"]
+    assert "board_minutes" in procurement_profile["governance_artifacts_present"]
+
+    outcome_evidence = json.loads((result.artifacts_dir / "outcome_evidence.json").read_text())
+    event_types = {item["event_type"] for item in outcome_evidence["events"]}
+    assert outcome_evidence["outcome_status"] == "scope_rescope"
+    assert "change_order" in event_types
+    assert "scope_change" in event_types
+    assert "project_status_update" in event_types
+
+    obligations = json.loads((result.artifacts_dir / "obligations_register.json").read_text())
+    assert any(item["title"] == "Submit monthly progress reports by work breakdown structure" for item in obligations)
+
+    context_profile = json.loads((result.artifacts_dir / "context_profile.json").read_text())
+    assert context_profile["funding_flexibility"] == "low"
+    assert context_profile["schedule_pressure"] == "high"
+    assert context_profile["oversight_intensity"] == "high"
+    assert context_profile["internal_only"] is True
+
+
+def test_bid_review_runner_persists_case_and_run_records(tmp_path: Path) -> None:
+    project_dir = tmp_path / "persisted-case"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Owner may terminate for convenience.",
+                "Subcontractor shall be paid on a pay-if-paid basis.",
+                "This agreement is subject to availability of funds appropriated through the Budget Act.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "Notice of claim must be provided within 5 business days.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "Certificates of insurance are required before starting work.",
+        encoding="utf-8",
+    )
+    (project_dir / "Board Resolution.md").write_text(
+        "Board resolution documents change order activity and status update.",
+        encoding="utf-8",
+    )
+
+    first = run_bid_review(project_dir)
+
+    case_record = json.loads(first.case_record_path.read_text())
+    run_record = json.loads(first.run_record_path.read_text())
+
+    assert case_record["project_id"] == "persisted-case"
+    assert case_record["latest_run_id"] == run_record["run_id"]
+    assert case_record["total_runs"] == 1
+    assert case_record["latest_agreement_type"] == "unknown_agreement_type"
+    assert run_record["procurement_profile"]["project_id"] == "persisted-case"
+    assert run_record["outcome_evidence"]["outcome_status"] == "dispute_or_change_documented"
+    assert run_record["artifact_paths"]["decision_summary.json"].endswith("decision_summary.json")
+
+    second = run_bid_review(project_dir)
+    case_record_after_second_run = json.loads(second.case_record_path.read_text())
+
+    assert case_record_after_second_run["total_runs"] == 2
+    assert case_record_after_second_run["latest_run_id"] != case_record["latest_run_id"]
+    assert len(case_record_after_second_run["run_history"]) == 2

@@ -1,0 +1,31 @@
+{
+  "recommendation": "go_with_conditions",
+  "human_review_required": true,
+  "missing_required_documents": [],
+  "risk_categories": [
+    "cmgc_offramp",
+    "appropriation_limit"
+  ],
+  "insurance_categories": [
+    "additional_insured",
+    "umbrella_drop_down"
+  ],
+  "compliance_categories": [],
+  "obligation_titles": [
+    "Provide required notice within 10 business days",
+    "Provide certificates of insurance before starting work",
+    "Submit monthly progress reports by work breakdown structure"
+  ],
+  "context_profile": {
+    "funding_flexibility": "low",
+    "schedule_pressure": "high",
+    "oversight_intensity": "high"
+  },
+  "procurement_profile": {
+    "agreement_type": "cmgc_preconstruction_services",
+    "procurement_method": "qbs_or_rfq"
+  },
+  "outcome_evidence": {
+    "outcome_status": "scope_rescope"
+  }
+}

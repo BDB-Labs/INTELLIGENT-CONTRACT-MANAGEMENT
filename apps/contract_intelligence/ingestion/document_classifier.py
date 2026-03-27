@@ -11,12 +11,23 @@ REQUIRED_BID_REVIEW_DOCUMENTS: tuple[DocumentType, ...] = (
 
 
 KEYWORD_HINTS: tuple[tuple[DocumentType, tuple[str, ...]], ...] = (
+    (DocumentType.CHANGE_ORDER, ("change order", "cco")),
+    (DocumentType.AMENDMENT, ("amendment", "amended", "restated")),
+    (DocumentType.BOARD_RECORD, ("resolution", "agenda", "council", "board", "legistar", "minutes")),
+    (DocumentType.BUDGET_DOCUMENT, ("budget", "capital improvement plan", "cip", "financial plan")),
+    (DocumentType.AUDIT_REPORT, ("audit", "auditor", "inspector general")),
+    (DocumentType.PROJECT_STATUS, ("status", "dashboard", "progress report", "construction map", "closeout")),
+    (
+        DocumentType.ENVIRONMENTAL_DOCUMENT,
+        ("ceqa", "environmental", "eir", "negative declaration", "swppp"),
+    ),
+    (DocumentType.LITIGATION_RECORD, ("complaint", "lawsuit", "litigation", "settlement", "release")),
     (DocumentType.INSURANCE_REQUIREMENTS, ("insurance", "coverage", "endorsement")),
     (DocumentType.GENERAL_CONDITIONS, ("general conditions", "aia a201", "gc")),
     (DocumentType.SPECIAL_PROVISIONS, ("special provisions", "supplementary conditions")),
     (DocumentType.ADDENDUM, ("addendum", "addenda")),
     (DocumentType.FUNDING_DOCUMENT, ("funding", "grant", "federal aid", "state aid")),
-    (DocumentType.PROCUREMENT_DOCUMENT, ("rfp", "ifb", "bid package", "procurement")),
+    (DocumentType.PROCUREMENT_DOCUMENT, ("rfp", "rfq", "ifb", "bid package", "procurement", "procedures")),
     (DocumentType.PRIME_CONTRACT, ("prime contract", "agreement", "owner contract", "contract")),
 )
 

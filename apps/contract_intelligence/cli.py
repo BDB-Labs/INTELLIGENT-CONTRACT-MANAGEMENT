@@ -5,8 +5,11 @@ from pathlib import Path
 import typer
 
 from apps.contract_intelligence.evaluation.corpus import default_corpus_dir, evaluate_corpus
+from apps.contract_intelligence.monitoring.runner import monitor_contract
+from apps.contract_intelligence.orchestration.commit_runner import commit_contract, load_committed_obligations
 from apps.contract_intelligence.orchestration.ese_bridge import run_bid_review_with_ese
 from apps.contract_intelligence.orchestration.bid_review_runner import run_bid_review
+from apps.contract_intelligence.ui.dashboard import render_project_dashboard
 
 
 app = typer.Typer(help="Contract intelligence pilot CLI")
@@ -33,6 +36,8 @@ def bid_review(
     typer.echo(f"Recommendation: {result.decision_summary.recommendation.value}")
     typer.echo(f"Overall risk: {result.decision_summary.overall_risk.value}")
     typer.echo(f"Human review required: {result.decision_summary.human_review_required}")
+    typer.echo(f"Case record: {result.case_record_path}")
+    typer.echo(f"Run record: {result.run_record_path}")
     typer.echo("Artifacts written:")
     for filename in sorted(result.artifact_paths):
         relative = Path(result.artifact_paths[filename]).resolve()
@@ -100,6 +105,88 @@ def ensemble_bid_review(
     )
     adapter_name = str((cfg.get("runtime") or {}).get("adapter") or "dry-run")
     typer.echo(f"ESE-backed bid review completed via {adapter_name}. Summary: {summary_path}")
+
+
+@app.command("commit")
+def commit_command(
+    project_dir: str = typer.Argument(..., help="Path to the project folder that already has a bid-review case record"),
+    committed_contract_dir: str | None = typer.Option(
+        None,
+        "--committed-contract-dir",
+        help="Optional path to the final committed contract package if it differs from the original project folder.",
+    ),
+    accepted_risks_file: str | None = typer.Option(
+        None,
+        "--accepted-risks-file",
+        help="Optional JSON list overriding the default accepted-risk carry-forward set.",
+    ),
+    negotiated_changes_file: str | None = typer.Option(
+        None,
+        "--negotiated-changes-file",
+        help="Optional JSON list of negotiated changes captured at commit time.",
+    ),
+) -> None:
+    """Create a committed contract record and obligation snapshot from the latest bid-review run."""
+    result = commit_contract(
+        project_dir=project_dir,
+        committed_contract_dir=committed_contract_dir,
+        accepted_risks_file=accepted_risks_file,
+        negotiated_changes_file=negotiated_changes_file,
+    )
+    typer.echo(f"Project: {result.project_id}")
+    typer.echo(f"Commit ID: {result.commit_id}")
+    typer.echo(f"Case record: {result.case_record_path}")
+    typer.echo(f"Commit record: {result.commit_record_path}")
+    typer.echo(f"Current obligations: {result.obligations_path}")
+    typer.echo(f"Obligations captured: {result.obligations_count}")
+
+
+@app.command("extract-obligations")
+def extract_obligations_command(
+    project_dir: str = typer.Argument(..., help="Path to the project folder with a committed contract record"),
+    output_path: str | None = typer.Option(
+        None,
+        "--output-path",
+        help="Optional path where the current committed-obligations snapshot should be copied.",
+    ),
+) -> None:
+    """Reload the current obligation snapshot from the latest committed contract state."""
+    result = load_committed_obligations(project_dir=project_dir, output_path=output_path)
+    typer.echo(f"Project: {result.project_id}")
+    typer.echo(f"Obligations: {result.obligations_path}")
+    typer.echo(f"Obligation count: {result.obligations_count}")
+
+
+@app.command("monitor")
+def monitor_command(
+    project_dir: str = typer.Argument(..., help="Path to the project folder with a committed contract record"),
+    status_inputs_file: str | None = typer.Option(
+        None,
+        "--status-inputs-file",
+        help="Optional JSON list describing current obligation statuses, due dates, and satisfaction dates.",
+    ),
+) -> None:
+    """Apply current operational status inputs to the committed obligation baseline and emit alerts."""
+    result = monitor_contract(project_dir=project_dir, status_inputs_file=status_inputs_file)
+    typer.echo(f"Project: {result.project_id}")
+    typer.echo(f"Monitoring run: {result.run_id}")
+    typer.echo(f"Monitoring snapshot: {result.monitoring_snapshot_path}")
+    typer.echo(f"Alerts: {result.alerts_path}")
+    typer.echo(f"Open alerts: {result.alerts_count}")
+
+
+@app.command("render-dashboard")
+def render_dashboard_command(
+    project_dir: str = typer.Argument(..., help="Path to the project folder with persisted lifecycle state"),
+    output_path: str | None = typer.Option(
+        None,
+        "--output-path",
+        help="Optional HTML output path for the rendered operator dashboard.",
+    ),
+) -> None:
+    """Render a self-contained HTML dashboard over the persisted contract lifecycle state."""
+    path = render_project_dashboard(project_dir=project_dir, output_path=output_path)
+    typer.echo(f"Dashboard: {path}")
 
 
 if __name__ == "__main__":

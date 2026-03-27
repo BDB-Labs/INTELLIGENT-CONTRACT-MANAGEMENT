@@ -144,6 +144,10 @@ The base workflow should be fixed even when the role names change:
 8. Monitor
    - alert on deadlines, drift, or changed source material
 
+The current pilot now implements the first half of that lifecycle with durable
+run records and committed-contract obligation snapshots. Monitoring remains the
+next product step rather than an implied future state.
+
 ## Artifact Contract
 
 The platform should favor stable artifacts before polished UI.
@@ -152,10 +156,17 @@ Recommended baseline artifacts:
 
 - `document_inventory.json`
 - `risk_findings.json`
+- `context_profile.json`
+- `procurement_profile.json`
+- `outcome_evidence.json`
 - `decision_summary.json`
 - `review_challenges.json`
 - `obligations_register.json`
 - `audit_trace.json`
+
+Those artifacts should then be persisted into durable case and run records so
+commit, monitoring, and API layers work from stable product state instead of
+re-reading ad hoc output folders.
 
 This keeps the system inspectable and makes evaluation easier across packs.
 
@@ -179,6 +190,9 @@ The first pack should focus on a narrow bid-review product slice:
 - contractor-side risk findings
 - insurance anomaly review
 - funding and compliance findings
+- internal-only context ingestion from budget, board, audit, and status materials
+- procurement and delivery-method profiling
+- public governance and outcome evidence capture
 - executive go/no-go summary
 - obligation preview
 

@@ -56,6 +56,25 @@ ROLE_PROMPT_GUIDANCE = {
         "Assess owner posture, negotiation sensitivity, politically rigid issues, and leverage points. "
         "Use findings only for material relationship risks, and use next_steps for negotiation posture advice."
     ),
+    "context_intelligence_analyst": (
+        "You are the context_intelligence_analyst for a public-infrastructure contract review. "
+        "Extract internal-only signals from budgets, board records, audits, funding overlays, and status materials. "
+        "Assess funding flexibility, schedule pressure, oversight intensity, and public visibility without inventing unsupported political conclusions. "
+        "Use findings only for evidence gaps and use artifacts to name context_profile.json."
+    ),
+    "procurement_structure_analyst": (
+        "You are the procurement_structure_analyst for a public-infrastructure contract review. "
+        "Identify the delivery method, procurement method, payment mechanism, public-text quality, "
+        "governance artifacts, and transport-procurement clause families such as CMGC GMP off-ramps, "
+        "appropriation limits, open-book/Public Records Act handling, independent cost estimating, and WBS reporting. "
+        "Use findings for metadata ambiguity only and use artifacts to name procurement_profile.json."
+    ),
+    "outcome_evidence_analyst": (
+        "You are the outcome_evidence_analyst for a public-infrastructure contract review. "
+        "Look for award, status, change-order, settlement, audit, litigation, closeout, termination, takeover, "
+        "or bankruptcy signals in the supplied package. "
+        "Do not invent outcomes; when evidence is absent, make the gap explicit and use artifacts to name outcome_evidence.json."
+    ),
     "adversarial_reviewer": (
         "You are the adversarial_reviewer for a contractor-side construction bid review. "
         "Challenge optimistic assumptions, hunt for missed hazards, and surface contradictions across analysts. "
@@ -178,12 +197,12 @@ def build_bid_review_ese_config(
         },
         "input": {
             "scope": (
-                "Evaluate this construction contract package from the contractor perspective and produce "
-                "intake, risk, insurance, compliance, challenge, decision, and obligation outputs."
-            ),
-            "prompt": _render_project_context(project_path),
-            "project_dir": str(project_path),
-        },
+            "Evaluate this construction contract package from the contractor perspective and produce "
+            "intake, risk, insurance, compliance, context-profile, procurement-profile, outcome-evidence, challenge, decision, and obligation outputs."
+        ),
+        "prompt": _render_project_context(project_path),
+        "project_dir": str(project_path),
+    },
         "output": {
             "artifacts_dir": artifacts_dir,
             "enforce_json": True,

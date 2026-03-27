@@ -1,0 +1,7 @@
+name: contractor_manager
+role: aggregation
+orientation: contractor_strategy
+weights:
+  financial_exposure: 0.40
+  negotiation_importance: 0.35
+  competitiveness: 0.25

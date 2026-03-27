@@ -29,6 +29,9 @@ def test_role_catalog_exposes_core_bid_review_roles() -> None:
     roles = role_keys()
     assert "document_intake_analyst" in roles
     assert "contract_risk_analyst" in roles
+    assert "context_intelligence_analyst" in roles
+    assert "procurement_structure_analyst" in roles
+    assert "outcome_evidence_analyst" in roles
     assert "bid_decision_analyst" in roles
     assert "adversarial_reviewer" in roles
 
@@ -36,6 +39,9 @@ def test_role_catalog_exposes_core_bid_review_roles() -> None:
 def test_bid_review_pipeline_has_expected_stage_order() -> None:
     stages = bid_review_pipeline()
     assert [stage.key for stage in stages] == ["intake", "analysis", "challenge", "synthesis"]
+    assert "context_profile.json" in stages[1].outputs
+    assert "procurement_profile.json" in stages[1].outputs
+    assert "outcome_evidence.json" in stages[1].outputs
     assert stages[-1].outputs == ("decision_summary.json", "obligations_register.json")
 
 
@@ -56,6 +62,9 @@ def test_document_classifier_detects_common_contract_inputs() -> None:
     assert classify_document("Prime_Contract_Agreement.pdf") is DocumentType.PRIME_CONTRACT
     assert classify_document("General-Conditions-AIA-A201.pdf") is DocumentType.GENERAL_CONDITIONS
     assert classify_document("Insurance Requirements Exhibit.docx") is DocumentType.INSURANCE_REQUIREMENTS
+    assert classify_document("Board Resolution 2026.pdf") is DocumentType.BOARD_RECORD
+    assert classify_document("Proposed Capital Budget FY2027.pdf") is DocumentType.BUDGET_DOCUMENT
+    assert classify_document("Agency Audit Report.pdf") is DocumentType.AUDIT_REPORT
 
 
 def test_missing_required_documents_flags_bid_review_gaps() -> None:

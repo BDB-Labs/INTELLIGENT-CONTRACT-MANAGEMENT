@@ -1,0 +1,12 @@
+name: relationship_strategist
+role: negotiation_strategy
+orientation: long_term_relationship
+weights:
+  reputation: 0.40
+  repeat_work: 0.30
+  negotiation_friction: 0.30
+output_classes:
+  - push_hard
+  - negotiate_softly
+  - accept_price
+  - accept

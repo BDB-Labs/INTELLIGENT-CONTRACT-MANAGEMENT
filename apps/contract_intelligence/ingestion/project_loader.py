@@ -25,6 +25,7 @@ PLAIN_TEXT_SUFFIXES = {
 
 IGNORED_PATH_PARTS = {
     ".git",
+    ".contract_intelligence",
     ".venv",
     ".pytest_cache",
     ".ruff_cache",

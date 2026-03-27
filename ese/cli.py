@@ -413,8 +413,10 @@ def pr(
             write_config(write_config_path, cfg)
         summary_path = run_pipeline(cfg=cfg, artifacts_dir=artifacts_dir)
         report = collect_run_report(artifacts_dir)
-        review_path = str(Path(artifacts_dir) / "pr_review.md")
-        Path(review_path).write_text(
+        review_path = str(Path(summary_path).parent / "pr_review.md")
+        review_file = Path(review_path)
+        review_file.parent.mkdir(parents=True, exist_ok=True)
+        review_file.write_text(
             render_pull_request_review_markdown(context, report),
             encoding="utf-8",
         )
