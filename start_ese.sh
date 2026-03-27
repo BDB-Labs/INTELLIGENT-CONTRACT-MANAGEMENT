@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VENV_DIR="${ROOT_DIR}/.venv"
-PYTHON_BIN="${PYTHON:-python3}"
-ESE_BIN="${VENV_DIR}/bin/ese"
+cd "${ROOT_DIR}"
+
+UV_BIN="${UV:-uv}"
 DEFAULT_ARTIFACTS_DIR="${ESE_ARTIFACTS_DIR:-${ROOT_DIR}/artifacts}"
 OLLAMA_LOG_FILE="${ROOT_DIR}/.ollama.log"
 
@@ -30,39 +30,22 @@ Examples:
 EOF
 }
 
-ensure_python() {
-  if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
-    echo "Required Python interpreter not found: ${PYTHON_BIN}" >&2
+ensure_uv() {
+  if ! command -v "${UV_BIN}" >/dev/null 2>&1; then
+    echo "Required tool not found: ${UV_BIN}" >&2
+    echo "Install uv from https://docs.astral.sh/uv/ and re-run this launcher." >&2
     exit 1
   fi
 }
 
-ensure_venv() {
-  ensure_python
-  if [[ ! -x "${VENV_DIR}/bin/python" ]]; then
-    echo "Creating virtual environment in ${VENV_DIR}"
-    "${PYTHON_BIN}" -m venv "${VENV_DIR}"
-  fi
-}
-
 ensure_install() {
-  ensure_venv
-  if [[ ! -x "${ESE_BIN}" ]]; then
-    echo "Installing ESE into ${VENV_DIR}"
-    "${VENV_DIR}/bin/python" -m pip install -e '.[dev]'
-    touch "${VENV_DIR}/.ese-installed"
-    return
-  fi
-
-  if [[ ! -e "${VENV_DIR}/.ese-installed" || "${ROOT_DIR}/pyproject.toml" -nt "${VENV_DIR}/.ese-installed" ]]; then
-    echo "Refreshing ESE installation in ${VENV_DIR}"
-    "${VENV_DIR}/bin/python" -m pip install -e '.[dev]'
-  fi
-  touch "${VENV_DIR}/.ese-installed"
+  ensure_uv
+  echo "Syncing ESE with uv..."
+  "${UV_BIN}" sync --locked
 }
 
 run_dashboard() {
-  exec "${ESE_BIN}" dashboard --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
+  exec "${UV_BIN}" run ese dashboard --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
 }
 
 run_task() {
@@ -71,19 +54,19 @@ run_task() {
     usage
     exit 2
   fi
-  exec "${ESE_BIN}" task "$1" --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "${@:2}"
+  exec "${UV_BIN}" run ese task "$1" --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "${@:2}"
 }
 
 run_pr() {
-  exec "${ESE_BIN}" pr --repo-path "${ROOT_DIR}" --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
+  exec "${UV_BIN}" run ese pr --repo-path "${ROOT_DIR}" --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
 }
 
 run_cli() {
-  exec "${ESE_BIN}" "$@"
+  exec "${UV_BIN}" run ese "$@"
 }
 
 run_tests() {
-  exec "${VENV_DIR}/bin/python" -m pytest
+  exec "${UV_BIN}" run pytest "$@"
 }
 
 ollama_installed() {
@@ -152,7 +135,7 @@ prompt_for_ollama_install_or_hosted_model() {
       ;;
     2)
       echo "Launching the advanced setup wizard so you can choose a hosted provider instead."
-      exec "${ESE_BIN}" init --advanced
+      exec "${UV_BIN}" run ese init --advanced
       ;;
     *)
       echo "Canceled."
@@ -163,7 +146,7 @@ prompt_for_ollama_install_or_hosted_model() {
 
 config_uses_local_runtime() {
   local config_path="$1"
-  "${VENV_DIR}/bin/python" - "$config_path" <<'PY'
+  "${UV_BIN}" run python - "$config_path" <<'PY'
 from __future__ import annotations
 import sys
 from pathlib import Path

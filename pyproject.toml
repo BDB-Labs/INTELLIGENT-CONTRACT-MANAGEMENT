@@ -16,14 +16,19 @@ dependencies = [
   "fastapi>=0.115",
 ]
 
-[project.optional-dependencies]
+[project.scripts]
+ese = "ese.cli:app"
+
+[dependency-groups]
 dev = [
+  "httpx>=0.27",
   "pytest>=8.0",
   "ruff>=0.4",
 ]
 
-[project.scripts]
-ese = "ese.cli:app"
+[tool.uv]
+default-groups = ["dev"]
+required-version = ">=0.9.0"
 
 [tool.setuptools.packages.find]
 include = ["ese*"]

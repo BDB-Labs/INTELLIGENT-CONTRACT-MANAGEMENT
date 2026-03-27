@@ -12,12 +12,12 @@
 Run locally:
 
 ```bash
-pip install -e . pytest ruff
-ruff check ese tests
-pytest -q
-ese doctor --config ese.config.yaml
-ese start --config ese.config.yaml --artifacts-dir artifacts
-pytest tests/test_contract_intelligence_corpus.py tests/test_contract_intelligence_ui.py tests/test_contract_intelligence_api.py tests/test_contract_intelligence_monitoring.py tests/test_contract_intelligence_commit_lifecycle.py tests/test_contract_intelligence_bid_review.py tests/test_contract_intelligence_ese_bridge.py tests/test_contract_intelligence_ingestion.py tests/test_contract_intelligence_scaffold.py
+uv sync --locked
+uv run ruff check ese tests
+uv run pytest -q
+uv run ese doctor --config ese.config.yaml
+uv run ese start --config ese.config.yaml --artifacts-dir artifacts
+uv run pytest tests/test_contract_intelligence_corpus.py tests/test_contract_intelligence_ui.py tests/test_contract_intelligence_api.py tests/test_contract_intelligence_monitoring.py tests/test_contract_intelligence_commit_lifecycle.py tests/test_contract_intelligence_bid_review.py tests/test_contract_intelligence_ese_bridge.py tests/test_contract_intelligence_ingestion.py tests/test_contract_intelligence_scaffold.py
 ```
 
 ## Publish flow
@@ -32,11 +32,10 @@ pytest tests/test_contract_intelligence_corpus.py tests/test_contract_intelligen
 After publish:
 
 ```bash
-python -m venv /tmp/ese-smoke
-source /tmp/ese-smoke/bin/activate
-pip install ese-cli==<version>
-ese --help
-ese roles
+uv venv /tmp/ese-smoke
+UV_PYTHON=/tmp/ese-smoke/bin/python uv pip install "ese-cli==<version>"
+/tmp/ese-smoke/bin/ese --help
+/tmp/ese-smoke/bin/ese roles
 ```
 
 Confirm CLI loads and basic commands execute.

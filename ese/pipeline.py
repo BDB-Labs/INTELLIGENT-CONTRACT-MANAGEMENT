@@ -322,6 +322,7 @@ def _role_prompt(
         return _compact_lines(prompt)
 
     if role == "implementer":
+        architect_section = f"Architect Plan:\n{architect_output}" if architect_output else ""
         prompt = textwrap.dedent(
             f"""
             You are the Implementer.
@@ -332,7 +333,7 @@ def _role_prompt(
 
             {extra_context_block}
 
-            {f"Architect Plan:\n{architect_output}" if architect_output else ""}
+            {architect_section}
 
             {json_contract}
             """,
@@ -365,6 +366,7 @@ def _role_prompt(
         ).strip()
         return _compact_lines(prompt)
 
+    implementer_section = f"Implementer Output:\n{implementer_output}" if implementer_output else ""
     prompt = textwrap.dedent(
         f"""
         You are the {role}.
@@ -375,7 +377,7 @@ def _role_prompt(
 
         {extra_context_block}
 
-        {f"Implementer Output:\n{implementer_output}" if implementer_output else ""}
+        {implementer_section}
 
         {json_contract}
         """,

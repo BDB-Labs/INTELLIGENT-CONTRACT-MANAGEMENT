@@ -47,46 +47,53 @@ Persistent lifecycle state now includes:
 
 ## Local usage
 
+From the repository root, sync the project once with `uv`:
+
+```bash
+uv sync --locked
+```
+
 Run the deterministic bid review over a project folder:
 
 ```bash
-python -m apps.contract_intelligence bid-review ./sample_project
+uv run python -m apps.contract_intelligence bid-review ./sample_project
 ```
 
 Run the same project through ESE's orchestration path:
 
 ```bash
-python -m apps.contract_intelligence ensemble-bid-review ./sample_project
+uv run python -m apps.contract_intelligence ensemble-bid-review ./sample_project
 ```
 
 Commit the latest reviewed package into committed state:
 
 ```bash
-python -m apps.contract_intelligence commit ./sample_project
+uv run python -m apps.contract_intelligence commit ./sample_project
 ```
 
 Reload the current obligation snapshot:
 
 ```bash
-python -m apps.contract_intelligence extract-obligations ./sample_project
+uv run python -m apps.contract_intelligence extract-obligations ./sample_project
 ```
 
 Apply operational status inputs and emit alerts:
 
 ```bash
-python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
+uv run python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
 ```
 
 Render the generated operator dashboard:
 
 ```bash
-python -m apps.contract_intelligence render-dashboard ./sample_project
+uv run python -m apps.contract_intelligence render-dashboard ./sample_project
+uv run python -m apps.contract_intelligence render-dashboard ./sample_project --mode external
 ```
 
 Run the starter gold corpus:
 
 ```bash
-python -m apps.contract_intelligence evaluate-corpus
+uv run python -m apps.contract_intelligence evaluate-corpus
 ```
 
 ## Product behavior notes
@@ -99,9 +106,9 @@ python -m apps.contract_intelligence evaluate-corpus
 - budget, board, audit, funding, and status materials feed an internal-only
   `context_profile.json` artifact used for strategy and relationship-aware
   reasoning
-- the generated dashboard supports internal and external display modes, but the
-  external mode is presentation-only and does not remove internal data from the
-  underlying HTML payload
+- the generated dashboard supports internal and external outputs; rendering
+  with `--mode external` omits internal-only context, review actions, and
+  sensitive path metadata from the generated HTML payload
 
 ## Local API safety defaults
 

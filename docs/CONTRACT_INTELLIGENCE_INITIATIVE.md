@@ -137,9 +137,9 @@ Completed foundation:
 
 Next likely extension:
 
-- server-backed persistence for human-review actions and overrides
-- true external artifact generation instead of presentation-only display mode
 - deeper context-source ingestion beyond package-local documents
+- richer operator workflows that promote review actions into explicit lifecycle overrides
+- signed or templated external exports for formal sharing workflows
 - explicit authentication and role-gated visibility if the local API is promoted beyond trusted local use
 
 ## Remediation Control

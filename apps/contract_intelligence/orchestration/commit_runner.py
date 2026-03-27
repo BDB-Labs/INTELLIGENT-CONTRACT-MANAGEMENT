@@ -11,7 +11,6 @@ from apps.contract_intelligence.domain.models import (
     AcceptedRisk,
     FindingDisposition,
     NegotiatedChange,
-    Obligation,
     ProjectDocumentRecord,
 )
 from apps.contract_intelligence.ingestion.document_classifier import REQUIRED_BID_REVIEW_DOCUMENTS

@@ -32,6 +32,12 @@ flowchart TD
 pip install ese-cli
 ```
 
+Or with `uv`:
+
+```bash
+uv tool install ese-cli
+```
+
 Homebrew install from the dedicated tap:
 
 ```bash
@@ -46,6 +52,20 @@ brew install ollama
 brew services start ollama
 ```
 
+## Repository Development With UV
+
+For local work from a clone of this repository, use `uv` as the primary
+environment and command runner:
+
+```bash
+uv sync --locked
+uv run ruff check ese tests
+uv run pytest -q
+```
+
+If you are running commands from the repo instead of an installed package,
+prefix CLI calls with `uv run`.
+
 ## One-Command Local Start
 
 There is now a local GUI: the ESE dashboard.
@@ -57,8 +77,8 @@ From the repo root, the simplest way to start everything is:
 ```
 
 That script will:
-- create `.venv` if needed,
-- install/update the package in the virtualenv,
+- sync the project with `uv` using `uv.lock`,
+- create or refresh the local `.venv` managed by `uv`,
 - start the local dashboard GUI.
 
 If you run a `local`/Ollama-backed workflow through the launcher, it now:
@@ -188,24 +208,26 @@ Current contract-intelligence lifecycle:
 - committed contract state with accepted risks and negotiated changes
 - obligation extraction and current/by-commit snapshots
 - monitoring runs with due, late, satisfied, and alert state
-- generated operator dashboard with internal/external display modes and local
-  human review actions
+- generated operator dashboard with internal/external display modes and
+  server-backed human review actions
 - thin local API over projects, runs, commits, obligations, monitoring, and
   alerts
 
 Common commands:
 
 ```bash
-python -m apps.contract_intelligence bid-review ./sample_project
-python -m apps.contract_intelligence commit ./sample_project
-python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
-python -m apps.contract_intelligence render-dashboard ./sample_project
+uv run python -m apps.contract_intelligence bid-review ./sample_project
+uv run python -m apps.contract_intelligence commit ./sample_project
+uv run python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
+uv run python -m apps.contract_intelligence render-dashboard ./sample_project
+uv run python -m apps.contract_intelligence render-dashboard ./sample_project --mode external
 ```
 
 The contract-intelligence dashboard escapes rendered contract-derived content
-before inserting it into dynamic HTML. Its external mode is presentation-only,
-not a true data-segregated export, so generated HTML should still be treated as
-internal unless a separate external artifact is rendered.
+before inserting it into dynamic HTML. Rendering with `--mode external`
+produces a sanitized artifact that omits internal-only context, review-action
+data, and sensitive path metadata from the embedded payload. Internal dashboard
+artifacts should still be treated as sensitive local operator outputs.
 
 ## Framework role drafting
 

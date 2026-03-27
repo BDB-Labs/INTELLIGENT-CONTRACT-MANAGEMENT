@@ -24,10 +24,10 @@ Primary entry point:
 Current workflow:
 
 1. Run bid review, commit, and monitoring against a project workspace.
-2. Render the dashboard with the contract-intelligence CLI `render-dashboard` command.
+2. Render the dashboard with the contract-intelligence CLI `render-dashboard` command, using `--mode external` when you want a sanitized external artifact.
 3. Open the generated HTML artifact from the project `artifacts/` directory.
 
 Near-term UI follow-on work:
 
-- exportable external report snapshots derived from the selected report mode
 - deeper action workflows that tie review decisions back into the lifecycle store
+- signed or templated external exports for formal stakeholder distribution

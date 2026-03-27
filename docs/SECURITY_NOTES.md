@@ -34,19 +34,17 @@ or broad `except Exception` handlers in its application code. Exception
 handling there is currently limited to more specific failure paths such as
 missing files and validation failures.
 
-## Important limitation
+## Dashboard artifact boundaries
 
-The contract-intelligence dashboard's external mode is a presentation mode, not
-a true redaction boundary.
+The contract-intelligence dashboard now has distinct internal and external
+rendering paths.
 
-That means:
+When rendered in external mode, the generated HTML omits internal-only context,
+review-action data, and sensitive path metadata from the embedded payload
+itself.
 
-- internal-only panels are hidden from view
-- the HTML still contains the underlying payload for the generated dashboard
-
-Do not treat the generated HTML itself as a safe external deliverable unless a
-separate external artifact is produced that omits internal context and review
-data at generation time.
+Internal-mode dashboards still contain strategy-only material and should remain
+inside the trusted operator boundary.
 
 ## Dependabot note
 
@@ -70,9 +68,9 @@ patched release becomes available.
 
 ## Next protection-oriented follow-on work
 
-- produce a true external report artifact that omits internal context data at
-  generation time
-- add server-backed persistence for human review actions instead of browser-only
-  local storage
 - introduce authentication and role-gated visibility if the local API or
   dashboard is ever promoted beyond trusted local use
+- add signed or checksummed external exports if external dashboards become part
+  of a formal reporting workflow
+- continue tightening ingestion-quality controls for weak PDFs and low-signal
+  source documents
