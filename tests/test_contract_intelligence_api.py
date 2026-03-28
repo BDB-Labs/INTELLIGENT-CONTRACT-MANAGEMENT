@@ -67,10 +67,14 @@ def test_contract_intelligence_api_wraps_full_local_lifecycle(tmp_path: Path) ->
     project_dir = tmp_path / "api-bridge"
     _write_project_package(project_dir)
 
-    analyze_response = client.post("/projects/analyze", json={"project_dir": str(project_dir)})
+    analyze_response = client.post(
+        "/projects/analyze",
+        json={"project_dir": str(project_dir), "analysis_perspective": "agency"},
+    )
     assert analyze_response.status_code == 200
     analyze_payload = analyze_response.json()
     assert analyze_payload["project_id"] == "api-bridge"
+    assert analyze_payload["analysis_perspective"] == "agency"
 
     dispositions_path = _write_finding_dispositions(project_dir, tmp_path / "finding_dispositions.json")
     commit_response = client.post(
@@ -116,6 +120,7 @@ def test_contract_intelligence_api_wraps_full_local_lifecycle(tmp_path: Path) ->
     assert latest_commit_response.status_code == 200
     assert latest_monitoring_response.status_code == 200
     assert alerts_response.status_code == 200
+    assert state_response.json()["latest_analysis_perspective"] == "agency"
     assert state_response.json()["latest_commit_id"] == latest_commit_response.json()["commit_id"]
     assert state_response.json()["latest_monitoring_run_id"] == latest_monitoring_response.json()["run_id"]
     assert any(item["alert_type"] == "late" for item in alerts_response.json())

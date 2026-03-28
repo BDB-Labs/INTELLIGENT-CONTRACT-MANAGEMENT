@@ -12,6 +12,7 @@ def _cfg() -> dict:
     return {
         "version": 1,
         "mode": "ensemble",
+        "execution_mode": "demo",
         "provider": {
             "name": "openai",
             "model": "gpt-5-mini",

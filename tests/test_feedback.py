@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ese.feedback import feedback_store_path, feedback_summary, record_feedback
+import pytest
+
+from ese.feedback import FeedbackStoreError, feedback_store_path, feedback_summary, record_feedback
 
 
 def test_feedback_is_stored_at_run_family_root(tmp_path: Path) -> None:
@@ -38,3 +40,16 @@ def test_feedback_summary_generates_pluralism_safe_guidance(tmp_path: Path) -> N
     assert summary["role_bias"]["security_auditor"] == "positive"
     assert summary["role_bias"]["adversarial_reviewer"] == "negative"
     assert any("without suppressing unique dissent" in item for item in summary["guidance"])
+
+
+def test_feedback_store_corruption_fails_closed(tmp_path: Path) -> None:
+    root = tmp_path / "runs"
+    root.mkdir()
+    store_path = feedback_store_path(root)
+    store_path.write_text("{not-json", encoding="utf-8")
+
+    with pytest.raises(FeedbackStoreError):
+        record_feedback(root, role="security_auditor", title="Missing authz", feedback="useful")
+
+    with pytest.raises(FeedbackStoreError):
+        feedback_summary(root)

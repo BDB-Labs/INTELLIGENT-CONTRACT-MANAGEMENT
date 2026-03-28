@@ -12,6 +12,10 @@ FEEDBACK_STORE_NAME = ".ese_feedback.json"
 ALLOWED_FEEDBACK = {"useful", "noisy", "wrong"}
 
 
+class FeedbackStoreError(ValueError):
+    """Raised when the local feedback store cannot be trusted."""
+
+
 def _feedback_root(path: str | Path) -> Path:
     candidate = Path(path)
     if (candidate / "pipeline_state.json").is_file():
@@ -32,14 +36,14 @@ def load_feedback_store(path: str | Path) -> dict[str, Any]:
 
     try:
         parsed = json.loads(store_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return {"version": 1, "items": []}
+    except json.JSONDecodeError as err:
+        raise FeedbackStoreError(f"Feedback store is not valid JSON: {store_path}") from err
 
     if not isinstance(parsed, dict):
-        return {"version": 1, "items": []}
+        raise FeedbackStoreError(f"Feedback store must be a JSON object: {store_path}")
     items = parsed.get("items")
     if not isinstance(items, list):
-        return {"version": 1, "items": []}
+        raise FeedbackStoreError(f"Feedback store items must be a list: {store_path}")
     return {"version": 1, "items": [item for item in items if isinstance(item, dict)]}
 
 

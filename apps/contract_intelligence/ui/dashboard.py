@@ -172,6 +172,7 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
         "obligation_status_counts": obligation_status_counts,
         "timeline": _lifecycle_timeline(case_record),
         "summary_metrics": {
+            "analysis_perspective": decision.get("analysis_perspective", case_record.get("latest_analysis_perspective", "vendor")),
             "recommendation": decision.get("recommendation", "unknown"),
             "overall_risk": decision.get("overall_risk", "unknown"),
             "confidence": decision.get("confidence", 0),
@@ -1548,6 +1549,7 @@ def render_project_dashboard(
       renderLocalCacheWarning();
       el("project-title").textContent = dashboardData.project_id;
       el("hero-badges").innerHTML = [
+        `<span class="badge">${safeTitle(metrics.analysis_perspective)} perspective</span>`,
         `<span class="badge risk">${safeTitle(metrics.recommendation)}</span>`,
         `<span class="badge warn">${safeTitle(metrics.overall_risk)} overall risk</span>`,
         `<span class="badge good">${safe(metrics.documents_count)} documents indexed</span>`,
@@ -1589,6 +1591,7 @@ def render_project_dashboard(
         ["Review runs", dashboardData.case_record.total_runs],
         ["Commits", dashboardData.case_record.total_commits],
         ["Monitoring runs", dashboardData.case_record.total_monitoring_runs],
+        ["Perspective", titleize(decision.analysis_perspective || dashboardData.case_record.latest_analysis_perspective)],
         ["Confidence", decision.confidence],
         ["Late obligations", dashboardData.obligation_status_counts.late],
         ["Saved review actions", review.total],
@@ -1633,6 +1636,7 @@ def render_project_dashboard(
       const summaryRows = [
         ["Recommendation", titleize(decision.recommendation)],
         ["Overall risk", titleize(decision.overall_risk)],
+        ["Perspective", titleize(decision.analysis_perspective || dashboardData.case_record.latest_analysis_perspective)],
         ["Human review required", fmt(decision.human_review_required)],
         ["Report mode", titleize(uiState.reportMode)],
         ["Latest run id", dashboardData.case_record.latest_run_id],
@@ -2088,28 +2092,39 @@ def render_project_dashboard(
         createdAt: existing && existing.createdAt ? existing.createdAt : new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      uiState.reviewActions[reviewKey(kind, id)] = nextRecord;
-      persistReviewActions();
-      try {
-        const persisted = await persistReviewActionToServer(nextRecord);
-        if (persisted) {
-          uiState.reviewActions[reviewKey(kind, id)] = persisted;
-          persistReviewActions();
+      const key = reviewKey(kind, id);
+      if (serverReviewActionsEnabled) {
+        try {
+          const persisted = await persistReviewActionToServer(nextRecord);
+          if (persisted) {
+            uiState.reviewActions[key] = persisted;
+            persistReviewActions();
+          }
+        } catch (error) {
+          setReviewSyncNote("Review action was not saved because server persistence failed.");
+          renderAll();
+          return;
         }
-      } catch (error) {
-        setReviewSyncNote("Review action saved locally, but server persistence failed for this browser session.");
+      } else {
+        uiState.reviewActions[key] = nextRecord;
+        persistReviewActions();
       }
       renderAll();
     }
 
     async function clearReviewAction(kind, id) {
-      delete uiState.reviewActions[reviewKey(kind, id)];
-      persistReviewActions();
-      try {
-        await clearReviewActionFromServer(kind, id);
-      } catch (error) {
-        setReviewSyncNote("Review action was cleared locally, but the server copy could not be updated.");
+      const key = reviewKey(kind, id);
+      if (serverReviewActionsEnabled) {
+        try {
+          await clearReviewActionFromServer(kind, id);
+        } catch (error) {
+          setReviewSyncNote("Review action was not cleared because server persistence failed.");
+          renderAll();
+          return;
+        }
       }
+      delete uiState.reviewActions[key];
+      persistReviewActions();
       renderAll();
     }
 

@@ -137,10 +137,18 @@ Completed foundation:
 
 Next likely extension:
 
+- explicit dual-perspective intake for vendor-side and agency-side analysis
+- negotiation packet generation as a first-class product artifact
+- counterparty-aware storage and portfolio rollups
+- playbook and policy comparison against internal standards
+- KPI, breach, waiver, and exception lifecycle modeling
 - deeper context-source ingestion beyond package-local documents
 - richer operator workflows that promote review actions into explicit lifecycle overrides
 - signed or templated external exports for formal sharing workflows
 - explicit authentication and role-gated visibility if the local API is promoted beyond trusted local use
+
+The clarified product direction and exact schema/API extension plan now live in
+`docs/CONTRACT_INTELLIGENCE_PRODUCT_DIRECTION.md`.
 
 ## Remediation Control
 

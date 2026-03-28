@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from apps.contract_intelligence.domain.enums import DocumentType, Recommendation, Severity
+from apps.contract_intelligence.domain.enums import AnalysisPerspective, DocumentType, Recommendation, Severity
 from apps.contract_intelligence.domain.models import (
     ContextProfile,
     ContextSignal,
@@ -44,6 +44,95 @@ _UNREADABLE_DOC_PENALTY = 0.04
 _HIGH_FINDING_PENALTY = 0.08
 _MAX_UNREADABLE_PENALTY_COUNT = 3
 _MIN_DECISION_CONFIDENCE = 0.35
+
+
+_AGENCY_FINDING_OVERRIDES: dict[str, dict[str, str]] = {
+    "payment_terms": {
+        "title": "Contingent payment language is likely to draw contractor resistance",
+        "summary": "Payment appears conditioned on upstream funding or owner payment, which may drive pricing pressure or negotiation friction.",
+        "recommended_action": "Decide whether this allocation is intentional and defensible, or whether fixed timing for undisputed amounts would preserve competition.",
+    },
+    "indemnity": {
+        "title": "Broad indemnity language may create negotiation and enforceability risk",
+        "summary": "The package appears to require expansive defense and indemnity obligations that contractors are likely to challenge.",
+        "recommended_action": "Confirm the intended negligence allocation and whether a narrower negligence-based standard would preserve protection without depressing bidder appetite.",
+    },
+    "delay_exposure": {
+        "title": "No-damages-for-delay language may increase claim and pricing pressure",
+        "summary": "Delay remedies appear limited to time extensions, which contractors are likely to challenge on owner-caused delay scenarios.",
+        "recommended_action": "Decide whether the clause is a hard policy requirement or whether targeted relief for owner-caused delay would better preserve competition.",
+    },
+    "change_orders": {
+        "title": "Strict written change authorization may impair field flexibility",
+        "summary": "Compensation appears limited to written authorization issued before work proceeds, which can create field-dispute risk.",
+        "recommended_action": "Preserve notice discipline but consider a practical emergency-direction path so valid changes do not turn into claims posture.",
+    },
+    "termination": {
+        "title": "Termination-for-convenience language may need clearer recovery boundaries",
+        "summary": "Owner termination rights appear broad and may leave contractor recovery language open to dispute.",
+        "recommended_action": "Clarify compensable closeout costs and excluded damages so the clause stays predictable and defensible.",
+    },
+    "additional_insured": {
+        "title": "Additional-insured wording may be broader than necessary",
+        "summary": "The package appears to require owner-side additional-insured language that contractors may price or resist depending on form.",
+        "recommended_action": "Confirm the exact endorsement objective and limit the requirement to the coverage the agency actually needs.",
+    },
+    "waiver_subrogation": {
+        "title": "Waiver-of-subrogation wording may increase pricing pressure",
+        "summary": "The package includes waiver-of-subrogation requirements that may be treated as cost or carrier-availability issues by bidders.",
+        "recommended_action": "Confirm whether the waiver is essential across all lines or whether it can be narrowed to preserve marketability.",
+    },
+    "primary_noncontributory": {
+        "title": "Primary and noncontributory wording may be broader than market forms support",
+        "summary": "The insurance stack appears to require primary/noncontributory positioning that contractors may challenge if forms are limited.",
+        "recommended_action": "Keep the intended priority of coverage clear, but avoid endorsement wording the market may not support cleanly.",
+    },
+    "completed_operations": {
+        "title": "Completed-operations duration may price higher than expected",
+        "summary": "The package appears to impose completed-operations requirements that can create longer-tail cost and negotiation friction.",
+        "recommended_action": "Verify that the duration and limits are truly necessary and align them with market-available forms where possible.",
+    },
+    "davis_bacon": {
+        "title": "Federal wage requirements appear material to bid-stage compliance",
+        "summary": "The package references federal wage requirements that must be complete and administrable before issue or award.",
+        "recommended_action": "Confirm wage determinations, flow-down language, and payroll administration requirements are complete and audit-ready.",
+    },
+    "certified_payroll": {
+        "title": "Certified payroll workflow should be explicit at intake",
+        "summary": "The package appears to require recurring payroll reporting that should be clear and administrable for bidders.",
+        "recommended_action": "Make the reporting cadence and owner review workflow explicit so the requirement is enforceable and predictable.",
+    },
+    "buy_america": {
+        "title": "Domestic sourcing rules may need clearer procurement administration",
+        "summary": "The package appears to include domestic content obligations that can constrain supplier selection and bid confidence.",
+        "recommended_action": "Confirm affected materials, certification expectations, and any waiver path so bidders can price the requirement accurately.",
+    },
+    "dbe_participation": {
+        "title": "DBE obligations should be fully specified before issue or award",
+        "summary": "The package references disadvantaged-business participation or reporting requirements that need precise bid-stage instructions.",
+        "recommended_action": "Ensure participation, documentation, and tracking expectations are explicit enough to survive protest or audit review.",
+    },
+    "cmgc_offramp": {
+        "title": "CMGC off-ramp language may price preconstruction participation",
+        "summary": "The package appears to let the owner reject GMP pricing or decline later construction award, which contractors will likely price carefully.",
+        "recommended_action": "Be explicit about preconstruction compensation and the later award decision path so bidders can assess the offramp honestly.",
+    },
+    "appropriation_limit": {
+        "title": "Appropriation contingency appears necessary but may need clearer recovery terms",
+        "summary": "Public funding language appears to limit enforceability to appropriated or available funds, which may trigger contractor concern if recovery is vague.",
+        "recommended_action": "Preserve statutory funding limits, but make the contractor's recovery path clear for work performed and orderly demobilization.",
+    },
+    "conflict_of_interest": {
+        "title": "Conflict-of-interest language may affect bidder confidence if cure paths are vague",
+        "summary": "The package appears to impose conflict-of-interest certification or disclosure obligations tied to award or termination rights.",
+        "recommended_action": "Keep the control objective, but make the disclosure workflow and cure consequences specific enough to avoid avoidable bidder drop-off.",
+    },
+    "umbrella_drop_down": {
+        "title": "Umbrella drop-down wording may exceed common market terms",
+        "summary": "The package appears to require umbrella or excess coverage to drop down in ways contractors may treat as unusual or costly.",
+        "recommended_action": "Confirm whether the drop-down feature is essential and limit it to commercially available forms where possible.",
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -483,6 +572,16 @@ def _project_id(project_dir: Path) -> str:
     return clean or "contract-project"
 
 
+def _normalize_analysis_perspective(value: str | AnalysisPerspective) -> AnalysisPerspective:
+    if isinstance(value, AnalysisPerspective):
+        return value
+    normalized = str(value).strip().lower()
+    try:
+        return AnalysisPerspective(normalized)
+    except ValueError as exc:
+        raise ValueError("analysis_perspective must be either 'vendor' or 'agency'.") from exc
+
+
 def _clause_evidence(document: LoadedDocument, clause: ClauseSpan, match: re.Match[str]) -> EvidenceRef:
     clause_text = clause.text
     start = max(0, match.start() - 100)
@@ -495,7 +594,25 @@ def _clause_evidence(document: LoadedDocument, clause: ClauseSpan, match: re.Mat
     )
 
 
-def _finding_from_rule(rule: FindingRule, documents: list[LoadedDocument]) -> Finding | None:
+def _finding_text(rule: FindingRule, perspective: AnalysisPerspective) -> tuple[str, str, str]:
+    if perspective is AnalysisPerspective.AGENCY:
+        override = _AGENCY_FINDING_OVERRIDES.get(rule.category)
+        if override:
+            return override["title"], override["summary"], override["recommended_action"]
+        return (
+            f"{rule.title} from the agency perspective",
+            f"{rule.summary} Contractors or proposers are likely to evaluate this term closely during negotiations.",
+            "Confirm whether this clause is required policy or legacy boilerplate before holding it as a hard position.",
+        )
+    return rule.title, rule.summary, rule.recommended_action
+
+
+def _finding_from_rule(
+    rule: FindingRule,
+    documents: list[LoadedDocument],
+    *,
+    analysis_perspective: AnalysisPerspective,
+) -> Finding | None:
     evidence: list[EvidenceRef] = []
     for document in documents:
         if rule.document_types and document.document_type not in rule.document_types:
@@ -518,14 +635,16 @@ def _finding_from_rule(rule: FindingRule, documents: list[LoadedDocument]) -> Fi
 
     confidence = _SINGLE_EVIDENCE_CONFIDENCE if len(evidence) == 1 else _MULTI_EVIDENCE_CONFIDENCE
     confidence = min(confidence, _MAX_FINDING_CONFIDENCE)
+    title, summary, recommended_action = _finding_text(rule, analysis_perspective)
     return Finding(
         id=f"{rule.role}:{rule.category}",
+        analysis_perspective=analysis_perspective,
         role=rule.role,
         category=rule.category,
         severity=rule.severity,
-        title=rule.title,
-        summary=rule.summary,
-        recommended_action=rule.recommended_action,
+        title=title,
+        summary=summary,
+        recommended_action=recommended_action,
         confidence=confidence,
         evidence=evidence[:3],
         uncertainty_notes=[],
@@ -1050,6 +1169,8 @@ def _relationship_strategy(
     all_findings: list[Finding],
     context_profile: ContextProfile,
     procurement_profile: ProcurementProfile,
+    *,
+    analysis_perspective: AnalysisPerspective,
 ) -> dict[str, object]:
     has_public_overlay = any(
         document.document_type in {DocumentType.FUNDING_DOCUMENT, DocumentType.PROCUREMENT_DOCUMENT}
@@ -1061,32 +1182,59 @@ def _relationship_strategy(
 
     sensitive_issues = [finding.title for finding in all_findings if SEVERITY_ORDER[finding.severity] >= SEVERITY_ORDER[Severity.HIGH]][:3]
     leverage_points: list[str] = []
-    if has_addenda:
-        leverage_points.append("Use pre-bid clarification and addendum channels to resolve ambiguous commercial terms before price lock.")
-    if insurance_pressure:
-        leverage_points.append("Push broker-to-broker on endorsement wording rather than arguing abstract insurance concepts in principal-only terms.")
-    if has_public_overlay:
-        leverage_points.append("Focus negotiation on commercial allocation and notice mechanics rather than statutory funding terms that are likely rigid.")
-    if context_profile.funding_flexibility == "low":
-        leverage_points.append("Budget or reimbursement constraints appear tight, so price cash-flow risk and avoid assuming payment-term flexibility.")
-    if context_profile.oversight_intensity == "high":
-        leverage_points.append("Heightened oversight signals suggest pushing hardest on clarity and administrability, not on public-accountability provisions.")
-    if context_profile.schedule_pressure == "high":
-        leverage_points.append("Schedule pressure appears elevated, so protect delay-cost recovery and notice mechanics instead of challenging milestone urgency directly.")
-    if procurement_profile.agreement_type == "cmgc_preconstruction_services":
-        leverage_points.append("Separate preconstruction compensation from later GMP or construction-award risk so the owner cannot strand unrecovered effort.")
-    if governance_material:
-        leverage_points.append("Use available board, status, or change-order records to understand which terms appear politically or operationally rigid before pushing on them.")
+    if analysis_perspective is AnalysisPerspective.VENDOR:
+        if has_addenda:
+            leverage_points.append("Use pre-bid clarification and addendum channels to resolve ambiguous commercial terms before price lock.")
+        if insurance_pressure:
+            leverage_points.append("Push broker-to-broker on endorsement wording rather than arguing abstract insurance concepts in principal-only terms.")
+        if has_public_overlay:
+            leverage_points.append("Focus negotiation on commercial allocation and notice mechanics rather than statutory funding terms that are likely rigid.")
+        if context_profile.funding_flexibility == "low":
+            leverage_points.append("Budget or reimbursement constraints appear tight, so price cash-flow risk and avoid assuming payment-term flexibility.")
+        if context_profile.oversight_intensity == "high":
+            leverage_points.append("Heightened oversight signals suggest pushing hardest on clarity and administrability, not on public-accountability provisions.")
+        if context_profile.schedule_pressure == "high":
+            leverage_points.append("Schedule pressure appears elevated, so protect delay-cost recovery and notice mechanics instead of challenging milestone urgency directly.")
+        if procurement_profile.agreement_type == "cmgc_preconstruction_services":
+            leverage_points.append("Separate preconstruction compensation from later GMP or construction-award risk so the owner cannot strand unrecovered effort.")
+        if governance_material:
+            leverage_points.append("Use available board, status, or change-order records to understand which terms appear politically or operationally rigid before pushing on them.")
 
-    posture = (
-        "Expect limited flexibility on funding-driven or public-agency compliance terms; prioritize commercial allocation, notice windows, and insurable-risk cleanup."
-        if has_public_overlay
-        else "Commercial terms may be negotiable, but the current package still needs structured human review before a bid commitment."
-    )
-    if context_profile.oversight_intensity == "high":
-        posture += " Oversight signals suggest keeping outward-facing negotiation framing operational and evidence-based."
+        posture = (
+            "Expect limited flexibility on funding-driven or public-agency compliance terms; prioritize commercial allocation, notice windows, and insurable-risk cleanup."
+            if has_public_overlay
+            else "Commercial terms may be negotiable, but the current package still needs structured human review before a bid commitment."
+        )
+        if context_profile.oversight_intensity == "high":
+            posture += " Oversight signals suggest keeping outward-facing negotiation framing operational and evidence-based."
+    else:
+        if has_addenda:
+            leverage_points.append("Use addenda and pre-bid clarification channels to clean up ambiguous boilerplate before bidders price avoidable uncertainty.")
+        if insurance_pressure:
+            leverage_points.append("Separate must-have insurance protections from broker-negotiable endorsement wording to avoid unnecessary premium loading.")
+        if has_public_overlay:
+            leverage_points.append("Keep statutory and funding-driven clauses intact, but distinguish them from legacy commercial language that may be negotiable.")
+        if context_profile.funding_flexibility == "low":
+            leverage_points.append("Tight reimbursement or appropriation conditions suggest bidders will push on payment timing and demobilization recovery.")
+        if context_profile.oversight_intensity == "high":
+            leverage_points.append("Heightened oversight signals favor retaining clear compliance controls, but unsupported aggressiveness may still reduce bidder confidence.")
+        if context_profile.schedule_pressure == "high":
+            leverage_points.append("Schedule pressure appears elevated, so preserve schedule-critical controls while avoiding unnecessary friction on non-critical boilerplate.")
+        if procurement_profile.agreement_type == "cmgc_preconstruction_services":
+            leverage_points.append("Be explicit about preconstruction compensation and later award discretion so bidders can price the CMGC off-ramp honestly.")
+        if governance_material:
+            leverage_points.append("Use available board, status, or change-order records to separate truly constrained clauses from terms that persist only by habit.")
+
+        posture = (
+            "Preserve statutory and funding-driven protections, but distinguish them from commercial boilerplate that may unnecessarily reduce competition or drive pricing."
+            if has_public_overlay
+            else "Commercial protections may still be negotiable; use the intake findings to separate real agency requirements from legacy boilerplate."
+        )
+        if context_profile.oversight_intensity == "high":
+            posture += " Outward-facing negotiation framing should stay operational, documented, and tied to enforceability."
     confidence = _PUBLIC_OVERLAY_CONFIDENCE if has_public_overlay else _NO_OVERLAY_CONFIDENCE
     return {
+        "analysis_perspective": analysis_perspective.value,
         "negotiation_posture": posture,
         "sensitive_issues": sensitive_issues,
         "leverage_points": leverage_points,
@@ -1151,6 +1299,7 @@ def _review_challenges(
 def _decision_summary(
     *,
     project_id: str,
+    analysis_perspective: AnalysisPerspective,
     findings: list[Finding],
     missing_docs: list[DocumentType],
     unreadable_documents: list[LoadedDocument],
@@ -1211,6 +1360,7 @@ def _decision_summary(
 
     return DecisionSummary(
         project_id=project_id,
+        analysis_perspective=analysis_perspective,
         recommendation=recommendation,
         overall_risk=overall_risk,
         confidence=round(confidence, 2),
@@ -1224,8 +1374,14 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = None) -> BidReviewRunResult:
+def run_bid_review(
+    project_dir: str | Path,
+    artifacts_dir: str | Path | None = None,
+    *,
+    analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
+) -> BidReviewRunResult:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
+    perspective = _normalize_analysis_perspective(analysis_perspective)
     output_dir = (
         resolve_output_directory(artifacts_dir, label="Artifacts directory")
         if artifacts_dir
@@ -1240,6 +1396,7 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
 
     document_inventory = {
         "project_id": project_id,
+        "analysis_perspective": perspective.value,
         "documents": [
             ProjectDocumentRecord(
                 document_id=document.document_id,
@@ -1259,23 +1416,29 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
     risk_findings = [
         finding
         for rule in (*CONTRACT_RISK_RULES, *TRANSPORT_CONTRACT_RISK_RULES)
-        if (finding := _finding_from_rule(rule, documents))
+        if (finding := _finding_from_rule(rule, documents, analysis_perspective=perspective))
     ]
     insurance_findings = [
         finding
         for rule in (*INSURANCE_RULES, *TRANSPORT_INSURANCE_RULES)
-        if (finding := _finding_from_rule(rule, documents))
+        if (finding := _finding_from_rule(rule, documents, analysis_perspective=perspective))
     ]
     compliance_findings = [
         finding
         for rule in (*COMPLIANCE_RULES, *TRANSPORT_COMPLIANCE_RULES)
-        if (finding := _finding_from_rule(rule, documents))
+        if (finding := _finding_from_rule(rule, documents, analysis_perspective=perspective))
     ]
     all_findings = [*risk_findings, *insurance_findings, *compliance_findings]
     context_profile = _context_profile(project_id, documents)
     procurement_profile = _procurement_profile(project_id, documents)
     outcome_evidence = _outcome_evidence_bundle(project_id, documents, procurement_profile)
-    relationship_strategy = _relationship_strategy(documents, all_findings, context_profile, procurement_profile)
+    relationship_strategy = _relationship_strategy(
+        documents,
+        all_findings,
+        context_profile,
+        procurement_profile,
+        analysis_perspective=perspective,
+    )
     review_challenges = _review_challenges(
         missing_docs=missing_docs,
         unreadable_documents=unreadable_documents,
@@ -1285,6 +1448,7 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
     obligations = _extract_obligations(documents)
     decision_summary = _decision_summary(
         project_id=project_id,
+        analysis_perspective=perspective,
         findings=all_findings,
         missing_docs=missing_docs,
         unreadable_documents=unreadable_documents,
@@ -1313,6 +1477,7 @@ def run_bid_review(project_dir: str | Path, artifacts_dir: str | Path | None = N
 
     persisted = FileSystemCaseStore(project_path / ".contract_intelligence").persist_bid_review_run(
         project_id=project_id,
+        analysis_perspective=perspective.value,
         source_project_dir=project_path,
         artifacts_dir=output_dir,
         artifact_paths=artifact_paths,

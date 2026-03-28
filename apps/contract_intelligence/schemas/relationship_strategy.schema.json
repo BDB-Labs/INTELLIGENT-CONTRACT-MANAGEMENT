@@ -2,8 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "RelationshipStrategy",
   "type": "object",
-  "required": ["negotiation_posture", "sensitive_issues", "leverage_points", "confidence"],
+  "required": ["analysis_perspective", "negotiation_posture", "sensitive_issues", "leverage_points", "confidence"],
   "properties": {
+    "analysis_perspective": {"type": "string", "enum": ["vendor", "agency"]},
     "negotiation_posture": {"type": "string"},
     "sensitive_issues": {
       "type": "array",

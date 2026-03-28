@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from apps.contract_intelligence.domain.enums import DocumentType
+from apps.contract_intelligence.domain.enums import AnalysisPerspective, DocumentType
 from apps.contract_intelligence.ingestion.document_classifier import missing_required_documents
 from apps.contract_intelligence.ingestion.project_loader import iter_project_documents
 from apps.contract_intelligence.orchestration.pipeline import bid_review_pipeline
@@ -96,6 +96,43 @@ ROLE_PROMPT_GUIDANCE = {
 }
 
 
+def _normalize_analysis_perspective(value: str | AnalysisPerspective) -> AnalysisPerspective:
+    if isinstance(value, AnalysisPerspective):
+        return value
+    normalized = str(value).strip().lower()
+    try:
+        return AnalysisPerspective(normalized)
+    except ValueError as exc:
+        raise ValueError("analysis_perspective must be either 'vendor' or 'agency'.") from exc
+
+
+def _perspective_label(perspective: AnalysisPerspective) -> str:
+    return "contractor-side" if perspective is AnalysisPerspective.VENDOR else "agency-side"
+
+
+def _prompt_for_role(role_key: str, output_artifact: str, *, analysis_perspective: AnalysisPerspective) -> str:
+    guidance = ROLE_PROMPT_GUIDANCE[role_key].replace(
+        "contractor-side",
+        _perspective_label(analysis_perspective),
+    )
+    if analysis_perspective is AnalysisPerspective.AGENCY:
+        guidance = guidance.replace(
+            "Focus on payment, indemnity, delay, claims, change-order, termination, flow-down, and liability risk.",
+            "Focus on payment, indemnity, delay, claims, change-order, termination, enforceability, bidder reaction, and owner-side risk allocation.",
+        ).replace(
+            "Assess owner posture, negotiation sensitivity, politically rigid issues, and leverage points.",
+            "Assess bidder reaction, negotiation sensitivity, publicly rigid issues, and leverage points from the agency perspective.",
+        ).replace(
+            "Produce an executive recommendation of go, go-with-conditions, or no-go.",
+            "Produce an executive recommendation of issue, issue-with-conditions, or do-not-issue, expressed using the standard go/go-with-conditions/no-go labels.",
+        )
+    return (
+        f"{guidance} "
+        f"Contribute to {output_artifact}. "
+        "Return the standard ESE JSON report format only."
+    )
+
+
 def _ordered_role_keys() -> list[str]:
     ordered: list[str] = []
     for stage in bid_review_pipeline():
@@ -105,15 +142,6 @@ def _ordered_role_keys() -> list[str]:
 
 def _default_model_for(provider: str) -> str:
     return DEFAULT_MODEL_BY_PROVIDER.get(provider, "model")
-
-
-def _prompt_for_role(role_key: str, output_artifact: str) -> str:
-    guidance = ROLE_PROMPT_GUIDANCE[role_key]
-    return (
-        f"{guidance} "
-        f"Contribute to {output_artifact}. "
-        "Return the standard ESE JSON report format only."
-    )
 
 
 def _document_priority(document) -> int:
@@ -219,9 +247,11 @@ def build_bid_review_ese_config(
     provider_name: str | None = None,
     base_url: str | None = None,
     fail_on_high: bool = False,
+    analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
 ) -> dict[str, Any]:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
     artifacts_path = resolve_output_directory(artifacts_dir, label="Artifacts directory")
+    perspective = _normalize_analysis_perspective(analysis_perspective)
     clean_provider = (provider or "local").strip().lower()
     effective_mode = resolve_execution_mode(
         provider=clean_provider,
@@ -237,7 +267,7 @@ def build_bid_review_ese_config(
         role_def = role_definitions[role_key]
         roles_cfg[role_key] = {
             "temperature": 0.2,
-            "prompt": _prompt_for_role(role_key, role_def.output_artifact),
+            "prompt": _prompt_for_role(role_key, role_def.output_artifact, analysis_perspective=perspective),
         }
 
     provider_cfg: dict[str, Any] = {
@@ -250,6 +280,7 @@ def build_bid_review_ese_config(
     cfg: dict[str, Any] = {
         "version": 1,
         "mode": "ensemble",
+        "execution_mode": effective_mode,
         "template_key": "contract-bid-review",
         "template_title": "Contract Bid Review",
         "role_order": _ordered_role_keys(),
@@ -260,11 +291,12 @@ def build_bid_review_ese_config(
         },
         "input": {
             "scope": (
-            "Evaluate this construction contract package from the contractor perspective and produce "
-            "intake, risk, insurance, compliance, context-profile, procurement-profile, outcome-evidence, challenge, decision, and obligation outputs."
-        ),
+                f"Evaluate this construction contract package from the {perspective.value} perspective and produce "
+                "intake, risk, insurance, compliance, context-profile, procurement-profile, outcome-evidence, challenge, decision, and obligation outputs."
+            ),
         "prompt": _render_project_context(project_path),
         "project_dir": str(project_path),
+        "analysis_perspective": perspective.value,
     },
         "output": {
             "artifacts_dir": str(artifacts_path),
@@ -334,6 +366,7 @@ def run_bid_review_with_ese(
     provider_name: str | None = None,
     base_url: str | None = None,
     fail_on_high: bool = False,
+    analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
     config_path: str | None = None,
 ) -> tuple[dict[str, Any], str]:
     cfg = build_bid_review_ese_config(
@@ -347,6 +380,7 @@ def run_bid_review_with_ese(
         provider_name=provider_name,
         base_url=base_url,
         fail_on_high=fail_on_high,
+        analysis_perspective=analysis_perspective,
     )
     if config_path:
         write_config(config_path, cfg)

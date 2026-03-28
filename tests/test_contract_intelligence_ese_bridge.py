@@ -35,6 +35,7 @@ def test_build_bid_review_ese_config_uses_domain_roles_and_dry_run_defaults() ->
     assert cfg["runtime"]["adapter"] == "dry-run"
     assert "Document Inventory:" in cfg["input"]["prompt"]
     assert "Use findings for contract issues, not software defects." in cfg["roles"]["document_intake_analyst"]["prompt"]
+    assert cfg["input"]["analysis_perspective"] == "vendor"
 
 
 def test_run_bid_review_with_ese_executes_through_pipeline(tmp_path: Path) -> None:
@@ -53,6 +54,15 @@ def test_run_bid_review_with_ese_executes_through_pipeline(tmp_path: Path) -> No
     first_role_output = json.loads((artifacts_dir / "01_document_intake_analyst.json").read_text(encoding="utf-8"))
     prompt_excerpt = first_role_output["metadata"]["prompt_excerpt"]
     assert "contractor-side construction bid review" in prompt_excerpt
+
+
+def test_build_bid_review_ese_config_supports_agency_perspective() -> None:
+    project_dir = default_corpus_dir() / "riverside_bridge" / "inputs"
+    cfg = build_bid_review_ese_config(project_dir=project_dir, analysis_perspective="agency")
+
+    assert cfg["input"]["analysis_perspective"] == "agency"
+    assert "from the agency perspective" in cfg["input"]["scope"]
+    assert "agency-side construction bid review" in cfg["roles"]["contract_risk_analyst"]["prompt"]
 
 
 def test_build_bid_review_ese_config_prioritizes_salient_clauses_in_prompt(tmp_path: Path) -> None:

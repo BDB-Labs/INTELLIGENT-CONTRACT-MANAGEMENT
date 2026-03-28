@@ -77,10 +77,12 @@ def test_commit_contract_creates_committed_record_and_obligation_snapshot(tmp_pa
 
     assert case_record["project_id"] == "committed-bridge"
     assert case_record["latest_commit_id"] == commit_result.commit_id
+    assert case_record["latest_analysis_perspective"] == "vendor"
     assert case_record["total_commits"] == 1
     assert case_record["latest_obligations_count"] == len(obligations)
 
     assert commit_record["project_id"] == "committed-bridge"
+    assert commit_record["analysis_perspective"] == "vendor"
     assert commit_record["source_run_id"] == json.loads(bid_result.run_record_path.read_text())["run_id"]
     assert commit_record["obligations_count"] == len(obligations)
     assert commit_record["accepted_risks"]

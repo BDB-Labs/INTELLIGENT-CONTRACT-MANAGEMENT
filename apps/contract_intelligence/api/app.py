@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 import json
 import os
 from datetime import datetime, timezone
@@ -8,11 +9,18 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, ValidationError
 
+from apps.contract_intelligence.domain.enums import AnalysisPerspective
 from apps.contract_intelligence.domain.models import AlertRecord, ReviewActionRecord
 from apps.contract_intelligence.monitoring.runner import monitor_contract
 from apps.contract_intelligence.orchestration.bid_review_runner import _project_id, run_bid_review
 from apps.contract_intelligence.orchestration.commit_runner import commit_contract
-from apps.contract_intelligence.paths import resolve_existing_directory, resolve_optional_existing_directory, resolve_output_directory
+from apps.contract_intelligence.paths import (
+    resolve_guarded_existing_directory,
+    resolve_guarded_existing_file,
+    resolve_guarded_optional_existing_directory,
+    resolve_guarded_output_directory,
+    validate_allowed_roots_configured,
+)
 from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
@@ -20,9 +28,16 @@ def _docs_enabled() -> bool:
     return os.getenv("CONTRACT_INTELLIGENCE_EXPOSE_DOCS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+@asynccontextmanager
+async def _lifespan(_: FastAPI):
+    validate_allowed_roots_configured()
+    yield
+
+
 app = FastAPI(
     title="Contract Intelligence API",
     version="0.1.0",
+    lifespan=_lifespan,
     docs_url="/docs" if _docs_enabled() else None,
     redoc_url="/redoc" if _docs_enabled() else None,
     openapi_url="/openapi.json" if _docs_enabled() else None,
@@ -32,6 +47,7 @@ app = FastAPI(
 class AnalyzeProjectRequest(BaseModel):
     project_dir: str
     artifacts_dir: str | None = None
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
 
 
 class CommitProjectRequest(BaseModel):
@@ -65,67 +81,54 @@ class ReviewActionClearRequest(BaseModel):
     ui_id: str
 
 
-def _allowed_roots() -> tuple[Path, ...]:
-    raw = os.getenv("CONTRACT_INTELLIGENCE_ALLOWED_ROOTS", "").strip()
-    if not raw:
-        return ()
-    return tuple(
-        Path(part).expanduser().resolve()
-        for part in raw.split(os.pathsep)
-        if part.strip()
-    )
-
-
-def _validate_path_boundary(path: Path, *, kind: str) -> Path:
-    allowed_roots = _allowed_roots()
-    if allowed_roots and not any(path == root or root in path.parents for root in allowed_roots):
-        raise HTTPException(status_code=403, detail=f"{kind} is outside the configured allowed roots.")
-    return path
-
-
 def _validated_project_path(project_dir: str | Path) -> Path:
     try:
-        project_path = resolve_existing_directory(project_dir, label="Project directory")
+        project_path = resolve_guarded_existing_directory(project_dir, label="Project directory")
     except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail="Project directory does not exist.") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return _validate_path_boundary(project_path, kind="Project directory")
+        status = 403 if "outside the configured allowed roots" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    return project_path
 
 
 def _validated_directory(path: str | Path | None, *, label: str) -> str | None:
     if path is None:
         return None
     try:
-        resolved = resolve_optional_existing_directory(path, label=label)
+        resolved = resolve_guarded_optional_existing_directory(path, label=label)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=400, detail=f"{label} does not exist.") from exc
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        status = 403 if "outside the configured allowed roots" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
     if resolved is None:
         return None
-    return str(_validate_path_boundary(resolved, kind=label))
+    return str(resolved)
 
 
 def _validated_output_dir(path: str | Path | None, *, label: str) -> str | None:
     if path is None:
         return None
     try:
-        resolved = resolve_output_directory(path, label=label)
+        resolved = resolve_guarded_output_directory(path, label=label)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return str(_validate_path_boundary(resolved, kind=label))
+        status = 403 if "outside the configured allowed roots" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    return str(resolved)
 
 
 def _validated_input_file(file_path: str | Path | None, *, label: str) -> str | None:
     if not file_path:
         return None
     path = Path(file_path).expanduser().resolve()
-    if not path.exists():
-        raise HTTPException(status_code=400, detail=f"{label} does not exist.")
-    if not path.is_file():
-        raise HTTPException(status_code=400, detail=f"{label} must be a file.")
-    return str(_validate_path_boundary(path, kind=label))
+    try:
+        return str(resolve_guarded_existing_file(path, label=label))
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=f"{label} does not exist.") from exc
+    except ValueError as exc:
+        status = 403 if "outside the configured allowed roots" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
 
 
 def _store_for(project_dir: str | Path) -> tuple[FileSystemCaseStore, str]:
@@ -152,9 +155,11 @@ def analyze_project(request: AnalyzeProjectRequest) -> dict[str, object]:
     result = run_bid_review(
         project_dir=project_path,
         artifacts_dir=_validated_output_dir(request.artifacts_dir, label="Artifacts directory"),
+        analysis_perspective=request.analysis_perspective,
     )
     return {
         "project_id": result.project_id,
+        "analysis_perspective": request.analysis_perspective.value,
         "artifacts_dir": str(result.artifacts_dir),
         "case_record_path": str(result.case_record_path),
         "run_record_path": str(result.run_record_path),

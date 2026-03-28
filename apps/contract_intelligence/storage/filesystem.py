@@ -248,6 +248,7 @@ class FileSystemCaseStore:
         self,
         *,
         project_id: str,
+        analysis_perspective: str,
         source_project_dir: str | Path,
         artifacts_dir: str | Path,
         artifact_paths: dict[str, str | Path],
@@ -277,6 +278,7 @@ class FileSystemCaseStore:
         run_record = BidReviewRunRecord(
             run_id=run_id,
             project_id=project_id,
+            analysis_perspective=analysis_perspective,
             created_at=timestamp,
             source_project_dir=source_dir,
             artifacts_dir=artifacts_dir_str,
@@ -327,6 +329,7 @@ class FileSystemCaseStore:
                 CaseRunIndexEntry(
                     run_id=run_id,
                     run_type="bid_review",
+                    analysis_perspective=analysis_perspective,
                     created_at=timestamp,
                     recommendation=decision_summary.recommendation,
                     overall_risk=decision_summary.overall_risk,
@@ -340,6 +343,7 @@ class FileSystemCaseStore:
                 source_project_dir=source_dir,
                 storage_dir=str(case_dir),
                 latest_run_id=run_id,
+                latest_analysis_perspective=analysis_perspective,
                 latest_recommendation=decision_summary.recommendation,
                 latest_overall_risk=decision_summary.overall_risk,
                 latest_agreement_type=procurement_profile.agreement_type,
@@ -371,6 +375,7 @@ class FileSystemCaseStore:
         self,
         *,
         project_id: str,
+        analysis_perspective: str,
         source_project_dir: str | Path,
         committed_contract_dir: str | Path,
         source_run_id: str,
@@ -398,6 +403,7 @@ class FileSystemCaseStore:
             commit_record = ContractCommitRecord(
                 commit_id=commit_id,
                 project_id=project_id,
+                analysis_perspective=analysis_perspective,
                 created_at=timestamp,
                 source_project_dir=str(Path(source_project_dir).expanduser().resolve()),
                 committed_contract_dir=str(Path(committed_contract_dir).expanduser().resolve()),
@@ -419,6 +425,7 @@ class FileSystemCaseStore:
             commit_history.append(
                 ContractCommitIndexEntry(
                     commit_id=commit_id,
+                    analysis_perspective=analysis_perspective,
                     created_at=timestamp,
                     source_run_id=source_run_id,
                     obligations_count=len(obligations),
@@ -429,6 +436,7 @@ class FileSystemCaseStore:
             updated_case_record = case_record.model_copy(
                 update={
                     "latest_commit_id": commit_id,
+                    "latest_analysis_perspective": analysis_perspective,
                     "total_commits": len(commit_history),
                     "latest_obligations_count": len(obligations),
                     "commit_history": commit_history[-20:],

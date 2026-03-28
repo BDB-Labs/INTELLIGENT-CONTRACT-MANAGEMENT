@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from apps.contract_intelligence.domain.enums import (
+    AnalysisPerspective,
     AlertStatus,
     AlertType,
     ObligationStatus,
@@ -27,6 +28,7 @@ class EvidenceRef(BaseModel):
 
 class Finding(BaseModel):
     id: str
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     role: str
     category: str
     severity: Severity
@@ -40,6 +42,7 @@ class Finding(BaseModel):
 
 class DecisionSummary(BaseModel):
     project_id: str
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     recommendation: Recommendation
     overall_risk: Severity
     confidence: float = Field(ge=0.0, le=1.0)
@@ -127,6 +130,7 @@ class ProjectDocumentRecord(BaseModel):
 class CaseRunIndexEntry(BaseModel):
     run_id: str
     run_type: str
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     created_at: datetime
     recommendation: Recommendation
     overall_risk: Severity
@@ -165,6 +169,7 @@ class NegotiatedChange(BaseModel):
 
 class ContractCommitIndexEntry(BaseModel):
     commit_id: str
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     created_at: datetime
     source_run_id: str
     obligations_count: int
@@ -186,6 +191,7 @@ class BidReviewRunRecord(BaseModel):
     run_id: str
     run_type: str = "bid_review"
     project_id: str
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     created_at: datetime
     source_project_dir: str
     artifacts_dir: str
@@ -203,6 +209,7 @@ class BidReviewRunRecord(BaseModel):
 class ContractCommitRecord(BaseModel):
     commit_id: str
     project_id: str
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     created_at: datetime
     source_project_dir: str
     committed_contract_dir: str
@@ -291,6 +298,7 @@ class CaseRecord(BaseModel):
     source_project_dir: str
     storage_dir: str
     latest_run_id: str
+    latest_analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
     latest_recommendation: Recommendation
     latest_overall_risk: Severity
     latest_agreement_type: str

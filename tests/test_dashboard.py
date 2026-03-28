@@ -3,7 +3,15 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-from ese.dashboard import DashboardJobStore, _allocate_run_artifacts_dir, _export_report_payload, _task_run_kwargs
+import pytest
+
+from ese.dashboard import (
+    DashboardJobStore,
+    DashboardStateError,
+    _allocate_run_artifacts_dir,
+    _export_report_payload,
+    _task_run_kwargs,
+)
 from ese.pipeline import run_pipeline
 
 
@@ -55,6 +63,7 @@ def test_export_report_payload_returns_requested_format(tmp_path: Path) -> None:
         {
             "version": 1,
             "mode": "ensemble",
+            "execution_mode": "demo",
             "provider": {"name": "openai", "model": "gpt-5-mini", "api_key_env": "OPENAI_API_KEY"},
             "roles": {"architect": {}, "implementer": {}},
             "runtime": {"adapter": "dry-run"},
@@ -91,3 +100,12 @@ def test_dashboard_job_store_persists_jobs(tmp_path: Path) -> None:
     assert persisted["status"] == "completed"
     assert persisted["result"] == {"ok": True}
     assert (tmp_path / "job-store" / f"{job_id}.json").exists()
+
+
+def test_dashboard_job_store_rejects_corrupt_persisted_state(tmp_path: Path) -> None:
+    store_dir = tmp_path / "job-store"
+    store_dir.mkdir()
+    (store_dir / "bad.json").write_text("{broken", encoding="utf-8")
+
+    with pytest.raises(DashboardStateError):
+        DashboardJobStore(storage_dir=store_dir)

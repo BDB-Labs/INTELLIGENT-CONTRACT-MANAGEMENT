@@ -56,13 +56,16 @@ def test_bid_review_runner_emits_core_artifacts(tmp_path: Path) -> None:
 
     assert result.decision_summary.recommendation.value == "go_with_conditions"
     assert result.decision_summary.human_review_required is True
+    assert result.decision_summary.analysis_perspective.value == "vendor"
 
     inventory = json.loads((result.artifacts_dir / "document_inventory.json").read_text())
     assert inventory["project_id"] == "riverside-bridge"
+    assert inventory["analysis_perspective"] == "vendor"
     assert inventory["missing_required_documents"] == []
     assert len(inventory["documents"]) == 4
 
     risk_findings = json.loads((result.artifacts_dir / "risk_findings.json").read_text())
+    assert all(item["analysis_perspective"] == "vendor" for item in risk_findings)
     assert any(item["category"] == "payment_terms" for item in risk_findings)
     assert any(item["category"] == "delay_exposure" for item in risk_findings)
 
@@ -158,6 +161,47 @@ def test_bid_review_runner_surfaces_outcome_contradictions(tmp_path: Path) -> No
     challenges = json.loads((result.artifacts_dir / "review_challenges.json").read_text())
 
     assert any("Public outcome evidence indicates delivery or governance stress" in item for item in challenges["contradictions"])
+
+
+def test_bid_review_runner_supports_agency_perspective_framing(tmp_path: Path) -> None:
+    project_dir = tmp_path / "agency-perspective"
+    project_dir.mkdir()
+    (project_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Subcontractor shall be paid on a pay-if-paid basis.",
+                "No damages for delay shall be allowed.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (project_dir / "General Conditions.md").write_text(
+        "Contractor shall defend, indemnify, and hold harmless the owner.",
+        encoding="utf-8",
+    )
+    (project_dir / "Insurance Requirements.md").write_text(
+        "Additional insured status is required.",
+        encoding="utf-8",
+    )
+
+    result = run_bid_review(project_dir, analysis_perspective="agency")
+
+    decision = json.loads((result.artifacts_dir / "decision_summary.json").read_text())
+    relationship = json.loads((result.artifacts_dir / "relationship_strategy.json").read_text())
+    findings = json.loads((result.artifacts_dir / "risk_findings.json").read_text())
+    case_record = json.loads(result.case_record_path.read_text())
+    run_record = json.loads(result.run_record_path.read_text())
+
+    assert decision["analysis_perspective"] == "agency"
+    assert relationship["analysis_perspective"] == "agency"
+    assert case_record["latest_analysis_perspective"] == "agency"
+    assert run_record["analysis_perspective"] == "agency"
+    assert any(
+        item["category"] == "payment_terms"
+        and "draw contractor resistance" in item["title"]
+        and "preserve competition" in item["recommended_action"]
+        for item in findings
+    )
 
 
 def test_bid_review_runner_profiles_transport_procurement_and_outcomes(tmp_path: Path) -> None:
@@ -362,8 +406,10 @@ def test_bid_review_runner_persists_case_and_run_records(tmp_path: Path) -> None
 
     assert case_record["project_id"] == "persisted-case"
     assert case_record["latest_run_id"] == run_record["run_id"]
+    assert case_record["latest_analysis_perspective"] == "vendor"
     assert case_record["total_runs"] == 1
     assert case_record["latest_agreement_type"] == "unknown_agreement_type"
+    assert run_record["analysis_perspective"] == "vendor"
     assert run_record["procurement_profile"]["project_id"] == "persisted-case"
     assert run_record["outcome_evidence"]["outcome_status"] == "dispute_or_change_documented"
     assert run_record["artifact_paths"]["decision_summary.json"].endswith("decision_summary.json")

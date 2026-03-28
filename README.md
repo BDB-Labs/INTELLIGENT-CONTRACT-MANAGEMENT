@@ -217,6 +217,7 @@ Common commands:
 
 ```bash
 uv run python -m apps.contract_intelligence bid-review ./sample_project
+uv run python -m apps.contract_intelligence bid-review ./sample_project --perspective agency
 uv run python -m apps.contract_intelligence commit ./sample_project
 uv run python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
 uv run python -m apps.contract_intelligence render-dashboard ./sample_project
@@ -323,6 +324,7 @@ runtime:
 - Contract-intelligence product overview: [`apps/contract_intelligence/README.md`](apps/contract_intelligence/README.md)
 - Case-intelligence platform design: [`docs/CASE_INTELLIGENCE_PLATFORM.md`](docs/CASE_INTELLIGENCE_PLATFORM.md)
 - Contract-intelligence initiative and current extension targets: [`docs/CONTRACT_INTELLIGENCE_INITIATIVE.md`](docs/CONTRACT_INTELLIGENCE_INITIATIVE.md)
+- Contract-intelligence product direction and extension backlog: [`docs/CONTRACT_INTELLIGENCE_PRODUCT_DIRECTION.md`](docs/CONTRACT_INTELLIGENCE_PRODUCT_DIRECTION.md)
 - Security posture and current advisory notes: [`docs/SECURITY_NOTES.md`](docs/SECURITY_NOTES.md)
 - Troubleshooting: [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
 - Contributor CI requirements: [`CONTRIBUTING.md`](CONTRIBUTING.md)

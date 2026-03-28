@@ -179,7 +179,7 @@ class LocalRuntimeConfig(BaseModel):
 class RuntimeConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    adapter: str = "dry-run"
+    adapter: str | None = None
     timeout_seconds: float = 60.0
     max_retries: int = 2
     retry_backoff_seconds: float = 1.0
@@ -190,7 +190,9 @@ class RuntimeConfig(BaseModel):
 
     @field_validator("adapter")
     @classmethod
-    def _validate_adapter(cls, value: str) -> str:
+    def _validate_adapter(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
         cleaned = value.strip()
         if not cleaned:
             raise ValueError("must be a non-empty string")
@@ -231,6 +233,7 @@ class ESEConfig(BaseModel):
 
     version: int = CONFIG_VERSION
     mode: Literal["ensemble", "solo"] = "ensemble"
+    execution_mode: Literal["auto", "demo", "live"] | None = None
     provider: ProviderConfig
     roles: dict[str, RoleConfig] = Field(default_factory=dict)
     role_order: list[str] | None = None
@@ -286,7 +289,14 @@ class ESEConfig(BaseModel):
 
     @model_validator(mode="after")
     def _validate_adapter_contract(self) -> "ESEConfig":
+        if not self.runtime.adapter:
+            raise ValueError(
+                "runtime.adapter must be explicitly set. Use execution_mode='demo' with runtime.adapter='dry-run' "
+                "or choose a live adapter.",
+            )
+
         adapter = self.runtime.adapter.strip().lower()
+        execution_mode = str(self.execution_mode or "").strip().lower()
         provider_name = self.provider.name.strip().lower()
         role_providers = {
             role: (role_cfg.provider or self.provider.name).strip().lower()
@@ -308,6 +318,9 @@ class ESEConfig(BaseModel):
             if missing_roles:
                 details = ", ".join(missing_roles)
                 raise ValueError(f"role_order omits configured roles: {details}")
+
+        if adapter == "dry-run" and execution_mode != "demo":
+            raise ValueError("runtime.adapter=dry-run requires execution_mode='demo'")
 
         if adapter == "openai":
             if provider_name != "openai":

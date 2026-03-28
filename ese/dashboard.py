@@ -29,6 +29,10 @@ from ese.reports import (
 from ese.templates import list_task_templates, recommend_template_for_scope, run_task_pipeline
 
 
+class DashboardStateError(RuntimeError):
+    """Raised when persisted dashboard state cannot be trusted."""
+
+
 class DashboardJobStore:
     """Thread-safe registry for background dashboard jobs."""
 
@@ -46,13 +50,15 @@ class DashboardJobStore:
         for path in sorted(self._storage_dir.glob("*.json")):
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, json.JSONDecodeError):
-                continue
+            except OSError as err:
+                raise DashboardStateError(f"Could not read persisted dashboard job state: {path}") from err
+            except json.JSONDecodeError as err:
+                raise DashboardStateError(f"Persisted dashboard job state is not valid JSON: {path}") from err
             if not isinstance(payload, dict):
-                continue
+                raise DashboardStateError(f"Persisted dashboard job state must be a JSON object: {path}")
             job_id = str(payload.get("id") or "").strip()
             if not job_id:
-                continue
+                raise DashboardStateError(f"Persisted dashboard job state is missing an id: {path}")
             self._jobs[job_id] = payload
 
     def _job_path(self, job_id: str) -> Path | None:

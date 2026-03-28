@@ -817,6 +817,7 @@ def run_wizard(config_path: str = "ese.config.yaml", *, advanced: bool = False) 
         cfg: Dict[str, Any] = {
             "version": 1,
             "mode": mode,
+            "execution_mode": execution_mode,
             "provider": {
                 "name": provider_name,
                 "model": model,

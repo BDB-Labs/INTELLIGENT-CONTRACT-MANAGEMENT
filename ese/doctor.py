@@ -68,7 +68,7 @@ def build_doctor_guidance(cfg: Dict[str, Any], violations: List[str]) -> List[st
     provider_cfg = cfg.get("provider") or {}
     runtime_cfg = cfg.get("runtime") or {}
     provider_name = str(provider_cfg.get("name") or "").strip().lower()
-    adapter_name = str(runtime_cfg.get("adapter") or "dry-run").strip().lower()
+    adapter_name = str(runtime_cfg.get("adapter") or "").strip().lower()
     supports_live = supports_builtin_live(provider_name)
 
     if any("No project scope supplied" in item for item in violations):
@@ -77,7 +77,9 @@ def build_doctor_guidance(cfg: Dict[str, Any], violations: List[str]) -> List[st
     if any("share model" in item for item in violations):
         guidance.append("Separate architect and implementer models, or reduce the constrained role set for this run.")
 
-    if adapter_name == "dry-run":
+    if not adapter_name:
+        guidance.append("Set runtime.adapter explicitly. Use dry-run only with execution_mode='demo'.")
+    elif adapter_name == "dry-run":
         guidance.append("You are in demo mode. Switch runtime.adapter to a live adapter when you want real model execution.")
     elif adapter_name not in {"openai", "local", "custom_api"} and ":" in adapter_name:
         guidance.append("Custom runtime adapter is configured. Re-run with `ese doctor` after adapter changes to keep validation tight.")

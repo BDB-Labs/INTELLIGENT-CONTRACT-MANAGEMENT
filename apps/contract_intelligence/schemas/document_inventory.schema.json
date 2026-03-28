@@ -2,9 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "DocumentInventory",
   "type": "object",
-  "required": ["project_id", "documents", "missing_required_documents"],
+  "required": ["project_id", "analysis_perspective", "documents", "missing_required_documents"],
   "properties": {
     "project_id": {"type": "string"},
+    "analysis_perspective": {"type": "string", "enum": ["vendor", "agency"]},
     "documents": {
       "type": "array",
       "items": {

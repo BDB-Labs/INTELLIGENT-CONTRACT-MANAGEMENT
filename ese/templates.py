@@ -281,6 +281,7 @@ def build_task_config(
     cfg: dict[str, Any] = {
         "version": 1,
         "mode": template.mode,
+        "execution_mode": effective_mode,
         "template_key": template.key,
         "template_title": template.title,
         "provider": provider_cfg,

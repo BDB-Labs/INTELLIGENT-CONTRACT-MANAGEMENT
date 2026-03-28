@@ -103,6 +103,7 @@ def test_render_project_dashboard_outputs_html_snapshot(tmp_path: Path) -> None:
     assert "Findings Workspace" in html
     assert "Lifecycle Timeline" in html
     assert "go_with_conditions" in html
+    assert '"analysis_perspective": "vendor"' in html
 
 
 def test_render_project_dashboard_external_mode_omits_internal_payload(tmp_path: Path) -> None:

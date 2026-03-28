@@ -8,6 +8,13 @@ monitoring for public-infrastructure work, with a particular emphasis on
 roadway and transportation packages where procurement method, funding overlays,
 governance records, and post-award outcomes materially affect bid decisions.
 
+The intended product posture is dual-perspective:
+
+- vendor-side intake and negotiation support against agency boilerplate
+- agency-side intake and negotiation support against proposed vendor terms
+- lifecycle carry-forward from intake findings into committed obligations,
+  exceptions, and monitoring
+
 ## Current lifecycle
 
 The product now covers a real end-to-end local lifecycle:
@@ -25,6 +32,7 @@ The product now covers a real end-to-end local lifecycle:
 Bid review emits:
 
 - document inventory
+- perspective-aware clause findings
 - contractor-side risk findings
 - insurance anomalies
 - funding and compliance findings
@@ -57,6 +65,7 @@ Run the deterministic bid review over a project folder:
 
 ```bash
 uv run python -m apps.contract_intelligence bid-review ./sample_project
+uv run python -m apps.contract_intelligence bid-review ./sample_project --perspective agency
 ```
 
 Run the same project through ESE's orchestration path:
@@ -106,6 +115,9 @@ uv run python -m apps.contract_intelligence evaluate-corpus
 - budget, board, audit, funding, and status materials feed an internal-only
   `context_profile.json` artifact used for strategy and relationship-aware
   reasoning
+- bid review now supports explicit `vendor` and `agency` perspectives so the
+  same package can be framed either as contractor-side intake or agency-side
+  pre-negotiation review
 - the generated dashboard supports internal and external outputs; rendering
   with `--mode external` omits internal-only context, review actions, and
   sensitive path metadata from the generated HTML payload

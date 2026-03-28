@@ -439,9 +439,12 @@ def _load_custom_adapter(reference: str) -> RoleAdapter:
 
 def _resolve_adapter(cfg: Dict[str, Any]) -> tuple[str, RoleAdapter]:
     runtime_cfg = cfg.get("runtime") or {}
-    reference = (runtime_cfg.get("adapter") or "dry-run").strip()
+    reference = str(runtime_cfg.get("adapter") or "").strip()
     if not reference:
-        reference = "dry-run"
+        raise PipelineError(
+            "runtime.adapter must be explicitly configured. Use 'dry-run' only with execution_mode='demo', "
+            "or choose a live adapter.",
+        )
 
     builtin = BUILTIN_ADAPTERS.get(reference)
     if builtin is not None:
@@ -679,11 +682,7 @@ def _write_summary_and_state(
 def _write_release_simulation_artifact(artifacts_dir: str) -> None:
     from ese.reports import build_release_simulation, collect_run_report
 
-    try:
-        report = collect_run_report(artifacts_dir)
-    except Exception:
-        return
-
+    report = collect_run_report(artifacts_dir)
     release_payload = build_release_simulation(report)
     if not release_payload.get("enabled"):
         return
@@ -699,11 +698,7 @@ def _write_code_suggestion_artifacts(artifacts_dir: str) -> None:
         render_code_suggestions_markdown,
     )
 
-    try:
-        report = collect_run_report(artifacts_dir)
-    except Exception:
-        return
-
+    report = collect_run_report(artifacts_dir)
     suggestions = report.get("code_suggestions") or []
     if not suggestions:
         return

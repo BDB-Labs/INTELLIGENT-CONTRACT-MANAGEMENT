@@ -16,6 +16,11 @@ class Recommendation(str, Enum):
     NO_GO = "no_go"
 
 
+class AnalysisPerspective(str, Enum):
+    VENDOR = "vendor"
+    AGENCY = "agency"
+
+
 class TextQuality(str, Enum):
     NONE = "none"
     LOW = "low"

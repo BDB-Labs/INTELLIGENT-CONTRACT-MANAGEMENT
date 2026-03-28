@@ -280,6 +280,7 @@ def commit_contract(
 
     persisted = store.persist_contract_commit(
         project_id=project_id,
+        analysis_perspective=latest_run.analysis_perspective,
         source_project_dir=project_path,
         committed_contract_dir=committed_path,
         source_run_id=latest_run.run_id,

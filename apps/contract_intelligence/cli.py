@@ -4,11 +4,20 @@ from pathlib import Path
 
 import typer
 
+from apps.contract_intelligence.domain.enums import AnalysisPerspective
 from apps.contract_intelligence.evaluation.corpus import default_corpus_dir, evaluate_corpus
 from apps.contract_intelligence.monitoring.runner import monitor_contract
 from apps.contract_intelligence.orchestration.commit_runner import commit_contract, load_committed_obligations
 from apps.contract_intelligence.orchestration.ese_bridge import run_bid_review_with_ese
 from apps.contract_intelligence.orchestration.bid_review_runner import run_bid_review
+from apps.contract_intelligence.paths import (
+    resolve_guarded_existing_directory,
+    resolve_guarded_existing_file,
+    resolve_guarded_optional_existing_directory,
+    resolve_guarded_output_directory,
+    resolve_guarded_output_file,
+    validate_allowed_roots_configured,
+)
 from apps.contract_intelligence.ui.dashboard import render_project_dashboard
 
 
@@ -20,6 +29,35 @@ def main() -> None:
     """Run contract-intelligence pilot workflows."""
 
 
+def _validated_project_dir(project_dir: str) -> str:
+    validate_allowed_roots_configured()
+    return str(resolve_guarded_existing_directory(project_dir, label="Project directory"))
+
+
+def _validated_optional_directory(path: str | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    return str(resolve_guarded_optional_existing_directory(path, label=label))
+
+
+def _validated_optional_output_dir(path: str | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    return str(resolve_guarded_output_directory(path, label=label))
+
+
+def _validated_optional_output_file(path: str | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    return str(resolve_guarded_output_file(path, label=label))
+
+
+def _validated_optional_file(path: str | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    return str(resolve_guarded_existing_file(path, label=label))
+
+
 @app.command("bid-review")
 def bid_review(
     project_dir: str = typer.Argument(..., help="Path to the project document folder"),
@@ -28,10 +66,20 @@ def bid_review(
         "--artifacts-dir",
         help="Optional output directory for generated bid-review artifacts",
     ),
+    analysis_perspective: AnalysisPerspective = typer.Option(
+        AnalysisPerspective.VENDOR,
+        "--perspective",
+        help="Evaluate the package from the vendor or agency perspective.",
+    ),
 ) -> None:
     """Run the deterministic construction bid-review pilot over a project folder."""
-    result = run_bid_review(project_dir=project_dir, artifacts_dir=artifacts_dir)
+    result = run_bid_review(
+        project_dir=_validated_project_dir(project_dir),
+        artifacts_dir=_validated_optional_output_dir(artifacts_dir, label="Artifacts directory"),
+        analysis_perspective=analysis_perspective,
+    )
     typer.echo(f"Project: {result.project_id}")
+    typer.echo(f"Perspective: {analysis_perspective.value}")
     typer.echo(f"Artifacts: {result.artifacts_dir}")
     typer.echo(f"Recommendation: {result.decision_summary.recommendation.value}")
     typer.echo(f"Overall risk: {result.decision_summary.overall_risk.value}")
@@ -58,7 +106,11 @@ def evaluate_corpus_command(
     ),
 ) -> None:
     """Run the deterministic gold-corpus evaluation suite for the pilot."""
-    results = evaluate_corpus(corpus_dir=corpus_dir, artifacts_root=artifacts_dir)
+    validate_allowed_roots_configured()
+    results = evaluate_corpus(
+        corpus_dir=str(resolve_guarded_existing_directory(corpus_dir, label="Corpus directory")),
+        artifacts_root=_validated_optional_output_dir(artifacts_dir, label="Artifacts directory"),
+    )
     passed = 0
     for result in results:
         status = "PASS" if result.passed else "FAIL"
@@ -86,24 +138,31 @@ def ensemble_bid_review(
     provider_name: str | None = typer.Option(None, help="Custom provider name when using custom_api"),
     base_url: str | None = typer.Option(None, help="Base URL for custom_api or local live runs"),
     api_key_env: str | None = typer.Option(None, help="API key environment variable override"),
+    analysis_perspective: AnalysisPerspective = typer.Option(
+        AnalysisPerspective.VENDOR,
+        "--perspective",
+        help="Evaluate the package from the vendor or agency perspective.",
+    ),
     fail_on_high: bool = typer.Option(False, help="Fail closed on HIGH/CRITICAL findings during the ESE run"),
     write_config_path: str | None = typer.Option(None, "--write-config", help="Optional path to save the generated ESE config"),
 ) -> None:
     """Run the construction bid review through ESE's real orchestration path."""
     cfg, summary_path = run_bid_review_with_ese(
-        project_dir=project_dir,
+        project_dir=_validated_project_dir(project_dir),
         provider=provider,
         execution_mode=execution_mode,
-        artifacts_dir=artifacts_dir,
+        artifacts_dir=str(resolve_guarded_output_directory(artifacts_dir, label="Artifacts directory")),
         model=model,
         api_key_env=api_key_env,
         runtime_adapter=runtime_adapter,
         provider_name=provider_name,
         base_url=base_url,
         fail_on_high=fail_on_high,
+        analysis_perspective=analysis_perspective,
         config_path=write_config_path,
     )
     adapter_name = str((cfg.get("runtime") or {}).get("adapter") or "dry-run")
+    typer.echo(f"Perspective: {analysis_perspective.value}")
     typer.echo(f"ESE-backed bid review completed via {adapter_name}. Summary: {summary_path}")
 
 
@@ -133,11 +192,20 @@ def commit_command(
 ) -> None:
     """Create a committed contract record and obligation snapshot from the latest bid-review run."""
     result = commit_contract(
-        project_dir=project_dir,
-        committed_contract_dir=committed_contract_dir,
-        finding_dispositions_file=finding_dispositions_file,
-        accepted_risks_file=accepted_risks_file,
-        negotiated_changes_file=negotiated_changes_file,
+        project_dir=_validated_project_dir(project_dir),
+        committed_contract_dir=_validated_optional_directory(
+            committed_contract_dir,
+            label="Committed contract directory",
+        ),
+        finding_dispositions_file=_validated_optional_file(
+            finding_dispositions_file,
+            label="Finding dispositions file",
+        ),
+        accepted_risks_file=_validated_optional_file(accepted_risks_file, label="Accepted risks file"),
+        negotiated_changes_file=_validated_optional_file(
+            negotiated_changes_file,
+            label="Negotiated changes file",
+        ),
     )
     typer.echo(f"Project: {result.project_id}")
     typer.echo(f"Commit ID: {result.commit_id}")
@@ -157,7 +225,10 @@ def extract_obligations_command(
     ),
 ) -> None:
     """Reload the current obligation snapshot from the latest committed contract state."""
-    result = load_committed_obligations(project_dir=project_dir, output_path=output_path)
+    result = load_committed_obligations(
+        project_dir=_validated_project_dir(project_dir),
+        output_path=_validated_optional_output_file(output_path, label="Output path"),
+    )
     typer.echo(f"Project: {result.project_id}")
     typer.echo(f"Obligations: {result.obligations_path}")
     typer.echo(f"Obligation count: {result.obligations_count}")
@@ -173,7 +244,10 @@ def monitor_command(
     ),
 ) -> None:
     """Apply current operational status inputs to the committed obligation baseline and emit alerts."""
-    result = monitor_contract(project_dir=project_dir, status_inputs_file=status_inputs_file)
+    result = monitor_contract(
+        project_dir=_validated_project_dir(project_dir),
+        status_inputs_file=_validated_optional_file(status_inputs_file, label="Status inputs file"),
+    )
     typer.echo(f"Project: {result.project_id}")
     typer.echo(f"Monitoring run: {result.run_id}")
     typer.echo(f"Monitoring snapshot: {result.monitoring_snapshot_path}")
@@ -192,7 +266,11 @@ def render_dashboard_command(
     ),
 ) -> None:
     """Render a self-contained HTML dashboard over the persisted contract lifecycle state."""
-    path = render_project_dashboard(project_dir=project_dir, output_path=output_path, report_mode=mode)
+    path = render_project_dashboard(
+        project_dir=_validated_project_dir(project_dir),
+        output_path=_validated_optional_output_file(output_path, label="Output path"),
+        report_mode=mode,
+    )
     typer.echo(f"Dashboard: {path}")
 
 
