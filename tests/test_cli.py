@@ -56,7 +56,7 @@ def test_packs_command_lists_construction_pack() -> None:
     assert "construction-contract-intelligence" in result.stdout
 
 
-def test_no_args_launches_dashboard(monkeypatch) -> None:
+def test_no_args_prints_help_in_non_interactive_mode(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
     def _fake_serve_dashboard(**kwargs):  # noqa: ANN003
@@ -67,16 +67,8 @@ def test_no_args_launches_dashboard(monkeypatch) -> None:
     result = runner.invoke(app, [])
 
     assert result.exit_code == 0
-    assert "Serving ESE dashboard" in result.stdout
-    assert calls == [
-        {
-            "artifacts_dir": "artifacts",
-            "host": "127.0.0.1",
-            "port": 8765,
-            "open_browser": True,
-            "config_path": None,
-        }
-    ]
+    assert "Usage:" in result.stdout
+    assert calls == []
 
 
 def test_doctor_command_exits_nonzero_on_violation(tmp_path: Path) -> None:
@@ -200,6 +192,26 @@ def test_status_and_report_commands_summarize_artifacts(tmp_path: Path) -> None:
     assert "Roles:" in report_result.stdout
 
 
+def test_status_command_supports_json_output(tmp_path: Path) -> None:
+    cfg = _base_cfg()
+    config_path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
+    artifacts_dir = tmp_path / "artifacts"
+
+    start_result = runner.invoke(
+        app,
+        ["start", "--config", config_path, "--artifacts-dir", str(artifacts_dir)],
+    )
+    assert start_result.exit_code == 0
+
+    status_result = runner.invoke(
+        app,
+        ["status", "--artifacts-dir", str(artifacts_dir), "--json"],
+    )
+
+    assert status_result.exit_code == 0
+    assert '"status": "completed"' in status_result.stdout
+
+
 def test_export_and_feedback_commands_write_outputs(tmp_path: Path) -> None:
     cfg = _base_cfg()
     config_path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
@@ -275,10 +287,16 @@ def test_pr_command_runs_pull_request_review(monkeypatch) -> None:
     def _fake_build_pr_review_config(**kwargs):  # noqa: ANN003
         return (
             context,
-            {
-                "runtime": {"adapter": "dry-run"},
-                "output": {"artifacts_dir": "/tmp/artifacts"},
-            },
+                {
+                    "version": 1,
+                    "mode": "ensemble",
+                    "execution_mode": "demo",
+                    "provider": {"name": "openai", "model": "gpt-5-mini", "api_key_env": "OPENAI_API_KEY"},
+                    "roles": {"architect": {"model": "gpt-5"}, "implementer": {}},
+                    "input": {"scope": "Review this pull request carefully"},
+                    "runtime": {"adapter": "dry-run"},
+                    "output": {"artifacts_dir": "/tmp/artifacts"},
+                },
         )
 
     monkeypatch.setattr("ese.cli.build_pr_review_config", _fake_build_pr_review_config)

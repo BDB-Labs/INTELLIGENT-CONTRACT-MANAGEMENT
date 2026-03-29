@@ -32,6 +32,32 @@ def _cfg() -> dict:
     }
 
 
+def _json_role_output(
+    summary: str,
+    *,
+    findings: list[dict[str, str]] | None = None,
+    artifacts: list[str] | None = None,
+    next_steps: list[str] | None = None,
+    code_suggestions: list[dict[str, str]] | None = None,
+    confidence: str = "HIGH",
+    assumptions: list[str] | None = None,
+    unknowns: list[str] | None = None,
+    evidence_basis: list[str] | None = None,
+) -> str:
+    payload = {
+        "summary": summary,
+        "confidence": confidence,
+        "assumptions": assumptions or [],
+        "unknowns": unknowns or [],
+        "evidence_basis": evidence_basis or [],
+        "findings": findings or [],
+        "artifacts": artifacts or [],
+        "next_steps": next_steps or [],
+        "code_suggestions": code_suggestions or [],
+    }
+    return json.dumps(payload)
+
+
 def test_pipeline_writes_expected_artifacts_and_state(tmp_path: Path) -> None:
     artifacts_dir = tmp_path / "artifacts"
 
@@ -58,6 +84,18 @@ def test_pipeline_context_chaining_visible_in_dry_run_outputs(tmp_path: Path) ->
     reviewer_output = json.loads((artifacts_dir / "03_adversarial_reviewer.json").read_text(encoding="utf-8"))
 
     assert implementer_output["metadata"]["context_keys"] == ["architect"]
+    assert reviewer_output["metadata"]["context_keys"] == ["implementer"]
+
+
+def test_pipeline_framed_review_isolation_preserves_architect_context_for_specialists(tmp_path: Path) -> None:
+    artifacts_dir = tmp_path / "artifacts"
+    cfg = _cfg()
+    cfg["runtime"]["review_isolation"] = "framed"
+
+    run_pipeline(cfg, artifacts_dir=str(artifacts_dir))
+
+    reviewer_output = json.loads((artifacts_dir / "03_adversarial_reviewer.json").read_text(encoding="utf-8"))
+
     assert reviewer_output["metadata"]["context_keys"] == ["architect", "implementer"]
 
 
@@ -148,27 +186,17 @@ def test_pipeline_blocks_on_high_severity_findings(tmp_path: Path, monkeypatch: 
     def _gating_adapter(**kwargs) -> str:  # noqa: ANN003
         role = kwargs["role"]
         if role == "architect":
-            return json.dumps(
+            return _json_role_output("Architecture complete.")
+        return _json_role_output(
+            "Reviewer found a release blocker.",
+            findings=[
                 {
-                    "summary": "Architecture complete.",
-                    "findings": [],
-                    "artifacts": [],
-                    "next_steps": [],
+                    "severity": "HIGH",
+                    "title": "Release blocker",
+                    "details": "A critical defect must be fixed before continuing.",
                 },
-            )
-        return json.dumps(
-            {
-                "summary": "Reviewer found a release blocker.",
-                "findings": [
-                    {
-                        "severity": "HIGH",
-                        "title": "Release blocker",
-                        "details": "A critical defect must be fixed before continuing.",
-                    },
-                ],
-                "artifacts": [],
-                "next_steps": ["Fix the blocker."],
-            },
+            ],
+            next_steps=["Fix the blocker."],
         )
 
     monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("test-gating", _gating_adapter))
@@ -191,14 +219,7 @@ def test_pipeline_can_rerun_from_a_specific_role(tmp_path: Path, monkeypatch: py
     def _tracking_adapter(**kwargs) -> str:  # noqa: ANN003
         role = kwargs["role"]
         calls.append(role)
-        return json.dumps(
-            {
-                "summary": f"{role} finished.",
-                "findings": [],
-                "artifacts": [],
-                "next_steps": [],
-            },
-        )
+        return _json_role_output(f"{role} finished.")
 
     monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("tracking", _tracking_adapter))
 
@@ -327,22 +348,17 @@ def test_pipeline_normalizes_structured_code_suggestions(
 
     def _suggesting_adapter(**kwargs) -> str:  # noqa: ANN003
         role = kwargs["role"]
-        return json.dumps(
-            {
-                "summary": f"{role} completed.",
-                "findings": [],
-                "artifacts": [],
-                "next_steps": [],
-                "code_suggestions": [
-                    {
-                        "path": "src/app.py",
-                        "kind": "patch",
-                        "summary": "Guard missing config",
-                        "suggestion": "Add an early return before dereferencing config in the request handler.",
-                        "snippet": "if config is None:\n    return default_response()",
-                    },
-                ],
-            },
+        return _json_role_output(
+            f"{role} completed.",
+            code_suggestions=[
+                {
+                    "path": "src/app.py",
+                    "kind": "patch",
+                    "summary": "Guard missing config",
+                    "suggestion": "Add an early return before dereferencing config in the request handler.",
+                    "snippet": "if config is None:\n    return default_response()",
+                },
+            ],
         )
 
     monkeypatch.setattr("ese.pipeline._resolve_adapter", lambda cfg: ("suggesting", _suggesting_adapter))

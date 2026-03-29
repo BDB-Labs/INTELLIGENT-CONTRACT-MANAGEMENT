@@ -11,6 +11,13 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from ese.provider_runtime import BUILTIN_RUNTIME_ADAPTERS, BUILTIN_RUNTIME_ADAPTERS_TEXT
 
 CONFIG_VERSION = 1
+REVIEW_ISOLATION_CHOICES = {
+    "framed",
+    "implementation_only",
+    "scope_only",
+    "scope_and_implementation",
+}
+STRICT_ROLE_KEYS = frozenset({"provider", "model", "temperature", "prompt"})
 
 
 class ConfigValidationError(ValueError):
@@ -50,8 +57,9 @@ class RoleConfig(BaseModel):
     provider: str | None = None
     model: str | None = None
     temperature: float | None = None
+    prompt: str | None = None
 
-    @field_validator("provider", "model")
+    @field_validator("provider", "model", "prompt")
     @classmethod
     def _optional_non_empty(cls, value: str | None) -> str | None:
         if value is None:
@@ -66,31 +74,89 @@ class ConstraintsConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     disallow_same_model_pairs: list[tuple[str, str]] = Field(default_factory=list)
+    require_roles: list[str] = Field(default_factory=list)
+    minimum_distinct_models: int | None = None
+    minimum_specialist_roles: int | None = None
+    disallow_same_provider_pairs: list[tuple[str, str]] = Field(default_factory=list)
+    require_json_for_roles: list[str] = Field(default_factory=list)
 
     @field_validator("disallow_same_model_pairs", mode="before")
     @classmethod
     def _normalize_pairs(cls, value: Any) -> list[tuple[str, str]]:
+        return _normalize_role_pairs(value)
+
+    @field_validator("disallow_same_provider_pairs", mode="before")
+    @classmethod
+    def _normalize_provider_pairs(cls, value: Any) -> list[tuple[str, str]]:
+        return _normalize_role_pairs(value)
+
+    @field_validator("require_roles", "require_json_for_roles", mode="before")
+    @classmethod
+    def _normalize_role_lists(cls, value: Any) -> list[str]:
+        return _normalize_role_list(value)
+
+    @field_validator("minimum_distinct_models")
+    @classmethod
+    def _validate_minimum_distinct_models(cls, value: int | None) -> int | None:
         if value is None:
-            return []
-        if not isinstance(value, list):
-            raise ValueError("must be a list of role name pairs")
+            return value
+        if value <= 0:
+            raise ValueError("must be > 0")
+        return value
 
-        pairs: list[tuple[str, str]] = []
-        for pair in value:
-            if not isinstance(pair, (list, tuple)) or len(pair) != 2:
-                raise ValueError("each pair must contain exactly two role names")
+    @field_validator("minimum_specialist_roles")
+    @classmethod
+    def _validate_minimum_specialist_roles(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        if value < 0:
+            raise ValueError("must be >= 0")
+        return value
 
-            left, right = pair
-            if not isinstance(left, str) or not isinstance(right, str):
-                raise ValueError("pair entries must be strings")
 
-            left = left.strip()
-            right = right.strip()
-            if not left or not right:
-                raise ValueError("pair entries must be non-empty strings")
+def _normalize_role_pairs(value: Any) -> list[tuple[str, str]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("must be a list of role name pairs")
 
-            pairs.append((left, right))
-        return pairs
+    pairs: list[tuple[str, str]] = []
+    for pair in value:
+        if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+            raise ValueError("each pair must contain exactly two role names")
+
+        left, right = pair
+        if not isinstance(left, str) or not isinstance(right, str):
+            raise ValueError("pair entries must be strings")
+
+        left = left.strip()
+        right = right.strip()
+        if not left or not right:
+            raise ValueError("pair entries must be non-empty strings")
+
+        pairs.append((left, right))
+    return pairs
+
+
+def _normalize_role_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("must be a list of role names")
+
+    roles: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError("role entries must be strings")
+        cleaned = item.strip()
+        if not cleaned:
+            raise ValueError("role entries must be non-empty strings")
+        if cleaned in seen:
+            continue
+        seen.add(cleaned)
+        roles.append(cleaned)
+    return roles
 
 
 class InputConfig(BaseModel):
@@ -184,6 +250,7 @@ class RuntimeConfig(BaseModel):
     max_retries: int = 2
     retry_backoff_seconds: float = 1.0
     max_output_tokens: int | None = None
+    review_isolation: str = "scope_and_implementation"
     openai: OpenAIRuntimeConfig = Field(default_factory=OpenAIRuntimeConfig)
     custom_api: CustomAPIRuntimeConfig | None = None
     local: LocalRuntimeConfig = Field(default_factory=LocalRuntimeConfig)
@@ -227,6 +294,15 @@ class RuntimeConfig(BaseModel):
             raise ValueError("must be > 0")
         return value
 
+    @field_validator("review_isolation", mode="before")
+    @classmethod
+    def _validate_review_isolation(cls, value: Any) -> str:
+        cleaned = str(value or "scope_and_implementation").strip().lower()
+        if cleaned not in REVIEW_ISOLATION_CHOICES:
+            allowed = ", ".join(sorted(REVIEW_ISOLATION_CHOICES))
+            raise ValueError(f"must be one of {allowed}")
+        return cleaned
+
 
 class ESEConfig(BaseModel):
     model_config = ConfigDict(extra="allow")
@@ -234,6 +310,7 @@ class ESEConfig(BaseModel):
     version: int = CONFIG_VERSION
     mode: Literal["ensemble", "solo"] = "ensemble"
     execution_mode: Literal["auto", "demo", "live"] | None = None
+    strict_config: bool = False
     provider: ProviderConfig
     roles: dict[str, RoleConfig] = Field(default_factory=dict)
     role_order: list[str] | None = None
@@ -307,6 +384,37 @@ class ESEConfig(BaseModel):
             raise ValueError(
                 "gating.fail_on_high requires output.enforce_json for deterministic severity parsing",
             )
+
+        required_json_roles = [
+            role
+            for role in self.constraints.require_json_for_roles
+            if role in self.roles
+        ]
+        if required_json_roles and not self.output.enforce_json:
+            details = ", ".join(required_json_roles)
+            raise ValueError(
+                "constraints.require_json_for_roles requires output.enforce_json=true "
+                f"when configured roles are present (found {details})",
+            )
+
+        if self.strict_config:
+            unknown_top_level = sorted((self.model_extra or {}).keys())
+            if unknown_top_level:
+                details = ", ".join(unknown_top_level)
+                raise ValueError(f"strict_config rejects unknown top-level keys: {details}")
+
+            invalid_role_keys: list[str] = []
+            for role, role_cfg in self.roles.items():
+                extra_keys = sorted((role_cfg.model_extra or {}).keys())
+                disallowed = [key for key in extra_keys if key not in STRICT_ROLE_KEYS]
+                if disallowed:
+                    invalid_role_keys.append(f"{role}={', '.join(disallowed)}")
+            if invalid_role_keys:
+                details = "; ".join(invalid_role_keys)
+                raise ValueError(
+                    "strict_config rejects unknown per-role keys outside "
+                    f"{sorted(STRICT_ROLE_KEYS)} (found {details})",
+                )
 
         if self.role_order is not None:
             configured_roles = list(self.roles.keys())
@@ -448,6 +556,23 @@ def resolve_role_model(cfg: Dict[str, Any], role: str) -> str:
         model = role_cfg["model"]
 
     return f"{provider}:{model}"
+
+
+def resolve_role_provider(cfg: Dict[str, Any], role: str) -> str:
+    """Resolve the normalized provider identifier for a role."""
+    provider_model = resolve_role_model(cfg, role)
+    provider, _, _model = provider_model.partition(":")
+    provider = provider.strip().lower()
+    return provider or "unknown"
+
+
+def resolve_role_identity(cfg: Dict[str, Any], role: str) -> str:
+    """Resolve a normalized provider:model identity for policy checks."""
+    provider_model = resolve_role_model(cfg, role)
+    provider, _, model = provider_model.partition(":")
+    clean_provider = provider.strip().lower() or "unknown"
+    clean_model = model.strip().lower()
+    return f"{clean_provider}:{clean_model}" if clean_model else clean_provider
 
 
 def resolve_scope_text(cfg: Dict[str, Any]) -> str:

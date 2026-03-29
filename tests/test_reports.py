@@ -41,6 +41,32 @@ def _cfg() -> dict:
     }
 
 
+def _json_role_output(
+    summary: str,
+    *,
+    findings: list[dict[str, str]] | None = None,
+    artifacts: list[str] | None = None,
+    next_steps: list[str] | None = None,
+    code_suggestions: list[dict[str, str]] | None = None,
+    confidence: str = "HIGH",
+    assumptions: list[str] | None = None,
+    unknowns: list[str] | None = None,
+    evidence_basis: list[str] | None = None,
+) -> str:
+    payload = {
+        "summary": summary,
+        "confidence": confidence,
+        "assumptions": assumptions or [],
+        "unknowns": unknowns or [],
+        "evidence_basis": evidence_basis or [],
+        "findings": findings or [],
+        "artifacts": artifacts or [],
+        "next_steps": next_steps or [],
+        "code_suggestions": code_suggestions or [],
+    }
+    return json.dumps(payload)
+
+
 def test_collect_run_report_summarizes_pipeline_outputs(tmp_path: Path) -> None:
     artifacts_dir = tmp_path / "artifacts"
     run_pipeline(_cfg(), artifacts_dir=str(artifacts_dir))
@@ -97,40 +123,30 @@ def test_collect_run_report_includes_comparison_feedback_and_code_suggestions(
 
     def _clean_adapter(**kwargs) -> str:  # noqa: ANN003
         role = kwargs["role"]
-        return json.dumps(
-            {
-                "summary": f"{role} completed cleanly.",
-                "findings": [],
-                "artifacts": [],
-                "next_steps": [],
-            },
-        )
+        return _json_role_output(f"{role} completed cleanly.")
 
     def _finding_adapter(**kwargs) -> str:  # noqa: ANN003
         role = kwargs["role"]
         if role == "adversarial_reviewer":
-            return json.dumps(
-                {
-                    "summary": "Reviewer found a concrete defect.",
-                    "findings": [
-                        {
-                            "severity": "HIGH",
-                            "title": "Null dereference risk",
-                            "details": "Guard the optional config object before dereferencing it in the request path.",
-                        },
-                    ],
-                    "artifacts": [],
-                    "next_steps": ["Add a guard clause and cover it with a regression test."],
-                    "code_suggestions": [
-                        {
-                            "path": "src/request_handler.py",
-                            "kind": "patch",
-                            "summary": "Guard the optional config before access",
-                            "suggestion": "Guard the optional config object before dereferencing it in the request path.",
-                            "snippet": "if config is None:\n    return default_response()",
-                        },
-                    ],
-                },
+            return _json_role_output(
+                "Reviewer found a concrete defect.",
+                findings=[
+                    {
+                        "severity": "HIGH",
+                        "title": "Null dereference risk",
+                        "details": "Guard the optional config object before dereferencing it in the request path.",
+                    },
+                ],
+                next_steps=["Add a guard clause and cover it with a regression test."],
+                code_suggestions=[
+                    {
+                        "path": "src/request_handler.py",
+                        "kind": "patch",
+                        "summary": "Guard the optional config before access",
+                        "suggestion": "Guard the optional config object before dereferencing it in the request path.",
+                        "snippet": "if config is None:\n    return default_response()",
+                    },
+                ],
             )
         return _clean_adapter(**kwargs)
 

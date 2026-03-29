@@ -181,3 +181,38 @@ def test_validate_config_rejects_role_order_unknown_role() -> None:
         validate_config(cfg, source="test.yaml")
 
     assert "role_order references unknown configured roles" in str(exc.value)
+
+
+def test_validate_config_accepts_review_isolation_and_required_roles() -> None:
+    cfg = _base_cfg()
+    cfg["runtime"]["review_isolation"] = "framed"
+    cfg["constraints"]["require_roles"] = ["architect", "implementer"]
+    cfg["constraints"]["require_json_for_roles"] = ["architect"]
+
+    validated = validate_config(cfg, source="test.yaml")
+
+    assert validated["runtime"]["review_isolation"] == "framed"
+    assert validated["constraints"]["require_roles"] == ["architect", "implementer"]
+
+
+def test_validate_config_rejects_require_json_roles_without_json_output() -> None:
+    cfg = _base_cfg()
+    cfg["constraints"]["require_json_for_roles"] = ["architect"]
+    cfg["output"] = {"artifacts_dir": "artifacts", "enforce_json": False}
+    cfg["gating"] = {"fail_on_high": False}
+
+    with pytest.raises(ConfigValidationError) as exc:
+        validate_config(cfg, source="test.yaml")
+
+    assert "constraints.require_json_for_roles requires output.enforce_json=true" in str(exc.value)
+
+
+def test_validate_config_strict_config_rejects_unknown_role_keys() -> None:
+    cfg = _base_cfg()
+    cfg["strict_config"] = True
+    cfg["roles"]["architect"]["unexpected"] = "value"
+
+    with pytest.raises(ConfigValidationError) as exc:
+        validate_config(cfg, source="test.yaml")
+
+    assert "strict_config rejects unknown per-role keys" in str(exc.value)

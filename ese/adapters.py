@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import re
 import socket
 import time
 import urllib.error
@@ -18,6 +20,11 @@ DEFAULT_CUSTOM_API_KEY_ENV = "CUSTOM_API_KEY"
 
 class AdapterExecutionError(RuntimeError):
     """Raised when a runtime adapter cannot execute successfully."""
+
+
+def _assurance_level(cfg: Mapping[str, Any]) -> str:
+    mode = str(cfg.get("mode") or "ensemble").strip().lower()
+    return "degraded" if mode == "solo" else "standard"
 
 
 def _json_output_enabled(cfg: Mapping[str, Any]) -> bool:
@@ -37,9 +44,17 @@ def dry_run_adapter(
 ) -> str:
     """Return deterministic placeholder output without external model calls."""
     snippet = prompt[:400].strip()
+    review_isolation = str((cfg.get("runtime") or {}).get("review_isolation") or "scope_and_implementation")
     if _json_output_enabled(cfg):
         payload = {
             "summary": f"Dry-run placeholder output for role '{role}'.",
+            "confidence": "MEDIUM",
+            "assumptions": [
+                "This run used the dry-run adapter and did not execute against a live model.",
+            ],
+            "unknowns": [
+                "No provider-backed reasoning or external validation was performed.",
+            ],
             "findings": [],
             "artifacts": [],
             "code_suggestions": [],
@@ -49,8 +64,10 @@ def dry_run_adapter(
             "metadata": {
                 "model": model,
                 "adapter": "dry-run",
+                "assurance_level": _assurance_level(cfg),
                 "prompt_excerpt": snippet or "(empty prompt)",
                 "context_keys": sorted(context.keys()),
+                "review_isolation": review_isolation,
             },
         }
         return json.dumps(payload)
@@ -202,25 +219,16 @@ def _openai_payload(
     cfg: Mapping[str, Any],
 ) -> dict[str, Any]:
     runtime_cfg = _runtime_cfg(cfg)
-    context_lines = [f"{name}: {value}" for name, value in sorted(context.items()) if value]
-    context_text = ""
-    if context_lines:
-        context_text = "\n\nUpstream context:\n" + "\n\n".join(context_lines)
+    _ = context
 
-    instructions = (
-        f"You are the {role} role in an ensemble software engineering pipeline. "
-        "Respond in concise Markdown focused on actionable output."
-    )
+    instructions = "Respond in concise Markdown focused on actionable output."
     if _json_output_enabled(cfg):
-        instructions = (
-            f"You are the {role} role in an ensemble software engineering pipeline. "
-            "Return valid JSON only and follow the requested schema exactly."
-        )
+        instructions = "Return valid JSON only and follow the requested schema exactly."
 
     payload: dict[str, Any] = {
         "model": model_name,
         "instructions": instructions,
-        "input": prompt + context_text,
+        "input": prompt,
     }
 
     max_output_tokens = runtime_cfg.get("max_output_tokens")
@@ -273,6 +281,24 @@ def _truncate_for_error(text: str, limit: int = 500) -> str:
     return cleaned[: limit - 3] + "..."
 
 
+def _redact_error_text(text: str) -> str:
+    redacted = text
+    patterns: list[tuple[re.Pattern[str], str]] = [
+        (re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._\-+/=]+\b"), "Bearer [REDACTED]"),
+        (
+            re.compile(r"(?i)\b(api[_-]?key|token|secret)(\s*[:=]\s*)([A-Za-z0-9._\-]{8,})"),
+            r"\1\2[REDACTED]",
+        ),
+    ]
+    for pattern, replacement in patterns:
+        redacted = pattern.sub(replacement, redacted)
+    return redacted
+
+
+def _retry_delay(retry_backoff_seconds: float, attempt: int) -> float:
+    return retry_backoff_seconds * attempt * random.uniform(0.9, 1.1)
+
+
 def _execute_responses_request(
     *,
     url: str,
@@ -283,6 +309,7 @@ def _execute_responses_request(
     retry_backoff_seconds: float,
     auth_error_message: str,
     provider_name: str,
+    role: str,
 ) -> str:
     body = json.dumps(payload).encode("utf-8")
     headers = {
@@ -311,22 +338,28 @@ def _execute_responses_request(
             response_body = err.read().decode("utf-8", errors="replace")
             status = err.code
             if status in {401, 403}:
-                raise AdapterExecutionError(auth_error_message) from err
+                raise AdapterExecutionError(f"{auth_error_message} Role: {role}.") from err
 
-            last_error = f"HTTP {status}: {_truncate_for_error(response_body)}"
+            last_error = (
+                f"provider={provider_name} role={role} status={status} "
+                f"attempt={attempt}/{attempts} body={_truncate_for_error(_redact_error_text(response_body))}"
+            )
             if attempt < attempts and _is_retryable_status(status):
-                time.sleep(retry_backoff_seconds * attempt)
+                time.sleep(_retry_delay(retry_backoff_seconds, attempt))
                 continue
 
             raise AdapterExecutionError(f"{provider_name} request failed ({last_error})") from err
         except (urllib.error.URLError, TimeoutError, socket.timeout) as err:
-            last_error = str(err)
+            last_error = (
+                f"provider={provider_name} role={role} attempt={attempt}/{attempts} "
+                f"error={_truncate_for_error(_redact_error_text(str(err)))}"
+            )
             if attempt < attempts:
-                time.sleep(retry_backoff_seconds * attempt)
+                time.sleep(_retry_delay(retry_backoff_seconds, attempt))
                 continue
             raise AdapterExecutionError(f"{provider_name} request failed after retries: {last_error}") from err
         except json.JSONDecodeError as err:
-            raise AdapterExecutionError(f"{provider_name} response was not valid JSON") from err
+            raise AdapterExecutionError(f"{provider_name} response was not valid JSON for role '{role}'") from err
 
     raise AdapterExecutionError(
         f"{provider_name} request failed after retries: {last_error or 'unknown error'}",
@@ -375,6 +408,7 @@ def openai_adapter(
         retry_backoff_seconds=retry_backoff_seconds,
         auth_error_message="OpenAI authentication failed. Check provider.api_key_env and token scope.",
         provider_name="OpenAI",
+        role=role,
     )
 
 
@@ -426,7 +460,8 @@ def custom_api_adapter(
         max_retries=max_retries,
         retry_backoff_seconds=retry_backoff_seconds,
         auth_error_message="Custom API authentication failed. Check provider.api_key_env and token scope.",
-        provider_name="Custom API",
+        provider_name=f"Custom API ({configured_provider})",
+        role=role,
     )
 
 
@@ -480,6 +515,7 @@ def local_adapter(
         retry_backoff_seconds=retry_backoff_seconds,
         auth_error_message="Local adapter authentication failed unexpectedly.",
         provider_name="Local adapter",
+        role=role,
     )
 
 

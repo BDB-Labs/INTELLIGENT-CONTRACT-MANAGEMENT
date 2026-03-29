@@ -113,6 +113,37 @@ def _finding_theme(value: str) -> str:
     return " ".join(cleaned.split())
 
 
+def _short_run_id(value: str) -> str:
+    cleaned = str(value or "").strip()
+    if len(cleaned) <= 12:
+        return cleaned
+    return cleaned[:12]
+
+
+def _recurring_unknowns(roles: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for role in roles:
+        role_name = str(role.get("role") or "").strip()
+        for unknown in role.get("unknowns", []):
+            if not isinstance(unknown, str) or not unknown.strip():
+                continue
+            theme = _finding_theme(unknown)
+            entry = grouped.setdefault(
+                theme,
+                {
+                    "text": unknown.strip(),
+                    "roles": [],
+                    "count": 0,
+                },
+            )
+            if role_name and role_name not in entry["roles"]:
+                entry["roles"].append(role_name)
+                entry["count"] += 1
+    recurring = [item for item in grouped.values() if item["count"] >= 2]
+    recurring.sort(key=lambda item: (-item["count"], item["text"]))
+    return recurring
+
+
 def _is_placeholder_suggestion(text: str) -> bool:
     lowered = str(text or "").strip().lower()
     return lowered.startswith("replace dry-run with a real adapter")
@@ -280,7 +311,15 @@ def build_release_simulation(report: dict[str, Any]) -> dict[str, Any]:
         if any(token in step.lower() for token in ("metric", "observe", "telemetry", "monitor", "alert", "latency"))
     ]
     required_sign_off = [role for role in ("release_manager", "devops_sre", "security_auditor") if role in role_map]
-    ready = report.get("blocker_count", 0) == 0 and report.get("status") == "completed"
+    assurance_level = str(report.get("assurance_level") or "standard").strip().lower()
+    ready = (
+        report.get("blocker_count", 0) == 0
+        and report.get("status") == "completed"
+        and assurance_level != "degraded"
+    )
+    summary = "Release-ready" if ready else "Hold release until blockers and rollout checks are resolved."
+    if assurance_level == "degraded":
+        summary = "Hold release: degraded assurance runs are not sufficient release evidence."
 
     return {
         "enabled": enabled,
@@ -291,7 +330,7 @@ def build_release_simulation(report: dict[str, Any]) -> dict[str, Any]:
         "observability_checks": observability_checks,
         "required_sign_off_roles": required_sign_off,
         "blocker_count": report.get("blocker_count", 0),
-        "summary": "Release-ready" if ready else "Hold release until blockers and rollout checks are resolved.",
+        "summary": summary,
     }
 
 
@@ -525,6 +564,7 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
     roles: list[dict[str, Any]] = []
     severity_counts = {severity: 0 for severity in SEVERITY_ORDER}
     blockers: list[dict[str, Any]] = []
+    low_confidence_blockers: list[dict[str, Any]] = []
     next_steps: list[dict[str, str]] = []
 
     for item in state.get("execution", []):
@@ -548,6 +588,10 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
             "findings": [],
             "next_steps": [],
             "artifacts": [],
+            "confidence": "",
+            "assumptions": [],
+            "unknowns": [],
+            "evidence_basis": [],
             "report_format": artifact_path.suffix.lower().lstrip("."),
         }
 
@@ -558,9 +602,15 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
             continue
 
         entry["summary"] = str(report.get("summary") or "").strip()
+        entry["confidence"] = str(report.get("confidence") or "").strip().upper()
         entry["findings"] = report.get("findings") if isinstance(report.get("findings"), list) else []
         entry["next_steps"] = [step for step in report.get("next_steps", []) if isinstance(step, str) and step.strip()]
         entry["artifacts"] = [step for step in report.get("artifacts", []) if isinstance(step, str) and step.strip()]
+        entry["assumptions"] = [item for item in report.get("assumptions", []) if isinstance(item, str) and item.strip()]
+        entry["unknowns"] = [item for item in report.get("unknowns", []) if isinstance(item, str) and item.strip()]
+        entry["evidence_basis"] = [
+            item for item in report.get("evidence_basis", []) if isinstance(item, str) and item.strip()
+        ]
         entry["code_suggestions"] = [
             item
             for item in report.get("code_suggestions", [])
@@ -574,14 +624,16 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
             if severity in severity_counts:
                 severity_counts[severity] += 1
             if severity in {"HIGH", "CRITICAL"}:
-                blockers.append(
-                    {
-                        "role": role,
-                        "severity": severity,
-                        "title": str(finding.get("title") or "").strip(),
-                        "details": str(finding.get("details") or "").strip(),
-                    },
-                )
+                blocker = {
+                    "role": role,
+                    "severity": severity,
+                    "title": str(finding.get("title") or "").strip(),
+                    "details": str(finding.get("details") or "").strip(),
+                    "confidence": entry["confidence"],
+                }
+                blockers.append(blocker)
+                if entry["confidence"] == "LOW":
+                    low_confidence_blockers.append(blocker)
 
         for step in entry["next_steps"]:
             next_steps.append({"role": role, "text": step})
@@ -591,9 +643,17 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
     finding_count = sum(severity_counts.values())
     documents = _document_entries(root, state)
     state_path = _state_path(root)
+    run_id = str(state.get("run_id") or "").strip()
+    assurance_level = str(state.get("assurance_level") or "").strip() or "standard"
+    recurring_unknowns = _recurring_unknowns(roles)
     report = {
         "artifacts_dir": str(root),
         "state": state,
+        "run_id": run_id,
+        "assurance_level": assurance_level,
+        "parent_run_id": state.get("parent_run_id"),
+        "state_contract_version": state.get("state_contract_version"),
+        "report_contract_version": state.get("report_contract_version"),
         "status": state.get("status", "unknown"),
         "scope": state.get("scope", ""),
         "provider": state.get("provider", ""),
@@ -603,11 +663,15 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
         "summary_path": str(root / "ese_summary.md"),
         "documents": documents,
         "failure": state.get("failure"),
+        "failed_roles": state.get("failed_roles", []),
+        "start_role": state.get("start_role"),
         "roles": roles,
         "severity_counts": severity_counts,
         "finding_count": finding_count,
         "blocker_count": len(blockers),
         "blockers": blockers,
+        "low_confidence_blockers": low_confidence_blockers,
+        "recurring_unknowns": recurring_unknowns,
         "next_steps": next_steps,
     }
     report["code_suggestions"] = _code_suggestions(roles)
@@ -625,6 +689,14 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
         }
     report["release_simulation"] = build_release_simulation(report)
     report["suggested_actions"] = _suggested_actions(report)
+    assurance_note = (
+        "Degraded assurance: solo or reduced-independence evidence should not be treated as equivalent to a full ensemble run."
+        if assurance_level == "degraded"
+        else "Standard assurance: ensemble independence checks passed for this run configuration."
+    )
+    report["assurance_note"] = assurance_note
+    report["top_blocker"] = blockers[0] if blockers else None
+    report["next_recommended_action"] = report["suggested_actions"][0] if report["suggested_actions"] else None
     return report
 
 
@@ -726,16 +798,29 @@ def render_status_text(report: dict[str, Any]) -> str:
         f"{severity.lower()}={counts.get(severity, 0)}"
         for severity in SEVERITY_ORDER
     )
+    run_id = _short_run_id(str(report.get("run_id") or ""))
     lines = [
         f"Status: {report.get('status', 'unknown')}",
+        f"Assurance: {report.get('assurance_level', 'standard')}",
         f"Provider: {report.get('provider', 'unknown')} ({report.get('adapter', 'unknown')})",
         f"Executed roles: {executed}",
         f"Findings: {report.get('finding_count', 0)} ({severity_line})",
         f"Blockers: {report.get('blocker_count', 0)}",
     ]
+    if run_id:
+        lines.insert(1, f"Run ID: {run_id}")
     scope = str(report.get("scope") or "").strip()
     if scope:
-        lines.insert(1, f"Scope: {scope}")
+        lines.insert(2 if run_id else 1, f"Scope: {scope}")
+    assurance_note = str(report.get("assurance_note") or "").strip()
+    if assurance_note:
+        lines.append(f"Assurance note: {assurance_note}")
+    top_blocker = report.get("top_blocker") or {}
+    if top_blocker:
+        lines.append(f"Top blocker: {top_blocker.get('role')}: {top_blocker.get('title')}")
+    next_action = report.get("next_recommended_action") or {}
+    if next_action:
+        lines.append(f"Next action: {next_action.get('text')}")
     comparison = report.get("comparison") or {}
     if comparison.get("previous_artifacts_dir"):
         lines.append(
@@ -750,11 +835,19 @@ def render_report_text(report: dict[str, Any]) -> str:
     lines = [
         render_status_text(report),
         "",
-        "Roles:",
     ]
+    failure = str(report.get("failure") or "").strip()
+    failed_roles = [role for role in report.get("failed_roles", []) if isinstance(role, str) and role.strip()]
+    if failure:
+        lines.extend(["Failure:", failure, ""])
+    if failed_roles:
+        lines.extend([f"Failed roles: {', '.join(failed_roles)}", ""])
+    lines.append("Roles:")
     for role in report.get("roles", []):
+        confidence = str(role.get("confidence") or "").strip()
+        confidence_suffix = f" confidence={confidence}" if confidence else ""
         lines.append(
-            f"- {role['role']} ({role['model']}): {role['summary'] or 'No summary provided.'}",
+            f"- {role['role']} ({role['model']}){confidence_suffix}: {role['summary'] or 'No summary provided.'}",
         )
         for finding in role.get("findings", []):
             if not isinstance(finding, dict):
@@ -767,9 +860,25 @@ def render_report_text(report: dict[str, Any]) -> str:
     if blockers:
         lines.extend(["", "Blockers:"])
         for blocker in blockers:
+            confidence = str(blocker.get("confidence") or "").strip()
+            confidence_suffix = f" confidence={confidence}" if confidence else ""
             lines.append(
-                f"- {blocker['role']} [{blocker['severity']}]: {blocker['title']}",
+                f"- {blocker['role']} [{blocker['severity']}]{confidence_suffix}: {blocker['title']}",
             )
+
+    low_confidence_blockers = report.get("low_confidence_blockers", [])
+    if low_confidence_blockers:
+        lines.extend(["", "Low-confidence blockers:"])
+        for blocker in low_confidence_blockers:
+            lines.append(
+                f"- {blocker['role']} [{blocker['severity']}] confidence=LOW: {blocker['title']}",
+            )
+
+    recurring_unknowns = report.get("recurring_unknowns", [])
+    if recurring_unknowns:
+        lines.extend(["", "Recurring unknowns:"])
+        for item in recurring_unknowns[:8]:
+            lines.append(f"- {item['text']} ({item['count']} roles: {', '.join(item['roles'])})")
 
     next_steps = report.get("next_steps", [])
     if next_steps:

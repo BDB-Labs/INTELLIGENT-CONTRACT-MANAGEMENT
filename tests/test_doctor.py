@@ -87,3 +87,31 @@ def test_doctor_fails_when_scope_is_missing(tmp_path) -> None:
     assert not ok
     assert "No project scope supplied. Set input.scope in the config or pass --scope." in violations
     assert set(role_models.keys()) == {"architect", "implementer"}
+
+
+def test_doctor_enforces_required_roles_and_provider_separation(tmp_path) -> None:
+    cfg = _base_cfg()
+    cfg["roles"]["adversarial_reviewer"] = {
+        "provider": "openrouter",
+        "model": "openai/gpt-5-mini",
+    }
+    cfg["constraints"]["require_roles"] = ["architect", "adversarial_reviewer"]
+    cfg["constraints"]["disallow_same_provider_pairs"] = [["architect", "adversarial_reviewer"]]
+    path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
+
+    ok, violations, _role_models = run_doctor(path)
+
+    assert ok
+    assert violations == []
+
+
+def test_doctor_rejects_minimum_distinct_models_shortfall(tmp_path) -> None:
+    cfg = _base_cfg()
+    cfg["roles"]["implementer"]["model"] = "gpt-5"
+    cfg["constraints"]["minimum_distinct_models"] = 2
+    path = _write_cfg(tmp_path / "ese.config.yaml", cfg)
+
+    ok, violations, _role_models = run_doctor(path)
+
+    assert not ok
+    assert any("at least 2 distinct role models" in item for item in violations)
