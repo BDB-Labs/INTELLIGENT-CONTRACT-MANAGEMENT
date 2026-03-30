@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, ValidationError
 
 from apps.contract_intelligence.domain.enums import AnalysisPerspective
@@ -144,9 +145,267 @@ def _not_found(message: str) -> HTTPException:
     return HTTPException(status_code=404, detail=message)
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _reference_site_root() -> Path:
+    explicit = os.getenv("CONTRACT_INTELLIGENCE_REFERENCE_SITE_DIR", "").strip()
+    if explicit:
+        return Path(explicit).expanduser().resolve()
+    reference_root = os.getenv("CONTRACT_INTELLIGENCE_REFERENCE_ROOT", "").strip()
+    if reference_root:
+        return Path(reference_root).expanduser().resolve() / "site"
+    return _repo_root() / "demo_site" / "generated"
+
+
+def _reference_manifest_path() -> Path:
+    return _reference_site_root() / "manifest.json"
+
+
+def _load_reference_manifest() -> dict[str, object]:
+    path = _reference_manifest_path()
+    if not path.exists():
+        raise _not_found(
+            "Reference manifest is not available. Build demo assets first with "
+            "`uv run python -m apps.contract_intelligence build-demo`."
+        )
+    payload = _read_json(path)
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=500, detail="Reference manifest is malformed.")
+    return payload
+
+
+def _reference_landing_html() -> str:
+    try:
+        manifest = _load_reference_manifest()
+        cases = manifest.get("cases", [])
+    except HTTPException:
+        cases = []
+
+    cards = []
+    for item in cases:
+        if not isinstance(item, dict):
+            continue
+        cards.append(
+            """
+            <article class="case-card">
+              <div class="case-head">
+                <h2>{title}</h2>
+                <span class="badge">{recommendation}</span>
+              </div>
+              <p class="risk">Overall risk: <strong>{overall_risk}</strong></p>
+              <p class="meta">{findings_count} findings · {obligations_count} obligations · {alerts_count} alerts</p>
+              <ul>{highlights}</ul>
+              <a class="button" href="/reference/cases/{case_id}/dashboard">Open dashboard</a>
+            </article>
+            """.format(
+                title=str(item.get("title", item.get("case_id", "Reference case"))),
+                recommendation=str(item.get("recommendation", "unknown")),
+                overall_risk=str(item.get("overall_risk", "unknown")),
+                findings_count=str(item.get("findings_count", 0)),
+                obligations_count=str(item.get("obligations_count", 0)),
+                alerts_count=str(item.get("alerts_count", 0)),
+                case_id=str(item.get("case_id", "")),
+                highlights="".join(
+                    f"<li>{str(highlight)}</li>"
+                    for highlight in item.get("highlights", [])
+                ) or "<li>Prepared reference lifecycle snapshot.</li>",
+            )
+        )
+
+    if not cards:
+        cards_markup = (
+            "<article class='empty-state'><p>No reference cases are available yet. "
+            "Run <code>uv run python -m apps.contract_intelligence build-demo</code> "
+            "to generate the demo corpus snapshots.</p></article>"
+        )
+    else:
+        cards_markup = "".join(cards)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ICM Reference Implementation</title>
+  <style>
+    :root {{
+      --ink: #112335;
+      --muted: #5b6774;
+      --bg: #f7f2ea;
+      --paper: rgba(255, 255, 255, 0.92);
+      --accent: #0f7662;
+      --accent-2: #c96b2c;
+      --line: rgba(17, 35, 53, 0.12);
+      --shadow: 0 22px 55px rgba(17, 35, 53, 0.12);
+      --radius: 22px;
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 0% 0%, rgba(201, 107, 44, 0.14), transparent 28%),
+        radial-gradient(circle at 100% 20%, rgba(15, 118, 98, 0.16), transparent 30%),
+        linear-gradient(180deg, #fcfaf6, var(--bg));
+    }}
+    main {{
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px 72px;
+    }}
+    .hero {{
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 32px;
+      padding: 36px;
+      box-shadow: var(--shadow);
+      margin-bottom: 28px;
+    }}
+    .eyebrow {{
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-size: 0.78rem;
+      margin: 0 0 12px;
+      font-weight: 700;
+    }}
+    h1 {{
+      margin: 0;
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      line-height: 1;
+    }}
+    .lead {{
+      max-width: 780px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.6;
+      margin: 18px 0 0;
+    }}
+    .links {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }}
+    .links a, .button {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 18px;
+      border-radius: 999px;
+      text-decoration: none;
+      font-weight: 700;
+      border: 1px solid transparent;
+    }}
+    .links a.primary, .button {{
+      background: var(--ink);
+      color: white;
+    }}
+    .links a.secondary {{
+      border-color: var(--line);
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.65);
+    }}
+    .grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+    }}
+    .case-card, .empty-state {{
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 22px;
+      box-shadow: var(--shadow);
+    }}
+    .case-head {{
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }}
+    .case-head h2 {{
+      margin: 0;
+      font-size: 1.1rem;
+    }}
+    .badge {{
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #164e63);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }}
+    .risk, .meta {{
+      color: var(--muted);
+      margin: 12px 0 0;
+    }}
+    ul {{
+      padding-left: 18px;
+      color: var(--muted);
+      line-height: 1.5;
+    }}
+    code {{
+      background: rgba(17, 35, 53, 0.06);
+      padding: 2px 6px;
+      border-radius: 6px;
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <section class="hero">
+      <p class="eyebrow">Reference Implementation</p>
+      <h1>ICM on Render</h1>
+      <p class="lead">
+        This service hosts the reference implementation of the contract-intelligence runtime.
+        It exposes the real FastAPI lifecycle surface and also serves curated reference cases
+        built from the shipped public-infrastructure corpus.
+      </p>
+      <div class="links">
+        <a class="primary" href="/reference/manifest">Reference manifest</a>
+        <a class="secondary" href="/health">Health</a>
+      </div>
+    </section>
+    <section class="grid">
+      {cards_markup}
+    </section>
+  </main>
+</body>
+</html>"""
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/", response_class=HTMLResponse)
+def root() -> str:
+    return _reference_landing_html()
+
+
+@app.get("/reference", response_class=HTMLResponse)
+def reference_home() -> str:
+    return _reference_landing_html()
+
+
+@app.get("/reference/manifest")
+def reference_manifest() -> dict[str, object]:
+    return _load_reference_manifest()
+
+
+@app.get("/reference/cases/{case_id}/dashboard")
+def reference_case_dashboard(case_id: str) -> FileResponse:
+    target = _reference_site_root() / "cases" / case_id / "dashboard.html"
+    if not target.exists():
+        raise _not_found(f"No reference dashboard exists for case '{case_id}'.")
+    return FileResponse(target, media_type="text/html")
 
 
 @app.post("/projects/analyze")

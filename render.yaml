@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: icm-reference
+    runtime: python
+    plan: starter
+    buildCommand: python -m pip install uv && uv sync --locked
+    startCommand: /bin/bash scripts/start_icm_reference.sh
+    healthCheckPath: /health
+    disk:
+      name: icm-data
+      mountPath: /var/data/icm
+      sizeGB: 1
+    envVars:
+      - key: CONTRACT_INTELLIGENCE_ALLOWED_ROOTS
+        value: /var/data/icm/reference
+      - key: CONTRACT_INTELLIGENCE_EXPOSE_DOCS
+        value: "0"
+      - key: ICM_REFERENCE_ROOT
+        value: /var/data/icm/reference
+      - key: ICM_REFERENCE_SITE_DIR
+        value: /var/data/icm/reference/site
+      - key: ICM_BOOTSTRAP_REFERENCE
+        value: "1"

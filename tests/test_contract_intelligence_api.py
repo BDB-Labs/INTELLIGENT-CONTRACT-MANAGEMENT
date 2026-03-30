@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from apps.contract_intelligence.api import app
+from apps.contract_intelligence.demo import build_demo_assets
 
 
 client = TestClient(app)
@@ -227,3 +228,52 @@ def test_contract_intelligence_api_rejects_malformed_alert_snapshots(tmp_path: P
     response = client.get("/projects/alerts", params={"project_dir": str(project_dir)})
     assert response.status_code == 500
     assert response.json()["detail"] == "Alert snapshot failed validation."
+
+
+def test_contract_intelligence_api_serves_reference_manifest_and_dashboard(monkeypatch, tmp_path: Path) -> None:
+    corpus_dir = tmp_path / "corpus"
+    case_dir = corpus_dir / "demo-reference"
+    inputs_dir = case_dir / "inputs"
+    inputs_dir.mkdir(parents=True)
+    (case_dir / "expected.json").write_text("{}", encoding="utf-8")
+    (inputs_dir / "Prime Contract Agreement.md").write_text(
+        "\n".join(
+            [
+                "Owner may terminate for convenience.",
+                "Subcontractor shall be paid on a pay-if-paid basis.",
+                "No damages for delay shall be allowed.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (inputs_dir / "General Conditions.md").write_text(
+        "Notice of claim must be provided within 5 calendar days.",
+        encoding="utf-8",
+    )
+    (inputs_dir / "Insurance Requirements.md").write_text(
+        "Certificates of insurance are required before starting work.",
+        encoding="utf-8",
+    )
+    (inputs_dir / "Funding Memo.md").write_text(
+        "Certified payroll must be submitted weekly.",
+        encoding="utf-8",
+    )
+
+    build_demo_assets(
+        corpus_dir=corpus_dir,
+        reference_root=tmp_path / "reference-root",
+        site_dir=tmp_path / "reference-site",
+    )
+    monkeypatch.setenv("CONTRACT_INTELLIGENCE_REFERENCE_SITE_DIR", str((tmp_path / "reference-site").resolve()))
+
+    root_response = client.get("/")
+    assert root_response.status_code == 200
+    assert "ICM on Render" in root_response.text
+
+    manifest_response = client.get("/reference/manifest")
+    assert manifest_response.status_code == 200
+    assert manifest_response.json()["cases"][0]["case_id"] == "demo-reference"
+
+    dashboard_response = client.get("/reference/cases/demo-reference/dashboard")
+    assert dashboard_response.status_code == 200
+    assert "Internal-only context is intentionally omitted from the external artifact." in dashboard_response.text

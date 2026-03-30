@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ICM Demo</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Public Demo</p>
+        <h1>ICM Contract Intelligence</h1>
+        <p class="lead">
+          A sanitized public demo of the contract-intelligence workflow for public-infrastructure and roadway agreements.
+          These examples use curated sample packages and show intake analysis, committed-state carry-forward, obligations,
+          and monitoring posture without exposing internal-only context.
+        </p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#demo-cases">Explore demo cases</a>
+          <a class="button button-secondary" href="https://github.com/BDB-Labs/INTELLIGENT-CONTRACT-MANAGEMENT">View repository</a>
+        </div>
+      </div>
+      <aside class="hero-panel">
+        <p class="panel-label">What this demo shows</p>
+        <ul>
+          <li>Perspective-aware intake review</li>
+          <li>Clause and risk findings</li>
+          <li>Committed obligations</li>
+          <li>Monitoring and alert posture</li>
+          <li>Sanitized external reporting</li>
+        </ul>
+      </aside>
+    </header>
+
+    <main>
+      <section class="overview-grid">
+        <article class="info-card">
+          <h2>How to read this demo</h2>
+          <p>
+            Each case below links to a generated external dashboard built from a curated sample contract package.
+            The dashboards are shareable artifacts, not internal operator views.
+          </p>
+        </article>
+        <article class="info-card">
+          <h2>What is omitted</h2>
+          <p>
+            Internal-only context, local paths, private review actions, and strategy-only notes are removed from these artifacts by design.
+          </p>
+        </article>
+        <article class="info-card">
+          <h2>Reference runtime</h2>
+          <p>
+            The real Python/FastAPI reference implementation is intended to run separately on Render while this Vercel surface stays public and read-only.
+          </p>
+        </article>
+      </section>
+
+      <section id="demo-cases" class="cases-section">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Demo Cases</p>
+            <h2>Sample contract packages</h2>
+          </div>
+          <p id="generated-at" class="generated-at"></p>
+        </div>
+        <div id="case-grid" class="case-grid">
+          <article class="loading-card">
+            <p>Loading demo cases…</p>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

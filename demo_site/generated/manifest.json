@@ -1,0 +1,63 @@
+{
+  "generated_at": "2026-03-30T03:42:02+00:00",
+  "site_title": "ICM Contract Intelligence Demo",
+  "summary": "Sanitized public demo cases generated from the contract-intelligence gold corpus.",
+  "cases": [
+    {
+      "case_id": "caltrans_cmgc_context",
+      "title": "Caltrans Cmgc Context",
+      "project_id": "caltrans-cmgc-context",
+      "analysis_perspective": "vendor",
+      "recommendation": "go_with_conditions",
+      "overall_risk": "high",
+      "findings_count": 4,
+      "obligations_count": 3,
+      "alerts_count": 2,
+      "documents_count": 7,
+      "dashboard_href": "./cases/caltrans_cmgc_context/dashboard.html",
+      "highlights": [
+        "CMGC pricing off-ramp may leave preconstruction effort stranded",
+        "Additional-insured requirement needs broker review",
+        "Must-fix before bid: Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.",
+        "Monitoring alert posture: 2 open alert(s) in the reference lifecycle snapshot."
+      ]
+    },
+    {
+      "case_id": "missing_insurance_package",
+      "title": "Missing Insurance Package",
+      "project_id": "missing-insurance-package",
+      "analysis_perspective": "vendor",
+      "recommendation": "no_go",
+      "overall_risk": "high",
+      "findings_count": 1,
+      "obligations_count": 0,
+      "alerts_count": 0,
+      "documents_count": 1,
+      "dashboard_href": "./cases/missing_insurance_package/dashboard.html",
+      "highlights": [
+        "Pay-if-paid structure shifts collection risk downstream",
+        "Missing required document: general_conditions",
+        "Must-fix before bid: Seek pay-when-paid language or an outside payment deadline."
+      ]
+    },
+    {
+      "case_id": "riverside_bridge",
+      "title": "Riverside Bridge",
+      "project_id": "riverside-bridge",
+      "analysis_perspective": "vendor",
+      "recommendation": "go_with_conditions",
+      "overall_risk": "high",
+      "findings_count": 10,
+      "obligations_count": 3,
+      "alerts_count": 2,
+      "documents_count": 4,
+      "dashboard_href": "./cases/riverside_bridge/dashboard.html",
+      "highlights": [
+        "Pay-if-paid structure shifts collection risk downstream",
+        "Broad indemnity language may exceed reasonable contractor risk",
+        "Must-fix before bid: Seek pay-when-paid language or an outside payment deadline.",
+        "Monitoring alert posture: 2 open alert(s) in the reference lifecycle snapshot."
+      ]
+    }
+  ]
+}

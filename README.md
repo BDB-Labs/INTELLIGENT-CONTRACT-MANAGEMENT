@@ -222,6 +222,7 @@ uv run python -m apps.contract_intelligence commit ./sample_project
 uv run python -m apps.contract_intelligence monitor ./sample_project --status-inputs-file ./status_inputs.json
 uv run python -m apps.contract_intelligence render-dashboard ./sample_project
 uv run python -m apps.contract_intelligence render-dashboard ./sample_project --mode external
+uv run python -m apps.contract_intelligence build-demo
 ```
 
 The contract-intelligence dashboard escapes rendered contract-derived content
@@ -229,6 +230,17 @@ before inserting it into dynamic HTML. Rendering with `--mode external`
 produces a sanitized artifact that omits internal-only context, review-action
 data, and sensitive path metadata from the embedded payload. Internal dashboard
 artifacts should still be treated as sensitive local operator outputs.
+
+Deployment guidance for this product split lives in
+[`docs/DEPLOYMENT_SPLIT_PLAN.md`](docs/DEPLOYMENT_SPLIT_PLAN.md). The short
+version is: use Vercel for a public demo surface fed by sanitized artifacts,
+and keep the real operator runtime separate.
+
+Concrete deployment assets now live in:
+
+- [demo_site/README.md](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/demo_site/README.md)
+- [render.yaml](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/render.yaml)
+- [scripts/start_icm_reference.sh](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/scripts/start_icm_reference.sh)
 
 ## Framework role drafting
 

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from apps.contract_intelligence.demo import build_demo_assets, default_demo_site_dir, default_reference_root
 from apps.contract_intelligence.domain.enums import AnalysisPerspective
 from apps.contract_intelligence.evaluation.corpus import default_corpus_dir, evaluate_corpus
 from apps.contract_intelligence.monitoring.runner import monitor_contract
@@ -11,6 +12,7 @@ from apps.contract_intelligence.orchestration.commit_runner import commit_contra
 from apps.contract_intelligence.orchestration.ese_bridge import run_bid_review_with_ese
 from apps.contract_intelligence.orchestration.bid_review_runner import run_bid_review
 from apps.contract_intelligence.paths import (
+    resolve_existing_directory,
     resolve_guarded_existing_directory,
     resolve_guarded_existing_file,
     resolve_guarded_optional_existing_directory,
@@ -122,6 +124,44 @@ def evaluate_corpus_command(
     typer.echo(f"Summary: {passed}/{len(results)} cases passed")
     if passed != len(results):
         raise typer.Exit(code=1)
+
+
+@app.command("build-demo")
+def build_demo_command(
+    corpus_dir: str = typer.Option(
+        str(default_corpus_dir()),
+        "--corpus-dir",
+        help="Directory containing curated demo cases with expected.json and inputs/.",
+    ),
+    reference_root: str = typer.Option(
+        str(default_reference_root()),
+        "--reference-root",
+        help="Directory where the reference demo workspaces and lifecycle state should be built.",
+    ),
+    site_dir: str = typer.Option(
+        str(default_demo_site_dir()),
+        "--site-dir",
+        help="Directory where the static Vercel demo artifacts should be written.",
+    ),
+) -> None:
+    """Build sanitized demo assets and reference workspaces from the shipped corpus."""
+    validate_allowed_roots_configured()
+    result = build_demo_assets(
+        corpus_dir=str(resolve_existing_directory(corpus_dir, label="Corpus directory")),
+        reference_root=str(resolve_guarded_output_directory(reference_root, label="Reference root")),
+        site_dir=str(resolve_guarded_output_directory(site_dir, label="Site directory")),
+    )
+    typer.echo(f"Generated: {result.generated_at}")
+    typer.echo(f"Reference root: {result.reference_root}")
+    typer.echo(f"Site dir: {result.site_dir}")
+    typer.echo(f"Manifest: {result.manifest_path}")
+    typer.echo("Cases:")
+    for case in result.cases:
+        typer.echo(
+            "  - "
+            f"{case.case_id}: {case.recommendation} / {case.overall_risk} "
+            f"({case.findings_count} findings, {case.alerts_count} alerts) -> {case.dashboard_path}"
+        )
 
 
 @app.command("ensemble-bid-review")

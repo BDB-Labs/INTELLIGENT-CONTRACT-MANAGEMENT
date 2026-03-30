@@ -105,6 +105,12 @@ Run the starter gold corpus:
 uv run python -m apps.contract_intelligence evaluate-corpus
 ```
 
+Build the Vercel demo assets and the Render reference workspaces:
+
+```bash
+uv run python -m apps.contract_intelligence build-demo
+```
+
 ## Product behavior notes
 
 - supported source types currently include `.md`, `.txt`, `.json`, `.yaml`,
@@ -133,6 +139,22 @@ The thin FastAPI layer in `api/` now:
 
 Set `CONTRACT_INTELLIGENCE_EXPOSE_DOCS=1` only when you explicitly want the API
 docs enabled in a trusted local environment.
+
+## Deployment posture
+
+This product should currently be treated as two separate deployment surfaces:
+
+- a private operator/runtime environment for real lifecycle work
+- a public demo environment that serves only sanitized demo artifacts
+
+See [`docs/DEPLOYMENT_SPLIT_PLAN.md`](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/docs/DEPLOYMENT_SPLIT_PLAN.md)
+for the recommended domain split, hosting posture, and rollout phases.
+
+Concrete deployment scaffolding now exists in:
+
+- [demo_site/README.md](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/demo_site/README.md)
+- [render.yaml](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/render.yaml)
+- [scripts/start_icm_reference.sh](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/scripts/start_icm_reference.sh)
 
 ## Folder map
 

@@ -46,3 +46,6 @@ Also verify:
   are still accurately characterized
 - no new contract-intelligence lifecycle docs are stale relative to the shipped
   commands and dashboard behavior
+- the public demo guidance in [`docs/DEPLOYMENT_SPLIT_PLAN.md`](DEPLOYMENT_SPLIT_PLAN.md)
+  still matches the real separation between demo artifacts and the internal
+  runtime
