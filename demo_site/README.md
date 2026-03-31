@@ -24,3 +24,6 @@ uv run python -m apps.contract_intelligence build-demo
 Point the Vercel project root at `demo_site/`.
 
 Do not deploy the internal Python/FastAPI runtime directly to Vercel.
+
+The Vercel-specific headers for this surface live in
+[`vercel.json`](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/demo_site/vercel.json).

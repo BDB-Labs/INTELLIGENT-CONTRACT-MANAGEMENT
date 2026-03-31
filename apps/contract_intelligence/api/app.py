@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import base64
 import json
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, ValidationError
 
 from apps.contract_intelligence.domain.enums import AnalysisPerspective
@@ -29,6 +31,43 @@ def _docs_enabled() -> bool:
     return os.getenv("CONTRACT_INTELLIGENCE_EXPOSE_DOCS", "").strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _reference_auth_credentials() -> tuple[str, str] | None:
+    user = os.getenv("ICM_REFERENCE_AUTH_USER", "").strip()
+    password = os.getenv("ICM_REFERENCE_AUTH_PASSWORD", "").strip()
+    if user and password:
+        return user, password
+    return None
+
+
+def _unauthorized() -> Response:
+    return Response(
+        content="Authentication required.",
+        status_code=401,
+        headers={"WWW-Authenticate": 'Basic realm="ICM Reference"'},
+    )
+
+
+def _authenticated(request: Request) -> bool:
+    credentials = _reference_auth_credentials()
+    if credentials is None:
+        return True
+    if request.url.path == "/health":
+        return True
+    header = request.headers.get("authorization", "")
+    if not header.startswith("Basic "):
+        return False
+    token = header[6:].strip()
+    try:
+        decoded = base64.b64decode(token).decode("utf-8")
+    except (ValueError, UnicodeDecodeError):
+        return False
+    username, separator, password = decoded.partition(":")
+    if not separator:
+        return False
+    expected_user, expected_password = credentials
+    return secrets.compare_digest(username, expected_user) and secrets.compare_digest(password, expected_password)
+
+
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
     validate_allowed_roots_configured()
@@ -43,6 +82,13 @@ app = FastAPI(
     redoc_url="/redoc" if _docs_enabled() else None,
     openapi_url="/openapi.json" if _docs_enabled() else None,
 )
+
+
+@app.middleware("http")
+async def _reference_auth_middleware(request: Request, call_next):
+    if not _authenticated(request):
+        return _unauthorized()
+    return await call_next(request)
 
 
 class AnalyzeProjectRequest(BaseModel):

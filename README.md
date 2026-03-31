@@ -241,6 +241,7 @@ Concrete deployment assets now live in:
 - [demo_site/README.md](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/demo_site/README.md)
 - [render.yaml](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/render.yaml)
 - [scripts/start_icm_reference.sh](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/scripts/start_icm_reference.sh)
+- [docs/DEPLOYMENT_CHECKLIST.md](/Users/billp/Documents/GitHub/INTELLIGENT-CONTRACT-MANAGEMENT/docs/DEPLOYMENT_CHECKLIST.md)
 
 ## Framework role drafting
 

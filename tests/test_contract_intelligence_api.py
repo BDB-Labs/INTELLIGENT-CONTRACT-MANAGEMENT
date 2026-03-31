@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import sys
 from pathlib import Path
@@ -277,3 +278,46 @@ def test_contract_intelligence_api_serves_reference_manifest_and_dashboard(monke
     dashboard_response = client.get("/reference/cases/demo-reference/dashboard")
     assert dashboard_response.status_code == 200
     assert "Internal-only context is intentionally omitted from the external artifact." in dashboard_response.text
+
+
+def test_contract_intelligence_api_optional_reference_auth(monkeypatch, tmp_path: Path) -> None:
+    corpus_dir = tmp_path / "corpus"
+    case_dir = corpus_dir / "demo-auth"
+    inputs_dir = case_dir / "inputs"
+    inputs_dir.mkdir(parents=True)
+    (case_dir / "expected.json").write_text("{}", encoding="utf-8")
+    (inputs_dir / "Prime Contract Agreement.md").write_text(
+        "Subcontractor shall be paid on a pay-if-paid basis.",
+        encoding="utf-8",
+    )
+    (inputs_dir / "General Conditions.md").write_text(
+        "Notice of claim must be provided within 5 calendar days.",
+        encoding="utf-8",
+    )
+    (inputs_dir / "Insurance Requirements.md").write_text(
+        "Certificates of insurance are required before starting work.",
+        encoding="utf-8",
+    )
+    (inputs_dir / "Funding Memo.md").write_text(
+        "Certified payroll must be submitted weekly.",
+        encoding="utf-8",
+    )
+    build_demo_assets(
+        corpus_dir=corpus_dir,
+        reference_root=tmp_path / "reference-root",
+        site_dir=tmp_path / "reference-site",
+    )
+    monkeypatch.setenv("CONTRACT_INTELLIGENCE_REFERENCE_SITE_DIR", str((tmp_path / "reference-site").resolve()))
+    monkeypatch.setenv("ICM_REFERENCE_AUTH_USER", "demo")
+    monkeypatch.setenv("ICM_REFERENCE_AUTH_PASSWORD", "secret")
+
+    unauthorized = client.get("/reference/manifest")
+    assert unauthorized.status_code == 401
+
+    token = base64.b64encode(b"demo:secret").decode("ascii")
+    authorized = client.get("/reference/manifest", headers={"Authorization": f"Basic {token}"})
+    assert authorized.status_code == 200
+    assert authorized.json()["cases"][0]["case_id"] == "demo-auth"
+
+    health_response = client.get("/health")
+    assert health_response.status_code == 200
