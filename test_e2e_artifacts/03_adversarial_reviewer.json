@@ -1,0 +1,28 @@
+{
+  "summary": "Dry-run placeholder output for role 'adversarial_reviewer'.",
+  "confidence": "MEDIUM",
+  "assumptions": [
+    "This run used the dry-run adapter and did not execute against a live model."
+  ],
+  "unknowns": [
+    "No provider-backed reasoning or external validation was performed."
+  ],
+  "findings": [],
+  "artifacts": [],
+  "code_suggestions": [],
+  "next_steps": [
+    "Replace dry-run with a real adapter to execute this role against a model."
+  ],
+  "metadata": {
+    "model": "openai:gpt-5-mini",
+    "adapter": "dry-run",
+    "assurance_level": "standard",
+    "prompt_excerpt": "You are the adversarial_reviewer. Act as an adversarial code reviewer. Hunt for correctness bugs, edge cases, regressions, unsafe assumptions, and missing validation.\n\nScope:\nTest end-to-end wiring\n\nImplementer Output:\n{\n  \"summary\": \"Dry-run placeholder output for role 'implementer'.\",\n  \"confidence\": \"MEDIUM\",\n  \"assumptions\": [\n    \"This run used the dry-run adapter and did not execute against",
+    "context_keys": [
+      "implementer"
+    ],
+    "review_isolation": "scope_and_implementation"
+  },
+  "role": "adversarial_reviewer",
+  "model": "openai:gpt-5-mini"
+}

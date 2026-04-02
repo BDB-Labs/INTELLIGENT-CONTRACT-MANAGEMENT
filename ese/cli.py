@@ -142,8 +142,7 @@ def _print_run_follow_up(artifacts_dir: str, *, quiet: bool = False) -> None:
     if consensus.get("agreements"):
         top = consensus["agreements"][0]
         typer.echo(
-            "Top consensus: "
-            f"{top['title']} across {', '.join(top['roles'])}",
+            "Top consensus: " f"{top['title']} across {', '.join(top['roles'])}",
         )
     comparison = report.get("comparison") or {}
     if comparison.get("previous_artifacts_dir"):
@@ -220,9 +219,7 @@ def _filtered_code_suggestions(
     path_filter: str | None = None,
 ) -> list[dict[str, Any]]:
     suggestions = [
-        item
-        for item in report.get("code_suggestions", [])
-        if isinstance(item, dict)
+        item for item in report.get("code_suggestions", []) if isinstance(item, dict)
     ]
     clean_role = (role or "").strip()
     clean_path = (path_filter or "").strip()
@@ -243,7 +240,9 @@ def _filtered_code_suggestions(
 
 @app.command()
 def init(
-    config: str = typer.Option("ese.config.yaml", help="Path to write the generated config"),
+    config: str = typer.Option(
+        "ese.config.yaml", help="Path to write the generated config"
+    ),
     simple: bool = typer.Option(
         True,
         "--simple/--advanced",
@@ -296,21 +295,27 @@ def doctor(config: str = typer.Option("ese.config.yaml", help="Path to ESE confi
         typer.echo("✅ Doctor checks passed")
 
 
-def _start_pipeline(config: str, artifacts_dir: str | None, scope: str | None, *, quiet: bool = False) -> None:
+def _start_pipeline(
+    config: str, artifacts_dir: str | None, scope: str | None, *, quiet: bool = False
+) -> None:
     try:
         effective_cfg = _load_effective_cfg(config=config, scope=scope)
     except ConfigValidationError as err:
         typer.echo(f"❌ ESE start failed: {err}")
         raise typer.Exit(code=2) from err
 
-    effective_artifacts_dir = artifacts_dir or str((effective_cfg.get("output") or {}).get("artifacts_dir") or "artifacts")
+    effective_artifacts_dir = artifacts_dir or str(
+        (effective_cfg.get("output") or {}).get("artifacts_dir") or "artifacts"
+    )
     _run_with_policy(
         kind="start",
         cfg=effective_cfg,
         artifacts_dir=effective_artifacts_dir,
         quiet=quiet,
         failure_label="ESE start failed",
-        execute=lambda: run_pipeline(cfg=effective_cfg, artifacts_dir=artifacts_dir),
+        execute=lambda: run_pipeline(
+            cfg=effective_cfg, artifacts_dir=effective_artifacts_dir
+        ),
         success_message=lambda summary_path: f"✅ Pipeline completed. Summary: {summary_path}",
     )
 
@@ -326,10 +331,14 @@ def start(
         None,
         help="Project scope/task override for this run (overrides input.scope in config)",
     ),
-    quiet: bool = typer.Option(False, "--quiet", help="Suppress preflight and follow-up chatter"),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Suppress preflight and follow-up chatter"
+    ),
 ):
     """Start the full ESE pipeline."""
-    _start_pipeline(config=config, artifacts_dir=artifacts_dir, scope=scope, quiet=quiet)
+    _start_pipeline(
+        config=config, artifacts_dir=artifacts_dir, scope=scope, quiet=quiet
+    )
 
 
 @app.command("run", hidden=True)
@@ -343,14 +352,20 @@ def run_alias(
         None,
         help="Project scope/task override for this run (overrides input.scope in config)",
     ),
-    quiet: bool = typer.Option(False, "--quiet", help="Suppress preflight and follow-up chatter"),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Suppress preflight and follow-up chatter"
+    ),
 ):
     """Backward-compatible alias for `ese start`."""
-    _start_pipeline(config=config, artifacts_dir=artifacts_dir, scope=scope, quiet=quiet)
+    _start_pipeline(
+        config=config, artifacts_dir=artifacts_dir, scope=scope, quiet=quiet
+    )
 
 
 @app.command("templates")
-def templates(json_output: bool = typer.Option(False, "--json", help="Emit templates as JSON")):
+def templates(
+    json_output: bool = typer.Option(False, "--json", help="Emit templates as JSON"),
+):
     """List opinionated task templates for quick task-first runs."""
     payload = [
         {
@@ -375,22 +390,44 @@ def templates(json_output: bool = typer.Option(False, "--json", help="Emit templ
 @app.command("task")
 def task(
     scope: str = typer.Argument(..., help="Project scope or task to run"),
-    template: str = typer.Option("", help="Opinionated task template (defaults from scope if omitted)"),
+    template: str = typer.Option(
+        "", help="Opinionated task template (defaults from scope if omitted)"
+    ),
     provider: str = typer.Option("openai", help="Provider preset"),
     execution_mode: str = typer.Option(AUTO_EXECUTION_MODE, help="auto, demo, or live"),
     artifacts_dir: str = typer.Option("artifacts", help="Directory for run artifacts"),
     model: str | None = typer.Option(None, help="Optional provider model override"),
-    runtime_adapter: str | None = typer.Option(None, help="Optional module:function adapter for advanced live runs"),
-    provider_name: str | None = typer.Option(None, help="Custom provider name when using custom_api"),
+    runtime_adapter: str | None = typer.Option(
+        None, help="Optional module:function adapter for advanced live runs"
+    ),
+    provider_name: str | None = typer.Option(
+        None, help="Custom provider name when using custom_api"
+    ),
     base_url: str | None = typer.Option(None, help="Base URL for custom_api live runs"),
-    api_key_env: str | None = typer.Option(None, help="API key environment variable override"),
-    repo_path: str | None = typer.Option(None, help="Optional Git repo path to inject working-tree context into the task"),
-    include_repo_status: bool = typer.Option(True, help="Include git status in task repo context"),
-    include_repo_diff: bool = typer.Option(True, help="Include working diff in task repo context"),
-    max_repo_diff_chars: int = typer.Option(8000, help="Maximum diff characters to inject for task repo context"),
-    write_config_path: str | None = typer.Option(None, "--write-config", help="Optional path to save the generated config"),
-    show_config: bool = typer.Option(False, help="Print the generated config before running"),
-    quiet: bool = typer.Option(False, "--quiet", help="Suppress preflight and follow-up chatter"),
+    api_key_env: str | None = typer.Option(
+        None, help="API key environment variable override"
+    ),
+    repo_path: str | None = typer.Option(
+        None, help="Optional Git repo path to inject working-tree context into the task"
+    ),
+    include_repo_status: bool = typer.Option(
+        True, help="Include git status in task repo context"
+    ),
+    include_repo_diff: bool = typer.Option(
+        True, help="Include working diff in task repo context"
+    ),
+    max_repo_diff_chars: int = typer.Option(
+        8000, help="Maximum diff characters to inject for task repo context"
+    ),
+    write_config_path: str | None = typer.Option(
+        None, "--write-config", help="Optional path to save the generated config"
+    ),
+    show_config: bool = typer.Option(
+        False, help="Print the generated config before running"
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Suppress preflight and follow-up chatter"
+    ),
 ):
     """Run ESE from a task description without hand-authoring config first."""
     chosen_template = (template or "").strip() or recommend_template_for_scope(scope)
@@ -423,7 +460,9 @@ def task(
             artifacts_dir=effective_artifacts_dir,
             quiet=quiet,
             failure_label="ESE task failed",
-            execute=lambda: run_pipeline(cfg=cfg, artifacts_dir=effective_artifacts_dir),
+            execute=lambda: run_pipeline(
+                cfg=cfg, artifacts_dir=effective_artifacts_dir
+            ),
             success_message=lambda summary_path: (
                 f"✅ Task run completed using template '{chosen_template}' via "
                 f"{str((cfg.get('runtime') or {}).get('adapter') or 'dry-run')}. "
@@ -439,21 +478,40 @@ def task(
 def pr(
     repo_path: str = typer.Option(".", help="Path to the Git repository to review"),
     pr: str | None = typer.Option(None, help="GitHub PR number or URL (requires gh)"),
-    base: str | None = typer.Option(None, help="Base ref. Defaults from PR metadata or origin/main"),
-    head: str | None = typer.Option(None, help="Head ref. Defaults from PR metadata or HEAD"),
+    base: str | None = typer.Option(
+        None, help="Base ref. Defaults from PR metadata or origin/main"
+    ),
+    head: str | None = typer.Option(
+        None, help="Head ref. Defaults from PR metadata or HEAD"
+    ),
     title: str | None = typer.Option(None, help="Optional review title override"),
     focus: str | None = typer.Option(None, help="Optional reviewer focus guidance"),
     provider: str = typer.Option("openai", help="Provider preset"),
     execution_mode: str = typer.Option(AUTO_EXECUTION_MODE, help="auto, demo, or live"),
-    artifacts_dir: str = typer.Option("artifacts", help="Directory for review artifacts"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Directory for review artifacts"
+    ),
     model: str | None = typer.Option(None, help="Optional provider model override"),
-    runtime_adapter: str | None = typer.Option(None, help="Optional module:function adapter for advanced live runs"),
-    provider_name: str | None = typer.Option(None, help="Custom provider name when using custom_api"),
+    runtime_adapter: str | None = typer.Option(
+        None, help="Optional module:function adapter for advanced live runs"
+    ),
+    provider_name: str | None = typer.Option(
+        None, help="Custom provider name when using custom_api"
+    ),
     base_url: str | None = typer.Option(None, help="Base URL for custom_api live runs"),
-    api_key_env: str | None = typer.Option(None, help="API key environment variable override"),
-    max_diff_chars: int = typer.Option(DEFAULT_MAX_DIFF_CHARS, help="Maximum unified diff characters to embed in review context"),
-    write_config_path: str | None = typer.Option(None, "--write-config", help="Optional path to save the generated config"),
-    quiet: bool = typer.Option(False, "--quiet", help="Suppress preflight and follow-up chatter"),
+    api_key_env: str | None = typer.Option(
+        None, help="API key environment variable override"
+    ),
+    max_diff_chars: int = typer.Option(
+        DEFAULT_MAX_DIFF_CHARS,
+        help="Maximum unified diff characters to embed in review context",
+    ),
+    write_config_path: str | None = typer.Option(
+        None, "--write-config", help="Optional path to save the generated config"
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Suppress preflight and follow-up chatter"
+    ),
 ):
     """Review a pull request or branch diff and export a GitHub-ready markdown summary."""
     try:
@@ -512,8 +570,12 @@ def pr(
 
 @app.command("status")
 def status(
-    artifacts_dir: str = typer.Option("artifacts", help="Directory containing pipeline_state.json"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable run status JSON"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Directory containing pipeline_state.json"
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable run status JSON"
+    ),
 ):
     """Print a concise run status summary for an artifacts directory."""
     try:
@@ -534,8 +596,12 @@ def status(
 
 @app.command("report")
 def report(
-    artifacts_dir: str = typer.Option("artifacts", help="Directory containing run artifacts"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable report JSON"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Directory containing run artifacts"
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable report JSON"
+    ),
 ):
     """Aggregate role outputs into a human-readable run report."""
     try:
@@ -552,10 +618,16 @@ def report(
 
 @app.command("suggestions")
 def suggestions(
-    artifacts_dir: str = typer.Option("artifacts", help="Directory containing run artifacts"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Directory containing run artifacts"
+    ),
     role: str | None = typer.Option(None, help="Optional role filter"),
-    path_filter: str | None = typer.Option(None, "--path", help="Optional substring filter for target file paths"),
-    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable code suggestions JSON"),
+    path_filter: str | None = typer.Option(
+        None, "--path", help="Optional substring filter for target file paths"
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable code suggestions JSON"
+    ),
 ):
     """Print synthesized programmer-facing code suggestions for a run."""
     try:
@@ -576,10 +648,18 @@ def suggestions(
 @app.command("rerun")
 def rerun(
     from_role: str = typer.Argument(..., help="Role to rerun from"),
-    artifacts_dir: str = typer.Option("artifacts", help="Directory containing the prior run"),
-    config: str | None = typer.Option(None, help="Config path. Defaults to the saved config snapshot in artifacts."),
-    scope: str | None = typer.Option(None, help="Optional scope override for the rerun"),
-    quiet: bool = typer.Option(False, "--quiet", help="Suppress preflight and follow-up chatter"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Directory containing the prior run"
+    ),
+    config: str | None = typer.Option(
+        None, help="Config path. Defaults to the saved config snapshot in artifacts."
+    ),
+    scope: str | None = typer.Option(
+        None, help="Optional scope override for the rerun"
+    ),
+    quiet: bool = typer.Option(
+        False, "--quiet", help="Suppress preflight and follow-up chatter"
+    ),
 ):
     """Rerun the pipeline from a specific role using existing prior artifacts as upstream context."""
     config_path = config or str(Path(artifacts_dir) / CONFIG_SNAPSHOT_NAME)
@@ -607,7 +687,9 @@ def rerun(
 
 @app.command("export")
 def export(
-    artifacts_dir: str = typer.Option("artifacts", help="Directory containing run artifacts"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Directory containing run artifacts"
+    ),
     format: str = typer.Option("sarif", help="Export format: sarif or junit"),
     output_path: str | None = typer.Option(None, help="Optional output path override"),
 ):
@@ -638,8 +720,12 @@ def feedback(
     role: str = typer.Option(..., help="Role that produced the finding"),
     title: str = typer.Option(..., help="Finding title"),
     rating: str = typer.Option(..., help="Feedback rating: useful, noisy, or wrong"),
-    artifacts_dir: str = typer.Option("artifacts", help="Artifacts directory for the run family"),
-    details: str | None = typer.Option(None, help="Optional note about why this feedback was recorded"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Artifacts directory for the run family"
+    ),
+    details: str | None = typer.Option(
+        None, help="Optional note about why this feedback was recorded"
+    ),
 ):
     """Record operator feedback so future runs can improve signal without collapsing dissent."""
     try:
@@ -662,11 +748,17 @@ def feedback(
 
 @app.command("dashboard")
 def dashboard(
-    artifacts_dir: str = typer.Option("artifacts", help="Artifacts directory to inspect by default"),
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Artifacts directory to inspect by default"
+    ),
     host: str = typer.Option("127.0.0.1", help="Host for the local dashboard server"),
     port: int = typer.Option(8765, help="Port for the local dashboard server"),
-    config: str | None = typer.Option(None, help="Optional config path to prefill the dashboard"),
-    open_browser: bool = typer.Option(True, "--open/--no-open", help="Open the dashboard in a browser"),
+    config: str | None = typer.Option(
+        None, help="Optional config path to prefill the dashboard"
+    ),
+    open_browser: bool = typer.Option(
+        True, "--open/--no-open", help="Open the dashboard in a browser"
+    ),
 ):
     """Launch the local ESE dashboard for task-first runs and run review."""
     _launch_dashboard(

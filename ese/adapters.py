@@ -12,10 +12,15 @@ import urllib.error
 import urllib.request
 from typing import Any, Mapping
 
-from ese.local_runtime import ensure_local_runtime_ready, local_base_url, LocalRuntimeError
+from ese.local_runtime import (
+    ensure_local_runtime_ready,
+    local_base_url,
+    LocalRuntimeError,
+)
 
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_CUSTOM_API_KEY_ENV = "CUSTOM_API_KEY"
+DEFAULT_RETRYABLE_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
 
 
 class AdapterExecutionError(RuntimeError):
@@ -44,7 +49,9 @@ def dry_run_adapter(
 ) -> str:
     """Return deterministic placeholder output without external model calls."""
     snippet = prompt[:400].strip()
-    review_isolation = str((cfg.get("runtime") or {}).get("review_isolation") or "scope_and_implementation")
+    review_isolation = str(
+        (cfg.get("runtime") or {}).get("review_isolation") or "scope_and_implementation"
+    )
     if _json_output_enabled(cfg):
         payload = {
             "summary": f"Dry-run placeholder output for role '{role}'.",
@@ -183,7 +190,9 @@ def _local_base_url(cfg: Mapping[str, Any]) -> str:
     return base_url.rstrip("/")
 
 
-def _api_key_from_env(cfg: Mapping[str, Any], *, default_env: str, adapter_name: str) -> str:
+def _api_key_from_env(
+    cfg: Mapping[str, Any], *, default_env: str, adapter_name: str
+) -> str:
     provider_cfg = _provider_cfg(cfg)
     api_key_env = provider_cfg.get("api_key_env") or default_env
     if not isinstance(api_key_env, str) or not api_key_env.strip():
@@ -236,7 +245,9 @@ def _openai_payload(
         try:
             token_limit = int(max_output_tokens)
         except (TypeError, ValueError) as err:
-            raise AdapterExecutionError("runtime.max_output_tokens must be an integer") from err
+            raise AdapterExecutionError(
+                "runtime.max_output_tokens must be an integer"
+            ) from err
         if token_limit <= 0:
             raise AdapterExecutionError("runtime.max_output_tokens must be > 0")
         payload["max_output_tokens"] = token_limit
@@ -270,8 +281,23 @@ def _extract_openai_text(data: Mapping[str, Any]) -> str:
     raise AdapterExecutionError("OpenAI response did not contain text output")
 
 
-def _is_retryable_status(status_code: int) -> bool:
-    return status_code in {408, 409, 429} or status_code >= 500
+def _is_retryable_status(
+    status_code: int, cfg: Mapping[str, Any] | None = None
+) -> bool:
+    runtime_cfg = _runtime_cfg(cfg) if cfg else {}
+    retryable_codes = runtime_cfg.get("retryable_status_codes")
+    if retryable_codes is not None:
+        if isinstance(retryable_codes, (list, set, tuple)):
+            return status_code in retryable_codes
+        if isinstance(retryable_codes, str):
+            codes = {
+                int(x.strip())
+                for x in retryable_codes.split(",")
+                if x.strip().isdigit()
+            }
+            if codes:
+                return status_code in codes
+    return status_code in DEFAULT_RETRYABLE_STATUS_CODES
 
 
 def _truncate_for_error(text: str, limit: int = 500) -> str:
@@ -286,7 +312,9 @@ def _redact_error_text(text: str) -> str:
     patterns: list[tuple[re.Pattern[str], str]] = [
         (re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._\-+/=]+\b"), "Bearer [REDACTED]"),
         (
-            re.compile(r"(?i)\b(api[_-]?key|token|secret)(\s*[:=]\s*)([A-Za-z0-9._\-]{8,})"),
+            re.compile(
+                r"(?i)\b(api[_-]?key|token|secret)(\s*[:=]\s*)([A-Za-z0-9._\-]{8,})"
+            ),
             r"\1\2[REDACTED]",
         ),
     ]
@@ -310,6 +338,7 @@ def _execute_responses_request(
     auth_error_message: str,
     provider_name: str,
     role: str,
+    cfg: Mapping[str, Any] | None = None,
 ) -> str:
     body = json.dumps(payload).encode("utf-8")
     headers = {
@@ -332,23 +361,29 @@ def _execute_responses_request(
                 response_text = response.read().decode("utf-8")
                 parsed = json.loads(response_text)
                 if not isinstance(parsed, Mapping):
-                    raise AdapterExecutionError(f"{provider_name} response JSON must be an object")
+                    raise AdapterExecutionError(
+                        f"{provider_name} response JSON must be an object"
+                    )
                 return _extract_openai_text(parsed)
         except urllib.error.HTTPError as err:
             response_body = err.read().decode("utf-8", errors="replace")
             status = err.code
             if status in {401, 403}:
-                raise AdapterExecutionError(f"{auth_error_message} Role: {role}.") from err
+                raise AdapterExecutionError(
+                    f"{auth_error_message} Role: {role}."
+                ) from err
 
             last_error = (
                 f"provider={provider_name} role={role} status={status} "
                 f"attempt={attempt}/{attempts} body={_truncate_for_error(_redact_error_text(response_body))}"
             )
-            if attempt < attempts and _is_retryable_status(status):
+            if attempt < attempts and _is_retryable_status(status, cfg):
                 time.sleep(_retry_delay(retry_backoff_seconds, attempt))
                 continue
 
-            raise AdapterExecutionError(f"{provider_name} request failed ({last_error})") from err
+            raise AdapterExecutionError(
+                f"{provider_name} request failed ({last_error})"
+            ) from err
         except (urllib.error.URLError, TimeoutError, socket.timeout) as err:
             last_error = (
                 f"provider={provider_name} role={role} attempt={attempt}/{attempts} "
@@ -357,9 +392,13 @@ def _execute_responses_request(
             if attempt < attempts:
                 time.sleep(_retry_delay(retry_backoff_seconds, attempt))
                 continue
-            raise AdapterExecutionError(f"{provider_name} request failed after retries: {last_error}") from err
+            raise AdapterExecutionError(
+                f"{provider_name} request failed after retries: {last_error}"
+            ) from err
         except json.JSONDecodeError as err:
-            raise AdapterExecutionError(f"{provider_name} response was not valid JSON for role '{role}'") from err
+            raise AdapterExecutionError(
+                f"{provider_name} response was not valid JSON for role '{role}'"
+            ) from err
 
     raise AdapterExecutionError(
         f"{provider_name} request failed after retries: {last_error or 'unknown error'}",
@@ -409,6 +448,7 @@ def openai_adapter(
         auth_error_message="OpenAI authentication failed. Check provider.api_key_env and token scope.",
         provider_name="OpenAI",
         role=role,
+        cfg=cfg,
     )
 
 
@@ -424,11 +464,17 @@ def custom_api_adapter(
     provider_name, model_name = _parse_provider_model(model)
     configured_provider = str((_provider_cfg(cfg).get("name") or "")).strip().lower()
     if not configured_provider:
-        raise AdapterExecutionError("provider.name must be a non-empty string for custom_api adapter")
+        raise AdapterExecutionError(
+            "provider.name must be a non-empty string for custom_api adapter"
+        )
     if configured_provider == "openai":
-        raise AdapterExecutionError("custom_api adapter cannot be used with provider.name='openai'")
+        raise AdapterExecutionError(
+            "custom_api adapter cannot be used with provider.name='openai'"
+        )
     if provider_name in {"", "unknown"}:
-        raise AdapterExecutionError("Custom API role model must include provider and model id")
+        raise AdapterExecutionError(
+            "Custom API role model must include provider and model id"
+        )
     if provider_name != configured_provider:
         raise AdapterExecutionError(
             f"Role model provider '{provider_name}' does not match configured provider '{configured_provider}'",
@@ -462,6 +508,7 @@ def custom_api_adapter(
         auth_error_message="Custom API authentication failed. Check provider.api_key_env and token scope.",
         provider_name=f"Custom API ({configured_provider})",
         role=role,
+        cfg=cfg,
     )
 
 
@@ -516,7 +563,61 @@ def local_adapter(
         auth_error_message="Local adapter authentication failed unexpectedly.",
         provider_name="Local adapter",
         role=role,
+        cfg=cfg,
     )
+
+
+def check_adapter_health(
+    adapter_name: str,
+    cfg: Mapping[str, Any],
+) -> tuple[bool, str]:
+    """Check if an adapter's endpoint is reachable and responsive."""
+    if adapter_name == "dry-run":
+        return True, "dry-run adapter always ready"
+
+    if adapter_name == "openai":
+        try:
+            base_url = _openai_base_url(cfg)
+            api_key = _openai_api_key(cfg)
+            url = f"{base_url}/models"
+            request = urllib.request.Request(
+                url, headers={"Authorization": f"Bearer {api_key}"}
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+                if response.status == 200:
+                    return True, f"OpenAI endpoint reachable at {base_url}"
+        except Exception as e:
+            return False, f"OpenAI endpoint unreachable: {e}"
+
+    if adapter_name == "local":
+        try:
+            base_url = _local_base_url(cfg)
+            url = f"{base_url}/tags"
+            request = urllib.request.Request(url)
+            local_cfg = _runtime_local_cfg(cfg)
+            if bool(local_cfg.get("use_openai_compat_auth", True)):
+                request.add_header("Authorization", "Bearer ollama")
+            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+                if response.status == 200:
+                    return True, f"Local endpoint reachable at {base_url}"
+        except Exception as e:
+            return False, f"Local endpoint unreachable: {e}"
+
+    if adapter_name == "custom_api":
+        try:
+            base_url = _custom_api_base_url(cfg)
+            api_key = _custom_api_key(cfg)
+            url = f"{base_url}/models"
+            request = urllib.request.Request(
+                url, headers={"Authorization": f"Bearer {api_key}"}
+            )
+            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+                if response.status == 200:
+                    return True, f"Custom API endpoint reachable at {base_url}"
+        except Exception as e:
+            return False, f"Custom API endpoint unreachable: {e}"
+
+    return False, f"Unknown adapter: {adapter_name}"
 
 
 BUILTIN_ADAPTERS = {

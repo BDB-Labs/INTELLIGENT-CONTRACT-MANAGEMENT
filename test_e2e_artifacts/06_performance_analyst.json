@@ -1,0 +1,28 @@
+{
+  "summary": "Dry-run placeholder output for role 'performance_analyst'.",
+  "confidence": "MEDIUM",
+  "assumptions": [
+    "This run used the dry-run adapter and did not execute against a live model."
+  ],
+  "unknowns": [
+    "No provider-backed reasoning or external validation was performed."
+  ],
+  "findings": [],
+  "artifacts": [],
+  "code_suggestions": [],
+  "next_steps": [
+    "Replace dry-run with a real adapter to execute this role against a model."
+  ],
+  "metadata": {
+    "model": "openai:gpt-3.5-turbo",
+    "adapter": "dry-run",
+    "assurance_level": "standard",
+    "prompt_excerpt": "You are the performance_analyst. Review performance and scalability. Focus on hot paths, latency risks, query or algorithmic complexity, memory pressure, and caching opportunities.\n\nScope:\nTest end-to-end wiring\n\nImplementer Output:\n{\n  \"summary\": \"Dry-run placeholder output for role 'implementer'.\",\n  \"confidence\": \"MEDIUM\",\n  \"assumptions\": [\n    \"This run used the dry-run adapter and did not ex",
+    "context_keys": [
+      "implementer"
+    ],
+    "review_isolation": "scope_and_implementation"
+  },
+  "role": "performance_analyst",
+  "model": "openai:gpt-3.5-turbo"
+}

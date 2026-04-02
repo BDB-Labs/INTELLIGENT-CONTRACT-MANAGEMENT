@@ -6,11 +6,21 @@ from pathlib import Path
 from typing import Any, Dict, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from ese.provider_runtime import BUILTIN_RUNTIME_ADAPTERS, BUILTIN_RUNTIME_ADAPTERS_TEXT
 
 CONFIG_VERSION = 1
+CONFIG_VERSION_KEY = "config_version"
+MIN_SUPPORTED_VERSION = 1
+MAX_SUPPORTED_VERSION = 1
 REVIEW_ISOLATION_CHOICES = {
     "framed",
     "implementation_only",
@@ -339,7 +349,9 @@ class ESEConfig(BaseModel):
 
     @field_validator("roles")
     @classmethod
-    def _validate_roles_non_empty(cls, value: dict[str, RoleConfig]) -> dict[str, RoleConfig]:
+    def _validate_roles_non_empty(
+        cls, value: dict[str, RoleConfig]
+    ) -> dict[str, RoleConfig]:
         if not value:
             raise ValueError("must include at least one configured role")
         return value
@@ -401,7 +413,9 @@ class ESEConfig(BaseModel):
             unknown_top_level = sorted((self.model_extra or {}).keys())
             if unknown_top_level:
                 details = ", ".join(unknown_top_level)
-                raise ValueError(f"strict_config rejects unknown top-level keys: {details}")
+                raise ValueError(
+                    f"strict_config rejects unknown top-level keys: {details}"
+                )
 
             invalid_role_keys: list[str] = []
             for role, role_cfg in self.roles.items():
@@ -421,8 +435,12 @@ class ESEConfig(BaseModel):
             unknown_roles = [role for role in self.role_order if role not in self.roles]
             if unknown_roles:
                 details = ", ".join(unknown_roles)
-                raise ValueError(f"role_order references unknown configured roles: {details}")
-            missing_roles = [role for role in configured_roles if role not in self.role_order]
+                raise ValueError(
+                    f"role_order references unknown configured roles: {details}"
+                )
+            missing_roles = [
+                role for role in configured_roles if role not in self.role_order
+            ]
             if missing_roles:
                 details = ", ".join(missing_roles)
                 raise ValueError(f"role_order omits configured roles: {details}")
@@ -432,7 +450,9 @@ class ESEConfig(BaseModel):
 
         if adapter == "openai":
             if provider_name != "openai":
-                raise ValueError("runtime.adapter=openai requires provider.name='openai'")
+                raise ValueError(
+                    "runtime.adapter=openai requires provider.name='openai'"
+                )
 
             incompatible_roles = [
                 f"{role}={resolved_provider}"
@@ -468,12 +488,16 @@ class ESEConfig(BaseModel):
             return self
 
         if provider_name == "openai":
-            raise ValueError("runtime.adapter=custom_api requires provider.name to be a custom provider")
+            raise ValueError(
+                "runtime.adapter=custom_api requires provider.name to be a custom provider"
+            )
         if not self.provider.api_key_env:
             raise ValueError("runtime.adapter=custom_api requires provider.api_key_env")
 
         provider_base_url = self.provider.base_url
-        runtime_base_url = self.runtime.custom_api.base_url if self.runtime.custom_api else None
+        runtime_base_url = (
+            self.runtime.custom_api.base_url if self.runtime.custom_api else None
+        )
         if not provider_base_url and not runtime_base_url:
             raise ValueError(
                 "runtime.adapter=custom_api requires provider.base_url or runtime.custom_api.base_url",
@@ -501,11 +525,25 @@ def _raise_validation_error(source: str, err: ValidationError) -> None:
         details.append(f"{loc}: {msg}")
 
     detail_text = "; ".join(details)
-    raise ConfigValidationError(f"Invalid ESE config at {source}: {detail_text}") from err
+    raise ConfigValidationError(
+        f"Invalid ESE config at {source}: {detail_text}"
+    ) from err
 
 
 def validate_config(cfg: Dict[str, Any], source: str = "<memory>") -> Dict[str, Any]:
     """Validate and normalize an ESE config dictionary."""
+    version = cfg.get(CONFIG_VERSION_KEY)
+    if version is not None:
+        if not isinstance(version, int):
+            raise ConfigValidationError(
+                f"Invalid {CONFIG_VERSION_KEY} in {source}: must be an integer"
+            )
+        if version < MIN_SUPPORTED_VERSION or version > MAX_SUPPORTED_VERSION:
+            raise ConfigValidationError(
+                f"Unsupported config version {version} in {source}: "
+                f"supported range is {MIN_SUPPORTED_VERSION} to {MAX_SUPPORTED_VERSION}. "
+                f"Please update your config or use a compatible ESE version."
+            )
     try:
         model = ESEConfig.model_validate(cfg or {})
     except ValidationError as err:
@@ -525,7 +563,9 @@ def load_config(path: str, validate: bool = True) -> Dict[str, Any]:
         loaded = yaml.safe_load(f) or {}
 
     if not isinstance(loaded, dict):
-        raise ConfigValidationError(f"Invalid ESE config at {path}: root must be a mapping")
+        raise ConfigValidationError(
+            f"Invalid ESE config at {path}: root must be a mapping"
+        )
 
     if not validate:
         return loaded

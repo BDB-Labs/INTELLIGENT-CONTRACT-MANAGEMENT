@@ -1,0 +1,26 @@
+{
+  "summary": "Dry-run placeholder output for role 'architect'.",
+  "confidence": "MEDIUM",
+  "assumptions": [
+    "This run used the dry-run adapter and did not execute against a live model."
+  ],
+  "unknowns": [
+    "No provider-backed reasoning or external validation was performed."
+  ],
+  "findings": [],
+  "artifacts": [],
+  "code_suggestions": [],
+  "next_steps": [
+    "Replace dry-run with a real adapter to execute this role against a model."
+  ],
+  "metadata": {
+    "model": "openai:gpt-3.5-turbo",
+    "adapter": "dry-run",
+    "assurance_level": "standard",
+    "prompt_excerpt": "You are the Architect. Produce a concise implementation plan for this scope.\n\nScope:\nTest end-to-end wiring\n\nUse `findings` only for actionable issues or gaps. Use `artifacts` for concrete deliverables such as docs, runbooks, test files, rollout checklists, or migration notes. Use `code_suggestions` for concrete file-targeted edits, test additions, or short patch-like snippets.\n\nReturn valid JSON",
+    "context_keys": [],
+    "review_isolation": "scope_and_implementation"
+  },
+  "role": "architect",
+  "model": "openai:gpt-3.5-turbo"
+}

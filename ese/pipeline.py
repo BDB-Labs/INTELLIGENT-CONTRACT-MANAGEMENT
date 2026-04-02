@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import inspect
 import json
+import logging
 import os
 import textwrap
 import time
@@ -16,9 +17,16 @@ from uuid import uuid4
 import yaml
 
 from ese.adapters import AdapterExecutionError, BUILTIN_ADAPTERS
-from ese.config import resolve_prompt_text, resolve_role_model, resolve_role_prompt_text, resolve_scope_text
+from ese.config import (
+    resolve_prompt_text,
+    resolve_role_model,
+    resolve_role_prompt_text,
+    resolve_scope_text,
+)
 from ese.feedback import feedback_prompt_guidance
 from ese.provider_runtime import BUILTIN_RUNTIME_ADAPTERS_TEXT
+
+logger = logging.getLogger(__name__)
 
 PIPELINE_ORDER = [
     "architect",
@@ -47,6 +55,16 @@ PROMPT_LIMITS = {
     "implementer_output": 8000,
     "upstream_artifact": 6000,
 }
+
+
+def _validate_prompt_limits() -> None:
+    for key, value in PROMPT_LIMITS.items():
+        if not isinstance(value, int) or value <= 0:
+            raise PipelineError(
+                f"PROMPT_LIMITS['{key}'] must be a positive integer, got {value}"
+            )
+
+
 SPECIALIST_ROLE_INSTRUCTIONS = {
     "adversarial_reviewer": (
         "Act as an adversarial code reviewer. Hunt for correctness bugs, edge cases, "
@@ -126,9 +144,7 @@ def _ensure_artifact_within_dir(artifacts_dir: str, path: str) -> str:
     try:
         resolved.relative_to(artifacts_root)
     except ValueError as err:
-        raise PipelineError(
-            f"Artifact path escapes artifacts_dir: {resolved}"
-        ) from err
+        raise PipelineError(f"Artifact path escapes artifacts_dir: {resolved}") from err
     return str(resolved)
 
 
@@ -163,9 +179,13 @@ def _normalize_role_order(cfg: Dict[str, Any]) -> list[str]:
                 raise PipelineError("role_order entries must be non-empty strings")
             clean_role = role.strip()
             if clean_role not in roles_cfg:
-                raise PipelineError(f"role_order references unknown role '{clean_role}'")
+                raise PipelineError(
+                    f"role_order references unknown role '{clean_role}'"
+                )
             if clean_role in seen:
-                raise PipelineError(f"role_order contains duplicate role '{clean_role}'")
+                raise PipelineError(
+                    f"role_order contains duplicate role '{clean_role}'"
+                )
             normalized.append(clean_role)
             seen.add(clean_role)
 
@@ -184,7 +204,9 @@ def _require_scope(cfg: Dict[str, Any]) -> str:
     scope = resolve_scope_text(cfg)
     if scope:
         return scope
-    raise PipelineError("No project scope supplied. Set input.scope in the config or pass --scope.")
+    raise PipelineError(
+        "No project scope supplied. Set input.scope in the config or pass --scope."
+    )
 
 
 def _output_cfg(cfg: Dict[str, Any]) -> Dict[str, Any]:
@@ -246,8 +268,17 @@ def _review_isolation(cfg: Mapping[str, Any]) -> str:
     runtime_cfg = cfg.get("runtime")
     if not isinstance(runtime_cfg, Mapping):
         return "scope_and_implementation"
-    value = str(runtime_cfg.get("review_isolation") or "scope_and_implementation").strip().lower()
-    if value in {"framed", "implementation_only", "scope_only", "scope_and_implementation"}:
+    value = (
+        str(runtime_cfg.get("review_isolation") or "scope_and_implementation")
+        .strip()
+        .lower()
+    )
+    if value in {
+        "framed",
+        "implementation_only",
+        "scope_only",
+        "scope_and_implementation",
+    }:
         return value
     return "scope_and_implementation"
 
@@ -256,7 +287,10 @@ def _truncate_prompt_block(text: str, *, limit: int) -> str:
     cleaned = text.strip()
     if len(cleaned) <= limit:
         return cleaned
-    return cleaned[: limit - len(PROMPT_TRUNCATION_MARKER) - 1].rstrip() + f"\n{PROMPT_TRUNCATION_MARKER}"
+    return (
+        cleaned[: limit - len(PROMPT_TRUNCATION_MARKER) - 1].rstrip()
+        + f"\n{PROMPT_TRUNCATION_MARKER}"
+    )
 
 
 def _prompt_section(title: str, text: str, *, limit: int) -> str:
@@ -279,16 +313,28 @@ def _role_upstream_sections(
     if role == "architect":
         return []
     if role == "implementer":
-        return [("Architect Plan", architect_output, PROMPT_LIMITS["architect_output"])] if architect_output else []
+        return (
+            [("Architect Plan", architect_output, PROMPT_LIMITS["architect_output"])]
+            if architect_output
+            else []
+        )
 
     if review_isolation == "scope_only":
         return []
 
     sections: list[tuple[str, str, int]] = []
     if review_isolation == "framed" and architect_output:
-        sections.append(("Architect Plan", architect_output, PROMPT_LIMITS["architect_output"]))
+        sections.append(
+            ("Architect Plan", architect_output, PROMPT_LIMITS["architect_output"])
+        )
     if implementer_output:
-        sections.append(("Implementer Output", implementer_output, PROMPT_LIMITS["implementer_output"]))
+        sections.append(
+            (
+                "Implementer Output",
+                implementer_output,
+                PROMPT_LIMITS["implementer_output"],
+            )
+        )
 
     if is_specialist:
         return sections
@@ -392,7 +438,11 @@ def _role_prompt(
     sections = [
         role_intro.strip(),
         _prompt_section("Scope", scope, limit=PROMPT_LIMITS["scope"]),
-        _prompt_section("Additional Run Context", additional_context, limit=PROMPT_LIMITS["additional_context"]),
+        _prompt_section(
+            "Additional Run Context",
+            additional_context,
+            limit=PROMPT_LIMITS["additional_context"],
+        ),
     ]
     sections.extend(
         _prompt_section(title, text, limit=limit)
@@ -403,7 +453,11 @@ def _role_prompt(
         )
     )
     sections.append(
-        _prompt_section("Operator Feedback", operator_feedback, limit=PROMPT_LIMITS["operator_feedback"])
+        _prompt_section(
+            "Operator Feedback",
+            operator_feedback,
+            limit=PROMPT_LIMITS["operator_feedback"],
+        )
     )
     assembled = "\n\n".join(section for section in sections if section)
     return _compact_lines(f"{assembled}{artifact_guidance}{json_contract}".strip())
@@ -475,7 +529,9 @@ def _run_adapter_healthcheck(
     kwargs: dict[str, Any] = {}
     args: list[Any] = []
     parameters = list(signature.parameters.values())
-    accepts_var_kwargs = any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters)
+    accepts_var_kwargs = any(
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters
+    )
     if accepts_var_kwargs or "cfg" in signature.parameters:
         kwargs["cfg"] = cfg
     elif "config" in signature.parameters:
@@ -491,7 +547,9 @@ def _run_adapter_healthcheck(
     try:
         result = healthcheck(*args, **kwargs)
     except Exception as err:  # noqa: BLE001
-        raise PipelineError(f"Adapter healthcheck failed for '{reference}': {err}") from err
+        raise PipelineError(
+            f"Adapter healthcheck failed for '{reference}': {err}"
+        ) from err
 
     if result is False:
         raise PipelineError(f"Adapter healthcheck failed for '{reference}'")
@@ -525,11 +583,17 @@ def _invoke_adapter(
     cfg: Mapping[str, Any],
 ) -> str:
     try:
-        result = adapter(role=role, model=model, prompt=prompt, context=context, cfg=cfg)
+        result = adapter(
+            role=role, model=model, prompt=prompt, context=context, cfg=cfg
+        )
     except AdapterExecutionError as err:
-        raise PipelineError(f"Adapter execution failed for role '{role}': {err}") from err
+        raise PipelineError(
+            f"Adapter execution failed for role '{role}': {err}"
+        ) from err
     except Exception as err:  # noqa: BLE001 - preserve adapter stack info in message.
-        raise PipelineError(f"Adapter execution failed for role '{role}': {err}") from err
+        raise PipelineError(
+            f"Adapter execution failed for role '{role}': {err}"
+        ) from err
 
     if not isinstance(result, str):
         raise PipelineError(f"Adapter output for role '{role}' must be a string")
@@ -574,7 +638,9 @@ def _normalize_json_report(*, role: str, model: str, output: str) -> dict[str, A
 
     for key in ("assumptions", "unknowns"):
         raw_value = report.get(key)
-        if not isinstance(raw_value, list) or any(not isinstance(item, str) for item in raw_value):
+        if not isinstance(raw_value, list) or any(
+            not isinstance(item, str) for item in raw_value
+        ):
             raise PipelineError(
                 f"JSON report for role '{role}' must contain a string list field '{key}'",
             )
@@ -582,15 +648,21 @@ def _normalize_json_report(*, role: str, model: str, output: str) -> dict[str, A
 
     evidence_basis = report.get("evidence_basis")
     if evidence_basis is not None:
-        if not isinstance(evidence_basis, list) or any(not isinstance(item, str) for item in evidence_basis):
+        if not isinstance(evidence_basis, list) or any(
+            not isinstance(item, str) for item in evidence_basis
+        ):
             raise PipelineError(
                 f"JSON report for role '{role}' must contain a string list field 'evidence_basis' when present",
             )
-        report["evidence_basis"] = [item.strip() for item in evidence_basis if item.strip()]
+        report["evidence_basis"] = [
+            item.strip() for item in evidence_basis if item.strip()
+        ]
 
     findings = report.get("findings")
     if not isinstance(findings, list):
-        raise PipelineError(f"JSON report for role '{role}' must contain a list field 'findings'")
+        raise PipelineError(
+            f"JSON report for role '{role}' must contain a list field 'findings'"
+        )
 
     normalized_findings: list[dict[str, str]] = []
     for index, finding in enumerate(findings, start=1):
@@ -633,7 +705,9 @@ def _normalize_json_report(*, role: str, model: str, output: str) -> dict[str, A
 
     for key in ("artifacts", "next_steps"):
         raw_value = report.get(key, [])
-        if not isinstance(raw_value, list) or any(not isinstance(item, str) for item in raw_value):
+        if not isinstance(raw_value, list) or any(
+            not isinstance(item, str) for item in raw_value
+        ):
             raise PipelineError(
                 f"JSON report for role '{role}' must contain a string list field '{key}'",
             )
@@ -752,7 +826,10 @@ def _write_summary_and_state(
         "",
         "Executed roles:",
     ]
-    summary_lines.extend(f"- {item['role']} ({item['model']}) -> {item['artifact']}" for item in execution)
+    summary_lines.extend(
+        f"- {item['role']} ({item['model']}) -> {item['artifact']}"
+        for item in execution
+    )
     if parent_run_id:
         summary_lines.extend(["", f"Parent Run ID: {parent_run_id}"])
     if start_role:
@@ -882,6 +959,7 @@ def _execute_role(
     strategy: str,
 ) -> dict[str, Any]:
     started_at = time.time()
+    logger.info("Executing role=%s index=%d strategy=%s", role, index, strategy)
     model_ref = resolve_role_model(cfg, role)
     prompt = _role_prompt(
         role=role,
@@ -893,7 +971,9 @@ def _execute_role(
         role_prompt_text=resolve_role_prompt_text(cfg, role),
         review_isolation=review_isolation,
     )
-    context = _role_context(role=role, outputs=outputs, review_isolation=review_isolation)
+    context = _role_context(
+        role=role, outputs=outputs, review_isolation=review_isolation
+    )
     output = _invoke_adapter(
         adapter,
         role=role,
@@ -912,6 +992,8 @@ def _execute_role(
     artifact_path = os.path.join(artifacts_dir, artifact_name)
     _write(artifact_path, rendered_output)
     completed_at = time.time()
+    duration_ms = int(round((completed_at - started_at) * 1000))
+    logger.info("Completed role=%s duration_ms=%d", role, duration_ms)
     return {
         "role": role,
         "index": index,
@@ -925,8 +1007,10 @@ def _execute_role(
             "artifact": artifact_path,
             "strategy": strategy,
             "started_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started_at)),
-            "completed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(completed_at)),
-            "duration_ms": int(round((completed_at - started_at) * 1000)),
+            "completed_at": time.strftime(
+                "%Y-%m-%dT%H:%M:%SZ", time.gmtime(completed_at)
+            ),
+            "duration_ms": duration_ms,
         },
     }
 
@@ -1008,14 +1092,23 @@ def _load_resume_state(
     artifacts_dir: str,
     role_order: list[str],
     start_role: str | None,
-) -> tuple[int, dict[str, str], dict[str, str], dict[str, str], list[dict[str, Any]], str | None]:
+) -> tuple[
+    int,
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    list[dict[str, Any]],
+    str | None,
+]:
     if not start_role:
         return 0, {}, {}, {}, [], None
 
     clean_role = start_role.strip()
     if clean_role not in role_order:
         available = ", ".join(role_order)
-        raise PipelineError(f"Unknown start role '{start_role}'. Choose one of: {available}")
+        raise PipelineError(
+            f"Unknown start role '{start_role}'. Choose one of: {available}"
+        )
 
     start_index = role_order.index(clean_role)
     if start_index == 0:
@@ -1031,16 +1124,22 @@ def _load_resume_state(
         with open(state_path, "r", encoding="utf-8") as f:
             state = json.load(f)
     except json.JSONDecodeError as err:
-        raise PipelineError(f"Could not parse existing pipeline state at {state_path}") from err
+        raise PipelineError(
+            f"Could not parse existing pipeline state at {state_path}"
+        ) from err
 
     if not isinstance(state, dict):
-        raise PipelineError(f"Existing pipeline state at {state_path} must be a JSON object")
+        raise PipelineError(
+            f"Existing pipeline state at {state_path} must be a JSON object"
+        )
 
     state_artifacts = state.get("artifacts")
     state_models = state.get("role_models")
     state_execution = state.get("execution")
     if not isinstance(state_artifacts, Mapping):
-        raise PipelineError(f"Existing pipeline state at {state_path} is missing an artifacts map")
+        raise PipelineError(
+            f"Existing pipeline state at {state_path} is missing an artifacts map"
+        )
 
     seeded_outputs: dict[str, str] = {}
     seeded_artifacts: dict[str, str] = {}
@@ -1078,7 +1177,9 @@ def _load_resume_state(
 
         seeded_artifacts[role] = artifact_path
         model_ref = resolve_role_model(cfg, role)
-        if isinstance(state_models, Mapping) and isinstance(state_models.get(role), str):
+        if isinstance(state_models, Mapping) and isinstance(
+            state_models.get(role), str
+        ):
             model_ref = str(state_models[role])
         seeded_models[role] = model_ref
         prior_execution = existing_execution_by_role.get(role, {})
@@ -1093,7 +1194,14 @@ def _load_resume_state(
         )
 
     parent_run_id = str(state.get("run_id") or "").strip() or None
-    return start_index, seeded_outputs, seeded_artifacts, seeded_models, seeded_execution, parent_run_id
+    return (
+        start_index,
+        seeded_outputs,
+        seeded_artifacts,
+        seeded_models,
+        seeded_execution,
+        parent_run_id,
+    )
 
 
 def run_pipeline(
@@ -1103,6 +1211,7 @@ def run_pipeline(
     start_role: str | None = None,
 ) -> str:
     """Run the ESE pipeline and write per-role artifacts plus summary outputs."""
+    _validate_prompt_limits()
     artifacts_dir = _resolve_artifacts_dir(cfg, artifacts_dir)
 
     provider = (cfg.get("provider") or {}).get("name", "unknown")
@@ -1113,6 +1222,11 @@ def run_pipeline(
     role_order = _normalize_role_order(cfg)
     if not role_order:
         raise PipelineError("No roles configured. Add at least one role under roles.")
+
+    logger.info(
+        "Starting ESE pipeline run_id=%s provider=%s mode=%s", run_id, provider, mode
+    )
+    logger.debug("Role order: %s", role_order)
 
     os.makedirs(artifacts_dir, exist_ok=True)
     config_snapshot = _config_snapshot_path(artifacts_dir)
@@ -1126,7 +1240,14 @@ def run_pipeline(
     enforce_json = output_cfg["enforce_json"]
     fail_on_high = gating_cfg["fail_on_high"]
 
-    start_index, role_outputs, role_artifacts, role_models, execution, parent_run_id = _load_resume_state(
+    (
+        start_index,
+        role_outputs,
+        role_artifacts,
+        role_models,
+        execution,
+        parent_run_id,
+    ) = _load_resume_state(
         cfg=cfg,
         artifacts_dir=artifacts_dir,
         role_order=role_order,
@@ -1140,7 +1261,9 @@ def run_pipeline(
         if parallel_cfg["parallel_specialists"] and _is_parallelizable_role(role):
             batch: list[tuple[int, str]] = []
             scan_pointer = index_pointer
-            while scan_pointer < len(role_order) and _is_parallelizable_role(role_order[scan_pointer]):
+            while scan_pointer < len(role_order) and _is_parallelizable_role(
+                role_order[scan_pointer]
+            ):
                 batch.append((scan_pointer + 1, role_order[scan_pointer]))
                 scan_pointer += 1
 
@@ -1164,8 +1287,7 @@ def run_pipeline(
                         cfg=cfg,
                         artifacts_dir=artifacts_dir,
                         strategy="parallel",
-                    )
-                    : (run_index, run_role)
+                    ): (run_index, run_role)
                     for run_index, run_role in batch
                 }
                 for future in as_completed(future_map):
@@ -1189,7 +1311,9 @@ def run_pipeline(
                 failures.sort(key=lambda item: item[0])
                 failed_roles = [role_name for _, role_name, _ in failures]
                 completed_roles = [str(result["role"]) for result in results]
-                failure_details = "; ".join(f"{role_name}: {message}" for _, role_name, message in failures)
+                failure_details = "; ".join(
+                    f"{role_name}: {message}" for _, role_name, message in failures
+                )
                 completion_note = ", ".join(completed_roles) or "none"
                 failure = (
                     "Parallel specialist batch failed. "
@@ -1253,6 +1377,7 @@ def run_pipeline(
                 strategy="serial",
             )
         except Exception as err:  # noqa: BLE001
+            logger.error("Role execution failed role=%s error=%s", role, err)
             failure = f"Role '{role}' failed: {err}"
             summary_path = _persist_run_outputs(
                 artifacts_dir=artifacts_dir,

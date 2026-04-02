@@ -1,0 +1,61 @@
+version: 1
+mode: ensemble
+execution_mode: demo
+strict_config: false
+provider:
+  name: openai
+  model: gpt-3.5-turbo
+roles:
+  architect:
+    temperature: 0.2
+  implementer:
+    model: gpt-5
+    temperature: 0.1
+  adversarial_reviewer:
+    model: gpt-5-mini
+    temperature: 0.7
+  security_auditor:
+    model: gpt-5-nano
+    temperature: 0.2
+  test_generator:
+    temperature: 0.2
+  performance_analyst:
+    temperature: 0.2
+constraints:
+  disallow_same_model_pairs:
+  - - architect
+    - implementer
+  - - implementer
+    - adversarial_reviewer
+  - - implementer
+    - security_auditor
+  require_roles: []
+  disallow_same_provider_pairs: []
+  require_json_for_roles: []
+input:
+  scope: Test end-to-end wiring
+output:
+  artifacts_dir: ./test_e2e_artifacts
+  enforce_json: true
+gating:
+  fail_on_high: true
+runtime:
+  adapter: dry-run
+  timeout_seconds: 60.0
+  max_retries: 2
+  retry_backoff_seconds: 1.0
+  review_isolation: scope_and_implementation
+  openai:
+    base_url: https://api.openai.com/v1
+  local:
+    base_url: http://localhost:11434/v1
+    use_openai_compat_auth: true
+template_key: feature-delivery
+template_title: Feature Delivery
+preset: balanced
+provider_runtime:
+  provider: openai
+  supports_builtin_live: true
+  execution_mode: demo
+  runtime_adapter: dry-run
+  note: openai will run in demo mode via dry-run artifacts.

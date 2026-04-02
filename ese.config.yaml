@@ -1,0 +1,29 @@
+config_version: 1
+provider:
+  name: openai
+  model: gpt-3.5-turbo
+  api_key_env: OPENAI_API_KEY
+
+mode: ensemble
+execution_mode: demo
+runtime:
+  adapter: dry-run
+
+input:
+  scope: "Test end-to-end system functionality"
+
+roles:
+  architect:
+    model: gpt-3.5-turbo-architect
+  implementer:
+    model: gpt-3.5-turbo-implementer
+  adversarial_reviewer:
+    model: gpt-3.5-turbo-reviewer
+  security_auditor:
+    model: gpt-3.5-turbo-security
+  test_generator:
+    model: gpt-3.5-turbo-test
+
+output:
+  artifacts_dir: ./e2e_test_artifacts
+  enforce_json: true

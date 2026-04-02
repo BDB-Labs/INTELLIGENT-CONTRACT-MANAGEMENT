@@ -1,0 +1,28 @@
+{
+  "summary": "Dry-run placeholder output for role 'security_auditor'.",
+  "confidence": "MEDIUM",
+  "assumptions": [
+    "This run used the dry-run adapter and did not execute against a live model."
+  ],
+  "unknowns": [
+    "No provider-backed reasoning or external validation was performed."
+  ],
+  "findings": [],
+  "artifacts": [],
+  "code_suggestions": [],
+  "next_steps": [
+    "Replace dry-run with a real adapter to execute this role against a model."
+  ],
+  "metadata": {
+    "model": "openai:gpt-5-nano",
+    "adapter": "dry-run",
+    "assurance_level": "standard",
+    "prompt_excerpt": "You are the security_auditor. Perform a security review. Focus on trust boundaries, authz/authn gaps, secrets handling, injection risks, data exposure, and abuse paths.\n\nScope:\nTest end-to-end wiring\n\nImplementer Output:\n{\n  \"summary\": \"Dry-run placeholder output for role 'implementer'.\",\n  \"confidence\": \"MEDIUM\",\n  \"assumptions\": [\n    \"This run used the dry-run adapter and did not execute agains",
+    "context_keys": [
+      "implementer"
+    ],
+    "review_isolation": "scope_and_implementation"
+  },
+  "role": "security_auditor",
+  "model": "openai:gpt-5-nano"
+}

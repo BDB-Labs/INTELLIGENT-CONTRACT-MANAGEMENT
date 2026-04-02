@@ -1,0 +1,28 @@
+{
+  "summary": "Dry-run placeholder output for role 'implementer'.",
+  "confidence": "MEDIUM",
+  "assumptions": [
+    "This run used the dry-run adapter and did not execute against a live model."
+  ],
+  "unknowns": [
+    "No provider-backed reasoning or external validation was performed."
+  ],
+  "findings": [],
+  "artifacts": [],
+  "code_suggestions": [],
+  "next_steps": [
+    "Replace dry-run with a real adapter to execute this role against a model."
+  ],
+  "metadata": {
+    "model": "openai:gpt-5",
+    "adapter": "dry-run",
+    "assurance_level": "standard",
+    "prompt_excerpt": "You are the Implementer. Build from the Architect plan and scope.\n\nScope:\nTest end-to-end wiring\n\nArchitect Plan:\n{\n  \"summary\": \"Dry-run placeholder output for role 'architect'.\",\n  \"confidence\": \"MEDIUM\",\n  \"assumptions\": [\n    \"This run used the dry-run adapter and did not execute against a live model.\"\n  ],\n  \"unknowns\": [\n    \"No provider-backed reasoning or external validation was performed.",
+    "context_keys": [
+      "architect"
+    ],
+    "review_isolation": "scope_and_implementation"
+  },
+  "role": "implementer",
+  "model": "openai:gpt-5"
+}

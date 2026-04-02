@@ -577,17 +577,8 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
             continue
 
         artifact_path = Path(artifact)
-        artifact_path = Path(artifact)
-        # Only join with root if the path is not already absolute and not already under root
         if not artifact_path.is_absolute():
-            # Check if the path is already relative to the root to avoid double prefixing
-            try:
-                # If this succeeds, the path is already under root
-                artifact_path.resolve().relative_to(root.resolve())
-                # Keep the original path as it's already correct
-            except ValueError:
-                # Path is not under root, so join with root
-                artifact_path = root / artifact_path
+            artifact_path = root / artifact_path
 
         entry: dict[str, Any] = {
             "role": role,
