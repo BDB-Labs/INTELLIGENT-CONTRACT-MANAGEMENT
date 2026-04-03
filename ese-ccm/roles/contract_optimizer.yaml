@@ -1,0 +1,5 @@
+name: contract_optimizer
+role: clause_improvement
+orientation: practical_fair
+output_schema: clause_revisions
+prompt_file: prompts/contract_optimizer.md

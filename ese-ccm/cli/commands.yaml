@@ -1,0 +1,28 @@
+commands:
+  analyze:
+    description: Run full pre-award ensemble analysis
+    pipeline: full_analysis
+    options:
+      - with-context
+      - with-budget
+
+  optimize:
+    description: Generate redlines and negotiation packet
+
+  commit:
+    description: Create final contract record
+
+  extract-obligations:
+    description: Generate post-award obligation register
+
+  monitor:
+    description: Run ongoing compliance monitoring
+    stateful: true
+
+  report:
+    description: Generate report
+    options:
+      - mode: external|internal
+
+  explain:
+    description: Explain decision or omission

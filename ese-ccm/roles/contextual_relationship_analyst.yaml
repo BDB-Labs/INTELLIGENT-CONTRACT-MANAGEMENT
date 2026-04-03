@@ -1,0 +1,10 @@
+name: contextual_relationship_analyst
+role: context_analysis
+orientation: environment_aware
+visibility: internal_only
+weights:
+  budget_pressure: 0.35
+  funding_constraints: 0.35
+  schedule_pressure: 0.30
+output_schema: context_signals
+prompt_file: prompts/contextual_relationship_analyst.md

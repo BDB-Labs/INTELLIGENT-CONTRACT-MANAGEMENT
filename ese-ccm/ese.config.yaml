@@ -1,0 +1,39 @@
+ensemble:
+  name: ese-ccm-construction-compliance
+  version: 1.0
+  description: Full lifecycle roadway contract compliance & monitoring system for Southern California contractor (Caltrans, county, municipal)
+
+input:
+  type: document
+  formats: [pdf, docx, txt]
+  parser: clause-level
+
+pipeline:
+  - contractor_reviewer
+  - owner_reviewer
+  - compliance_reviewer
+  - contractor_manager
+  - owner_manager
+  - relationship_strategist
+  - contextual_relationship_analyst
+  - orchestrator
+  - contract_optimizer
+  - compliance_monitor
+
+output:
+  formats:
+    - external_report
+    - internal_trace
+    - obligation_register
+  enforce_json: true
+  gating:
+    fail_on_high: true
+
+context_engine:
+  enabled: true
+  visibility: internal_only
+  sources: [agency_budget, funding_stack, local_media_patterns]
+
+sanitization:
+  enabled: true
+  rules_file: prompts/sanitization_rules.md
