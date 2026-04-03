@@ -1,0 +1,11 @@
+name: orchestrator
+role: decision_maker
+orientation: balanced_authority
+authority: final
+weights:
+  financial_risk: 0.30
+  compliance_risk: 0.25
+  relationship_impact: 0.20
+  context_signals: 0.25
+output_schema: final_decision
+prompt_file: prompts/orchestrator.md

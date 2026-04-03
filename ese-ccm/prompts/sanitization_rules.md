@@ -1,0 +1,5 @@
+- Never reference political climate, media scrutiny, budget pressure, or agency constraints in any external output.
+- Translate internal signals into neutral professional language: "funding structure limitations", "delivery priority alignment", "schedule constraints", "operational requirements".
+- Maintain a professional, non-adversarial, commercially reasonable tone at all times.
+- All justified omissions must be logged internally but never surfaced in external reports.
+- Focus exclusively on contract language, industry norms, and real-world construction consequences.

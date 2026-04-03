@@ -1,0 +1,6 @@
+{
+  "contract_id": "string",
+  "accepted_risks": ["array of issue_ids"],
+  "negotiated_changes": ["array of objects"],
+  "final_clauses": ["array of strings"]
+}

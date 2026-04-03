@@ -1,0 +1,11 @@
+name: compliance_reviewer
+role: regulatory_analysis
+orientation: compliance
+weights:
+  federal_compliance: 0.40
+  state_compliance: 0.30
+  local_compliance: 0.30
+bias:
+  strictness: very_high
+output_schema: risk_packet
+prompt_file: prompts/compliance_reviewer.md

@@ -1,0 +1,21 @@
+{
+  "issue_id": "string",
+  "clause_reference": "string",
+  "issue_category": "string",
+  "summary": "string",
+  "why_it_matters": "string",
+  "trigger_scenario": "string",
+  "probability": "Low|Medium|High",
+  "impact": "Low|Medium|High",
+  "risk_score": "Low|Moderate|High",
+  "risk_type": "Financial|Schedule|Legal|Operational|Reputational",
+  "position": "Owner Advantage|Contractor Advantage|Neutral",
+  "industry_standard": "Yes|No|Debatable",
+  "recommended_action": "Accept|Clarify|Negotiate|Price the Risk|Reject",
+  "proposed_revision": "string",
+  "relationship_impact": "Negative|Neutral|Positive",
+  "traceability": {
+    "source_clause_text": "string",
+    "related_issues": ["array of strings"]
+  }
+}
