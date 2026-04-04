@@ -28,6 +28,15 @@ from ese.provider_runtime import BUILTIN_RUNTIME_ADAPTERS_TEXT
 
 logger = logging.getLogger(__name__)
 
+# Certainty assessment thresholds
+CERTAINTY_THRESHOLD_HIGH = 0.75  # Below this, response should be curtailed
+CERTAINTY_THRESHOLD_MEDIUM = 0.50  # Below this, strong warning issued
+CERTAINTY_INDICATORS = {
+    "low": 0.3,
+    "medium": 0.6,
+    "high": 0.85,
+}
+
 PIPELINE_ORDER = [
     "architect",
     "implementer",
@@ -460,7 +469,22 @@ def _role_prompt(
         )
     )
     assembled = "\n\n".join(section for section in sections if section)
-    return _compact_lines(f"{assembled}{artifact_guidance}{json_contract}".strip())
+    uncertainty_reinforcement = (
+        "\n\n## CERTAINTY AND EVIDENCE REQUIREMENT\n"
+        "You MUST assess your own certainty level before answering. "
+        "If the evidence is insufficient, ambiguous, or speculative, you MUST:\n"
+        "1. State your confidence level explicitly as 'LOW', 'MEDIUM', or 'HIGH'\n"
+        "2. List specific evidence gaps or unknowns in an 'evidence_gaps' or 'unknowns' field\n"
+        "3. Curtail your response to only what you can support with facts or data\n"
+        "4. NOT fabricate details, conclusions, or recommendations when certainty is low\n"
+        "5. Surface the uncertainty situation clearly so downstream roles know this output is provisional\n\n"
+        "CRITICAL: Answering authoritatively when indicators point to high uncertainty is worse than saying 'insufficient evidence'. "
+        "If you cannot support your answer with facts from the supplied materials, say so explicitly. "
+        "Do not invent conclusions to fill gaps."
+    )
+    return _compact_lines(
+        f"{assembled}{artifact_guidance}{uncertainty_reinforcement}{json_contract}".strip()
+    )
 
 
 def _role_context(
@@ -784,6 +808,150 @@ def _render_role_output(
     return "json", rendered, report
 
 
+def _assess_response_certainty(
+    *,
+    role: str,
+    report: dict[str, Any] | None,
+    output: str,
+) -> dict[str, Any]:
+    """Assess the certainty level of a model's response and flag uncertainty.
+
+    Returns a certainty assessment dict with:
+    - certainty_score: 0.0 to 1.0
+    - certainty_level: "low", "medium", or "high"
+    - warning: str or None - warning message if certainty is below threshold
+    - curtailed: bool - whether the response should be curtailed
+    - reasons: list[str] - reasons for the certainty assessment
+    """
+    reasons: list[str] = []
+    certainty_score = 1.0  # Start with full certainty, deduct for issues
+
+    if report is None:
+        # Non-JSON output, assess based on text patterns
+        output_lower = output.lower()
+        uncertainty_phrases = [
+            "uncertain",
+            "cannot determine",
+            "insufficient",
+            "unclear",
+            "may or may not",
+            "it is possible",
+            "could be",
+            "might be",
+            "speculative",
+            "unknown",
+            "not enough",
+            "lack of",
+            "unable to confirm",
+            "cannot verify",
+            "no evidence",
+        ]
+        for phrase in uncertainty_phrases:
+            if phrase in output_lower:
+                certainty_score -= 0.15
+                reasons.append(f"Uncertainty phrase detected: '{phrase}'")
+
+        # Check for hedging language
+        hedge_count = sum(
+            1
+            for phrase in ["perhaps", "possibly", "maybe", "likely", "seems"]
+            if phrase in output_lower
+        )
+        if hedge_count >= 3:
+            certainty_score -= 0.2
+            reasons.append(f"Multiple hedging phrases detected ({hedge_count})")
+    else:
+        # Check confidence field if present
+        confidence = report.get("confidence", "")
+        if isinstance(confidence, str):
+            confidence_lower = confidence.lower().strip()
+            if confidence_lower in CERTAINTY_INDICATORS:
+                certainty_score = CERTAINTY_INDICATORS[confidence_lower]
+                reasons.append(f"Explicit confidence: {confidence}")
+            elif "low" in confidence_lower:
+                certainty_score = 0.3
+                reasons.append(f"Low confidence stated: {confidence}")
+            elif "medium" in confidence_lower:
+                certainty_score = 0.6
+                reasons.append(f"Medium confidence stated: {confidence}")
+            elif "high" in confidence_lower:
+                certainty_score = 0.85
+                reasons.append(f"High confidence stated: {confidence}")
+
+        # Check for evidence gaps
+        evidence_gaps = (
+            report.get("evidence_gaps")
+            or report.get("coverage_gaps")
+            or report.get("unknowns")
+        )
+        if isinstance(evidence_gaps, list) and len(evidence_gaps) > 0:
+            gap_penalty = min(0.4, len(evidence_gaps) * 0.1)
+            certainty_score -= gap_penalty
+            reasons.append(f"Evidence gaps identified: {len(evidence_gaps)}")
+
+        # Check for uncertainty notes
+        uncertainty_notes = report.get("uncertainty_notes", [])
+        if isinstance(uncertainty_notes, list) and len(uncertainty_notes) > 0:
+            note_penalty = min(0.3, len(uncertainty_notes) * 0.1)
+            certainty_score -= note_penalty
+            reasons.append(f"Uncertainty notes present: {len(uncertainty_notes)}")
+
+        # Check findings for low confidence
+        findings = report.get("findings", [])
+        if isinstance(findings, list):
+            low_confidence_findings = [
+                f
+                for f in findings
+                if isinstance(f, dict)
+                and f.get("confidence")
+                and isinstance(f["confidence"], (int, float))
+                and f["confidence"] < 0.5
+            ]
+            if low_confidence_findings:
+                certainty_score -= min(0.3, len(low_confidence_findings) * 0.1)
+                reasons.append(
+                    f"Low-confidence findings: {len(low_confidence_findings)}"
+                )
+
+    # Clamp score
+    certainty_score = max(0.0, min(1.0, certainty_score))
+
+    # Determine level
+    if certainty_score >= 0.75:
+        certainty_level = "high"
+    elif certainty_score >= 0.50:
+        certainty_level = "medium"
+    else:
+        certainty_level = "low"
+
+    # Determine if response should be curtailed
+    curtailed = certainty_score < CERTAINTY_THRESHOLD_MEDIUM
+    warning = None
+
+    if curtailed:
+        warning = (
+            f"ROLE '{role}' RESPONSE CERTAINTY CRITICALLY LOW ({certainty_score:.2f}). "
+            f"The model is answering despite high uncertainty. "
+            f"Response should be curtailed until supporting evidence is available. "
+            f"Reasons: {'; '.join(reasons)}"
+        )
+    elif certainty_score < CERTAINTY_THRESHOLD_HIGH:
+        warning = (
+            f"ROLE '{role}' RESPONSE CERTAINTY BELOW THRESHOLD ({certainty_score:.2f}). "
+            f"Model is answering with moderate uncertainty. "
+            f"Review findings carefully before acting on this output. "
+            f"Reasons: {'; '.join(reasons)}"
+        )
+
+    return {
+        "certainty_score": round(certainty_score, 2),
+        "certainty_level": certainty_level,
+        "warning": warning,
+        "curtailed": curtailed,
+        "reasons": reasons,
+    }
+
+
 def _high_severity_findings(report: Mapping[str, Any]) -> list[dict[str, str]]:
     findings = report.get("findings")
     if not isinstance(findings, list):
@@ -988,12 +1156,27 @@ def _execute_role(
         output=output,
         enforce_json=enforce_json,
     )
+    certainty = _assess_response_certainty(
+        role=role,
+        report=structured_report,
+        output=output,
+    )
+    if certainty["warning"]:
+        if certainty["curtailed"]:
+            logger.error("CERTAINTY CRITICAL %s", certainty["warning"])
+        else:
+            logger.warning("CERTAINTY LOW %s", certainty["warning"])
     artifact_name = f"{index:02d}_{role}.{artifact_extension}"
     artifact_path = os.path.join(artifacts_dir, artifact_name)
     _write(artifact_path, rendered_output)
     completed_at = time.time()
     duration_ms = int(round((completed_at - started_at) * 1000))
-    logger.info("Completed role=%s duration_ms=%d", role, duration_ms)
+    logger.info(
+        "Completed role=%s duration_ms=%d certainty=%.2f",
+        role,
+        duration_ms,
+        certainty["certainty_score"],
+    )
     return {
         "role": role,
         "index": index,
@@ -1001,6 +1184,7 @@ def _execute_role(
         "artifact_path": artifact_path,
         "rendered_output": rendered_output,
         "structured_report": structured_report,
+        "certainty": certainty,
         "execution": {
             "role": role,
             "model": model_ref,
