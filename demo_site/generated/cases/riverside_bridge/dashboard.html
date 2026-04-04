@@ -3,26 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111d">
   <title>Contract Intelligence Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     :root {
-      color-scheme: light;
-      --sand: #f4efe6;
-      --paper: #fbf8f2;
-      --panel: rgba(255, 255, 255, 0.92);
-      --panel-strong: #ffffff;
-      --ink: #132238;
-      --muted: #5c6874;
-      --line: rgba(19, 34, 56, 0.10);
-      --accent: #0f7662;
-      --accent-2: #c96b2c;
-      --risk: #9e2a2b;
-      --warn: #a16207;
-      --glow: rgba(15, 118, 98, 0.18);
-      --shadow: 0 18px 60px rgba(19, 34, 56, 0.10);
-      --radius-xl: 28px;
-      --radius-lg: 20px;
-      --radius-md: 14px;
+      color-scheme: dark;
+      --bg: #07111d;
+      --bg-deep: #030711;
+      --panel: rgba(8, 19, 34, 0.82);
+      --panel-strong: rgba(13, 29, 51, 0.94);
+      --panel-soft: rgba(9, 20, 36, 0.68);
+      --ink: #edf4ff;
+      --muted: #95a8c2;
+      --line: rgba(148, 163, 184, 0.17);
+      --line-strong: rgba(125, 211, 252, 0.24);
+      --accent: #48e5c2;
+      --accent-2: #ff9666;
+      --accent-3: #7dc3ff;
+      --risk: #ff7687;
+      --warn: #ffbc69;
+      --good: #66efc6;
+      --glow: rgba(72, 229, 194, 0.22);
+      --shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
     }
 
     * { box-sizing: border-box; }
@@ -31,57 +40,94 @@
       margin: 0;
       color: var(--ink);
       background:
-        radial-gradient(circle at 0% 0%, rgba(201, 107, 44, 0.14), transparent 30%),
-        radial-gradient(circle at 100% 20%, rgba(15, 118, 98, 0.18), transparent 36%),
-        linear-gradient(180deg, #f7f0e6 0%, #f4f6f7 44%, #eef2f3 100%);
-      font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        radial-gradient(circle at 12% 10%, rgba(72, 229, 194, 0.14), transparent 24%),
+        radial-gradient(circle at 88% 12%, rgba(255, 150, 102, 0.18), transparent 24%),
+        radial-gradient(circle at 50% 85%, rgba(125, 195, 255, 0.12), transparent 32%),
+        linear-gradient(180deg, #08111d 0%, #060c16 48%, #04070e 100%);
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI Variable Text", sans-serif;
       min-height: 100vh;
     }
 
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(125, 195, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 195, 255, 0.05) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 92%);
+      opacity: 0.34;
+    }
+
     .shell {
+      position: relative;
       max-width: 1440px;
       margin: 0 auto;
       padding: 28px 18px 56px;
+    }
+
+    .shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(72, 229, 194, 0.08), transparent 26%),
+        radial-gradient(circle at 100% 20%, rgba(255, 150, 102, 0.10), transparent 26%);
+      z-index: 0;
     }
 
     .masthead {
       position: relative;
       overflow: hidden;
       background:
-        linear-gradient(135deg, rgba(255,255,255,0.90), rgba(255,255,255,0.74)),
-        linear-gradient(135deg, rgba(15,118,98,0.08), rgba(201,107,44,0.10));
-      border: 1px solid rgba(255,255,255,0.65);
+        linear-gradient(160deg, rgba(12, 27, 47, 0.96), rgba(7, 16, 29, 0.88)),
+        var(--panel-strong);
+      border: 1px solid var(--line);
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow);
-      padding: 28px;
-      backdrop-filter: blur(12px);
+      padding: 30px;
+      backdrop-filter: blur(18px);
+      z-index: 1;
+    }
+
+    .masthead::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(125, 195, 255, 0.14), transparent 34%, transparent 64%, rgba(72, 229, 194, 0.10));
     }
 
     .masthead::after {
       content: "";
       position: absolute;
-      inset: auto -10% -40% 50%;
-      height: 220px;
-      background: radial-gradient(circle, rgba(15,118,98,0.10), transparent 65%);
+      inset: auto -10% -46% 44%;
+      height: 260px;
+      background: radial-gradient(circle, rgba(72, 229, 194, 0.16), transparent 65%);
       pointer-events: none;
     }
 
     .eyebrow {
-      font: 700 0.74rem/1.2 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.75rem/1.2 "IBM Plex Mono", monospace;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--accent-3);
       margin-bottom: 14px;
     }
 
     h1, h2, h3 {
       margin: 0;
       color: var(--ink);
+      font-family: "Space Grotesk", "Avenir Next", sans-serif;
+      letter-spacing: -0.03em;
     }
 
     h1 {
-      font: 700 clamp(2.2rem, 5vw, 4.2rem)/0.94 "Avenir Next Condensed", "Avenir Next", "Segoe UI Variable Display", sans-serif;
-      letter-spacing: -0.04em;
+      font: 700 clamp(2.5rem, 5vw, 4.4rem)/0.92 "Space Grotesk", "Avenir Next", sans-serif;
       max-width: 12ch;
     }
 
@@ -89,8 +135,8 @@
       margin-top: 14px;
       max-width: 72ch;
       color: var(--muted);
-      font-size: 1.02rem;
-      line-height: 1.6;
+      font-size: 1rem;
+      line-height: 1.72;
     }
 
     .hero-grid {
@@ -104,16 +150,28 @@
     .card,
     .workspace,
     .subpanel {
-      background: var(--panel);
+      background:
+        linear-gradient(180deg, rgba(12, 27, 47, 0.86), rgba(7, 16, 29, 0.72)),
+        var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      box-shadow: 0 10px 35px rgba(19, 34, 56, 0.06);
-      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(18px);
     }
 
     .hero-panel {
+      position: relative;
       padding: 22px;
       min-height: 100%;
+    }
+
+    .hero-panel::before,
+    .workspace::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(125, 195, 255, 0.08), transparent 36%, transparent 70%, rgba(72, 229, 194, 0.06));
     }
 
     .kpis {
@@ -126,19 +184,19 @@
     .kpi {
       padding: 18px;
       border-radius: var(--radius-md);
-      background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.80));
-      border: 1px solid rgba(19, 34, 56, 0.08);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.92), rgba(10, 22, 39, 0.80));
+      border: 1px solid rgba(125, 211, 252, 0.12);
     }
 
     .kpi .value {
-      font: 700 1.9rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 700 1.9rem/1 "Space Grotesk", "Avenir Next", sans-serif;
       letter-spacing: -0.04em;
       margin-bottom: 6px;
     }
 
     .kpi .label {
       color: var(--muted);
-      font: 600 0.86rem/1.3 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.74rem/1.4 "IBM Plex Mono", monospace;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
@@ -156,24 +214,24 @@
       gap: 8px;
       padding: 9px 14px;
       border-radius: 999px;
-      font: 700 0.8rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
-      letter-spacing: 0.05em;
+      font: 600 0.74rem/1 "IBM Plex Mono", monospace;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      background: rgba(255,255,255,0.88);
-      border: 1px solid rgba(19, 34, 56, 0.08);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(125, 211, 252, 0.16);
     }
 
-    .badge.risk { color: var(--risk); }
-    .badge.warn { color: var(--warn); }
-    .badge.good { color: var(--accent); }
+    .badge.risk { color: var(--risk); border-color: rgba(255, 118, 135, 0.22); }
+    .badge.warn { color: var(--warn); border-color: rgba(255, 188, 105, 0.22); }
+    .badge.good { color: var(--good); border-color: rgba(102, 239, 198, 0.22); }
 
     .mode-switch {
       display: inline-flex;
       gap: 8px;
       padding: 6px;
       border-radius: 999px;
-      background: rgba(19,34,56,0.06);
-      border: 1px solid rgba(19,34,56,0.08);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(125, 211, 252, 0.12);
       margin-bottom: 10px;
     }
 
@@ -185,9 +243,9 @@
       padding: 10px 14px;
       border-radius: 999px;
       cursor: pointer;
-      font: 700 0.82rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.75rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       transition: background 150ms ease, color 150ms ease, transform 150ms ease;
     }
 
@@ -196,14 +254,14 @@
     }
 
     .mode-button.is-active {
-      background: linear-gradient(135deg, rgba(15,118,98,0.18), rgba(255,255,255,0.95));
+      background: linear-gradient(135deg, rgba(72, 229, 194, 0.18), rgba(125, 195, 255, 0.10));
       color: var(--ink);
-      box-shadow: inset 0 0 0 1px rgba(15,118,98,0.18);
+      box-shadow: inset 0 0 0 1px rgba(72, 229, 194, 0.18);
     }
 
     .mode-caption {
       color: var(--muted);
-      font: 500 0.92rem/1.5 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.92rem/1.6 "IBM Plex Sans", sans-serif;
       margin: 0 0 16px;
     }
 
@@ -220,10 +278,21 @@
       gap: 8px;
       padding: 10px 12px;
       border-radius: 14px;
-      background: rgba(255,255,255,0.86);
-      border: 1px solid rgba(19,34,56,0.08);
-      font: 700 0.8rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(125, 211, 252, 0.12);
+      font: 600 0.76rem/1 "IBM Plex Mono", monospace;
       color: var(--ink);
+    }
+
+    .warning-pill {
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255, 150, 102, 0.10);
+      border-color: rgba(255, 188, 105, 0.22);
+    }
+
+    .note-tight {
+      margin-top: 6px;
     }
 
     .confidence-wrap {
@@ -233,14 +302,14 @@
     .confidence-track {
       height: 12px;
       border-radius: 999px;
-      background: linear-gradient(90deg, rgba(158,42,43,0.16), rgba(201,107,44,0.18), rgba(15,118,98,0.18));
+      background: linear-gradient(90deg, rgba(255, 118, 135, 0.14), rgba(255, 188, 105, 0.16), rgba(72, 229, 194, 0.16));
       overflow: hidden;
     }
 
     .confidence-fill {
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #d86d4f, #0f7662);
+      background: linear-gradient(90deg, #ff9666, #48e5c2);
       box-shadow: 0 0 28px var(--glow);
     }
 
@@ -259,10 +328,10 @@
     }
 
     .rail h2 {
-      font: 700 1rem/1.1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.82rem/1.1 "IBM Plex Mono", monospace;
       margin-bottom: 14px;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.12em;
       color: var(--muted);
     }
 
@@ -273,14 +342,14 @@
 
     .nav-button {
       appearance: none;
-      border: 1px solid rgba(19, 34, 56, 0.08);
+      border: 1px solid rgba(125, 211, 252, 0.12);
       border-radius: 16px;
-      background: rgba(255,255,255,0.75);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.82), rgba(10, 22, 39, 0.72));
       padding: 14px 16px;
       text-align: left;
       cursor: pointer;
       color: var(--ink);
-      font: 700 0.92rem/1.2 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.88rem/1.2 "Space Grotesk", sans-serif;
       transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
     }
 
@@ -288,7 +357,7 @@
       display: block;
       margin-top: 6px;
       color: var(--muted);
-      font: 500 0.76rem/1.4 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 500 0.72rem/1.4 "IBM Plex Mono", monospace;
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
@@ -296,11 +365,12 @@
     .nav-button:hover,
     .nav-button[aria-selected="true"] {
       transform: translateX(3px);
-      background: linear-gradient(135deg, rgba(15,118,98,0.12), rgba(255,255,255,0.92));
-      border-color: rgba(15,118,98,0.28);
+      background: linear-gradient(135deg, rgba(72, 229, 194, 0.14), rgba(125, 195, 255, 0.08));
+      border-color: rgba(72, 229, 194, 0.28);
     }
 
     .workspace {
+      position: relative;
       overflow: hidden;
       padding: 18px;
     }
@@ -334,6 +404,8 @@
     .section-head p {
       margin: 8px 0 0;
       max-width: 70ch;
+      color: var(--muted);
+      line-height: 1.6;
     }
 
     .control-row {
@@ -346,11 +418,11 @@
     .control-row input,
     .control-row select {
       appearance: none;
-      border: 1px solid rgba(19,34,56,0.12);
-      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(125, 211, 252, 0.12);
+      background: rgba(7, 17, 29, 0.86);
       border-radius: 12px;
       padding: 12px 14px;
-      font: 500 0.92rem/1 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.92rem/1 "IBM Plex Sans", sans-serif;
       color: var(--ink);
       min-width: 180px;
     }
@@ -364,11 +436,11 @@
     .chip {
       border-radius: 999px;
       padding: 8px 12px;
-      background: rgba(15,118,98,0.08);
-      border: 1px solid rgba(15,118,98,0.14);
-      font: 700 0.76rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      background: rgba(72, 229, 194, 0.10);
+      border: 1px solid rgba(72, 229, 194, 0.16);
+      font: 600 0.74rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
       color: var(--accent);
     }
 
@@ -396,13 +468,21 @@
     .stat-card {
       padding: 18px;
       border-radius: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.78));
-      border: 1px solid rgba(19,34,56,0.08);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.86), rgba(10, 22, 39, 0.70));
+      border: 1px solid rgba(125, 211, 252, 0.12);
     }
 
     .stat-card .number {
-      font: 700 2rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 700 2rem/1 "Space Grotesk", sans-serif;
       letter-spacing: -0.05em;
+    }
+
+    .stat-card .label {
+      margin-top: 8px;
+      color: var(--muted);
+      font: 600 0.72rem/1.4 "IBM Plex Mono", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .stack {
@@ -418,9 +498,9 @@
     .doc-card,
     .review-card,
     .detail-card {
-      border: 1px solid rgba(19,34,56,0.08);
+      border: 1px solid rgba(125, 211, 252, 0.12);
       border-radius: 18px;
-      background: rgba(255,255,255,0.88);
+      background: linear-gradient(180deg, rgba(12, 27, 47, 0.86), rgba(8, 18, 33, 0.72));
       padding: 16px;
     }
 
@@ -432,7 +512,7 @@
     .doc-card h3,
     .review-card h3,
     .detail-card h3 {
-      font: 700 1rem/1.25 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 1rem/1.25 "Space Grotesk", sans-serif;
       margin-bottom: 8px;
     }
 
@@ -443,14 +523,14 @@
 
     .interactive-card:hover {
       transform: translateY(-1px);
-      border-color: rgba(15,118,98,0.22);
-      box-shadow: 0 12px 28px rgba(19,34,56,0.08);
+      border-color: rgba(72, 229, 194, 0.22);
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
     }
 
     .interactive-card.active {
-      border-color: rgba(15,118,98,0.32);
-      box-shadow: 0 14px 34px rgba(15,118,98,0.12);
-      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(236,248,245,0.92));
+      border-color: rgba(72, 229, 194, 0.32);
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+      background: linear-gradient(180deg, rgba(17, 35, 60, 0.96), rgba(9, 20, 36, 0.88));
     }
 
     .meta {
@@ -465,11 +545,11 @@
       align-items: center;
       padding: 6px 10px;
       border-radius: 999px;
-      background: rgba(19,34,56,0.05);
+      background: rgba(255,255,255,0.05);
       color: var(--muted);
-      font: 700 0.72rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.7rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
 
     .severity-critical { color: var(--risk); }
@@ -489,7 +569,7 @@
       top: 0;
       bottom: 0;
       width: 2px;
-      background: linear-gradient(180deg, rgba(15,118,98,0.26), rgba(201,107,44,0.24));
+      background: linear-gradient(180deg, rgba(72, 229, 194, 0.30), rgba(255, 150, 102, 0.24));
     }
 
     .timeline-item {
@@ -506,7 +586,7 @@
       height: 12px;
       border-radius: 999px;
       background: var(--accent);
-      box-shadow: 0 0 0 6px rgba(15,118,98,0.12);
+      box-shadow: 0 0 0 6px rgba(72, 229, 194, 0.12);
     }
 
     .columns {
@@ -518,8 +598,8 @@
     .column {
       border-radius: 18px;
       padding: 14px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.64));
-      border: 1px solid rgba(19,34,56,0.08);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.82), rgba(10, 22, 39, 0.66));
+      border: 1px solid rgba(125, 211, 252, 0.12);
       min-height: 220px;
     }
 
@@ -536,14 +616,14 @@
       top: 18px;
       border-radius: 20px;
       padding: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(249,252,251,0.82));
-      border: 1px solid rgba(19,34,56,0.08);
-      box-shadow: 0 16px 40px rgba(19,34,56,0.08);
+      background: linear-gradient(180deg, rgba(15, 31, 53, 0.94), rgba(8, 18, 33, 0.84));
+      border: 1px solid rgba(125, 211, 252, 0.14);
+      box-shadow: 0 20px 56px rgba(0, 0, 0, 0.34);
     }
 
     .detail-divider {
       height: 1px;
-      background: rgba(19,34,56,0.10);
+      background: rgba(148, 163, 184, 0.14);
       margin: 16px 0;
     }
 
@@ -567,9 +647,9 @@
     .review-form label {
       display: grid;
       gap: 6px;
-      font: 700 0.78rem/1.25 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.74rem/1.3 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       color: var(--muted);
     }
 
@@ -578,11 +658,11 @@
     .review-form textarea {
       width: 100%;
       appearance: none;
-      border: 1px solid rgba(19,34,56,0.12);
-      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(125, 211, 252, 0.12);
+      background: rgba(7, 17, 29, 0.84);
       border-radius: 12px;
       padding: 12px 14px;
-      font: 500 0.92rem/1.35 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.92rem/1.35 "IBM Plex Sans", sans-serif;
       color: var(--ink);
     }
 
@@ -599,60 +679,66 @@
 
     .action-button {
       appearance: none;
-      border: 1px solid rgba(15,118,98,0.18);
-      background: linear-gradient(135deg, rgba(15,118,98,0.12), rgba(255,255,255,0.94));
+      border: 1px solid rgba(72, 229, 194, 0.18);
+      background: linear-gradient(135deg, rgba(72, 229, 194, 0.12), rgba(125, 195, 255, 0.06));
       color: var(--ink);
       border-radius: 12px;
       padding: 10px 14px;
       cursor: pointer;
-      font: 700 0.82rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.75rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
 
     .action-button.subtle {
-      border-color: rgba(19,34,56,0.10);
-      background: rgba(255,255,255,0.90);
+      border-color: rgba(148, 163, 184, 0.14);
+      background: rgba(255,255,255,0.04);
     }
 
     .note {
       margin: 0;
       color: var(--muted);
-      font: 500 0.88rem/1.5 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.88rem/1.6 "IBM Plex Sans", sans-serif;
     }
 
     .doc-table {
       width: 100%;
       border-collapse: collapse;
-      background: rgba(255,255,255,0.84);
+      background: rgba(7, 17, 29, 0.76);
       border-radius: 18px;
       overflow: hidden;
-      border: 1px solid rgba(19,34,56,0.08);
+      border: 1px solid rgba(125, 211, 252, 0.12);
     }
 
     .doc-table th,
     .doc-table td {
       padding: 12px 14px;
       text-align: left;
-      border-bottom: 1px solid rgba(19,34,56,0.08);
-      font-family: "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.10);
+      font-family: "IBM Plex Sans", sans-serif;
       font-size: 0.92rem;
     }
 
     .doc-table th {
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.74rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .doc-table tr:last-child th,
+    .doc-table tr:last-child td {
+      border-bottom: none;
     }
 
     .empty {
       padding: 28px 20px;
       text-align: center;
       color: var(--muted);
-      border: 1px dashed rgba(19,34,56,0.16);
+      border: 1px dashed rgba(125, 211, 252, 0.18);
       border-radius: 18px;
-      background: rgba(255,255,255,0.54);
+      background: rgba(255,255,255,0.03);
     }
 
     @media (max-width: 1120px) {
@@ -946,7 +1032,7 @@
   </div>
 
   <script>
-    const dashboardData = {"project_id": "riverside-bridge", "project_path": null, "case_record": {"project_id": "riverside-bridge", "latest_run_id": "run_20260404T142830899546Z", "latest_analysis_perspective": "vendor", "latest_recommendation": "go_with_conditions", "latest_overall_risk": "high", "latest_agreement_type": "unknown_agreement_type", "latest_project_sector": "unknown_project_sector", "latest_outcome_status": "unknown_publicly_documented", "total_runs": 1, "run_history": [{"run_id": "run_20260404T142830899546Z", "run_type": "bid_review", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:28:30.899546Z", "recommendation": "go_with_conditions", "overall_risk": "high", "artifact_count": 11}], "latest_commit_id": "commit_20260404T142830902919Z", "total_commits": 1, "latest_obligations_count": 3, "commit_history": [{"commit_id": "commit_20260404T142830902919Z", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:28:30.902919Z", "source_run_id": "run_20260404T142830899546Z", "obligations_count": 3, "accepted_risks_count": 5, "negotiated_changes_count": 0}], "latest_monitoring_run_id": "monitor_20260404T142830904912Z", "total_monitoring_runs": 1, "monitoring_history": [{"run_id": "monitor_20260404T142830904912Z", "created_at": "2026-04-04T14:28:30.904912Z", "source_commit_id": "commit_20260404T142830902919Z", "alerts_count": 2, "due_count": 1, "late_count": 1, "satisfied_count": 1}]}, "latest_run": {"run_id": "run_20260404T142830899546Z", "project_id": "riverside-bridge", "created_at": "2026-04-04T14:28:30.899546Z", "decision_summary": {"project_id": "riverside-bridge", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["Pay-if-paid structure shifts collection risk downstream", "Broad indemnity language may exceed reasonable contractor risk", "No-damages-for-delay language compresses schedule recovery options"], "must_fix_before_bid": ["Seek pay-when-paid language or an outside payment deadline.", "Seek negligence-based limits and remove duty-to-defend language where possible.", "Preserve compensation rights for owner-caused delay, disruption, or resequencing.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "document_inventory": {"project_id": "riverside-bridge", "analysis_perspective": "vendor", "documents": [{"document_id": "doc_0576adcb70", "filename": "Funding Memo.md", "document_type": "funding_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 4}], "missing_required_documents": []}, "procurement_profile": {"project_id": "riverside-bridge", "agreement_type": "unknown_agreement_type", "project_sector": "unknown_project_sector", "payment_mechanism": "unknown_payment_mechanism", "procurement_method": "unknown_procurement_method", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": [], "detected_clause_families": [], "evidence": [], "notes": ["No board, change-order, audit, or project-status artifacts were supplied with the contract package."]}, "outcome_evidence": {"project_id": "riverside-bridge", "outcome_status": "unknown_publicly_documented", "governance_artifacts_present": [], "events": [], "coverage_gaps": ["No governance or status documents were supplied, so public outcome evidence is incomplete."], "monitoring_recommendations": ["Collect at least one board action, project status, or audit source so the package has a documented public outcome baseline.", "Preserve later change-order and settlement records because those documents are often the best public evidence of delivery stress."]}, "obligations_count": 3, "context_profile": {"signals": [], "notes": ["Internal-only context is intentionally omitted from the external artifact."], "internal_only": false}}, "latest_commit": {"commit_id": "commit_20260404T142830902919Z", "project_id": "riverside-bridge", "created_at": "2026-04-04T14:28:30.902919Z", "source_run_id": "run_20260404T142830899546Z", "decision_summary": {"project_id": "riverside-bridge", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["Pay-if-paid structure shifts collection risk downstream", "Broad indemnity language may exceed reasonable contractor risk", "No-damages-for-delay language compresses schedule recovery options"], "must_fix_before_bid": ["Seek pay-when-paid language or an outside payment deadline.", "Seek negligence-based limits and remove duty-to-defend language where possible.", "Preserve compensation rights for owner-caused delay, disruption, or resequencing.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "procurement_profile": {"project_id": "riverside-bridge", "agreement_type": "unknown_agreement_type", "project_sector": "unknown_project_sector", "payment_mechanism": "unknown_payment_mechanism", "procurement_method": "unknown_procurement_method", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": [], "detected_clause_families": [], "evidence": [], "notes": ["No board, change-order, audit, or project-status artifacts were supplied with the contract package."]}, "outcome_status": "unknown_publicly_documented", "negotiated_changes": [], "obligations_count": 3}, "latest_monitoring": {"run_id": "monitor_20260404T142830904912Z", "project_id": "riverside-bridge", "created_at": "2026-04-04T14:28:30.904912Z", "source_commit_id": "commit_20260404T142830902919Z", "as_of_date": "2026-04-04", "monitored_obligations": [{"obligation_id": "obl_993222db41e8", "title": "Submit certified payroll reports", "source_clause": "Funding Memo.md::Funding Memo.md:L1", "owner_role": "payroll_compliance_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_6d675f182b71", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:L1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e991f59af1c7", "title": "Provide required notice within 7 calendar days", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L7", "owner_role": "project_manager", "severity_if_missed": "high", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_97b4ec229ff6", "obligation_id": "obl_993222db41e8", "created_at": "2026-04-04T14:28:30.904895Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_97b4ec229ff6"}, {"alert_id": "alert_a101e8aba0fe", "obligation_id": "obl_6d675f182b71", "created_at": "2026-04-04T14:28:30.904895Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_a101e8aba0fe"}]}, "documents": [{"document_id": "doc_0576adcb70", "filename": "Funding Memo.md", "document_type": "funding_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 4}], "findings": [{"id": "contract_risk_analyst:payment_terms", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "payment_terms", "severity": "high", "title": "Pay-if-paid structure shifts collection risk downstream", "summary": "Payment appears conditioned on owner payment to the prime contractor.", "recommended_action": "Seek pay-when-paid language or an outside payment deadline.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "Section 7.2 Payment Terms Subcontractor shall be paid on a pay-if-paid basis and payment is conditioned upon receipt of payment from the owner."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:payment_terms"}, {"id": "contract_risk_analyst:indemnity", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "indemnity", "severity": "high", "title": "Broad indemnity language may exceed reasonable contractor risk", "summary": "The package appears to require expansive defense and indemnity obligations.", "recommended_action": "Seek negligence-based limits and remove duty-to-defend language where possible.", "confidence": 0.68, "evidence": [{"document_id": "doc_914932d86c", "location": "General Conditions.md:L1", "excerpt": "Section 4.3 Indemnity Contractor shall defend, indemnify, and hold harmless the owner, whether caused in part by the owner or not."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:indemnity"}, {"id": "contract_risk_analyst:delay_exposure", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "delay_exposure", "severity": "high", "title": "No-damages-for-delay language compresses schedule recovery options", "summary": "Delay remedies appear limited to time extensions rather than monetary recovery.", "recommended_action": "Preserve compensation rights for owner-caused delay, disruption, or resequencing.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L4", "excerpt": "Section 8.4 Delays No damages for delay shall be allowed. The sole remedy for delay is an extension of time."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:delay_exposure"}, {"id": "insurance_requirements_analyst:additional_insured", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "additional_insured", "severity": "high", "title": "Additional-insured requirement needs broker review", "summary": "The package appears to require owner-side additional-insured coverage language.", "recommended_action": "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "Section 10 Insurance Additional insured status is required for ongoing and completed operations. Waiver of subrogation applies. Coverage sh"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:additional_insured"}, {"id": "insurance_requirements_analyst:waiver_subrogation", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "waiver_subrogation", "severity": "medium", "title": "Waiver-of-subrogation language may exceed current program assumptions", "summary": "The package includes waiver-of-subrogation requirements that can affect program cost and claims posture.", "recommended_action": "Confirm carrier availability and price impact before bid submission.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "Section 10 Insurance Additional insured status is required for ongoing and completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required befo"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:waiver_subrogation"}, {"id": "insurance_requirements_analyst:primary_noncontributory", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "primary_noncontributory", "severity": "medium", "title": "Primary and noncontributory wording should be confirmed against available endorsements", "summary": "The insurance stack appears to require primary/noncontributory positioning.", "recommended_action": "Confirm exact endorsement wording and whether it is available on required lines.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "is required for ongoing and completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required before starting work."}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:primary_noncontributory"}, {"id": "insurance_requirements_analyst:completed_operations", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "completed_operations", "severity": "medium", "title": "Completed-operations duration may carry longer-tail cost than expected", "summary": "The package appears to impose completed-operations coverage requirements after project completion.", "recommended_action": "Confirm duration, limits, and compatibility with current carrier terms.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "Section 10 Insurance Additional insured status is required for ongoing and completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insu"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:completed_operations"}, {"id": "funding_compliance_analyst:davis_bacon", "analysis_perspective": "vendor", "role": "funding_compliance_analyst", "category": "davis_bacon", "severity": "high", "title": "Davis-Bacon obligations likely apply", "summary": "The package references federal wage requirements that can materially affect payroll administration.", "recommended_action": "Confirm wage determinations, certified payroll workflow, and subcontractor compliance readiness.", "confidence": 0.68, "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "Section 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals a"}], "uncertainty_notes": [], "source_group": "compliance", "ui_id": "funding_compliance_analyst:davis_bacon"}, {"id": "funding_compliance_analyst:certified_payroll", "analysis_perspective": "vendor", "role": "funding_compliance_analyst", "category": "certified_payroll", "severity": "medium", "title": "Certified payroll administration appears required", "summary": "The package appears to require recurring payroll reporting.", "recommended_action": "Assign payroll compliance ownership and confirm weekly reporting capability before bid submission.", "confidence": 0.68, "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "ction 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply."}], "uncertainty_notes": [], "source_group": "compliance", "ui_id": "funding_compliance_analyst:certified_payroll"}, {"id": "funding_compliance_analyst:dbe_participation", "analysis_perspective": "vendor", "role": "funding_compliance_analyst", "category": "dbe_participation", "severity": "medium", "title": "DBE participation and documentation may require bid-stage planning", "summary": "The package references disadvantaged-business participation or reporting requirements.", "recommended_action": "Confirm bid-stage documentation and post-award tracking expectations.", "confidence": 0.68, "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "deral aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply."}], "uncertainty_notes": [], "source_group": "compliance", "ui_id": "funding_compliance_analyst:dbe_participation"}], "obligations": [{"id": "obl_993222db41e8", "source_clause": "Funding Memo.md::Funding Memo.md:L1", "source_document_id": "doc_0576adcb70", "source_excerpt": "ction 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply.", "title": "Submit certified payroll reports", "obligation_type": "recurring_reporting", "trigger": "during covered work", "due_rule": "weekly during covered work", "owner_role": "payroll_compliance_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "ction 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply."}], "ui_id": "obl_993222db41e8"}, {"id": "obl_6d675f182b71", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:L1", "source_document_id": "doc_6f78fa0858", "source_excerpt": "completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required before starting work.", "title": "Provide certificates of insurance before starting work", "obligation_type": "pre_start_requirement", "trigger": "before mobilization or notice to proceed", "due_rule": "before starting work", "owner_role": "risk_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required before starting work."}], "ui_id": "obl_6d675f182b71"}, {"id": "obl_e991f59af1c7", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L7", "source_document_id": "doc_2b13cd1fb4", "source_excerpt": "", "title": "Provide required notice within 7 calendar days", "obligation_type": "notice_deadline", "trigger": "contractual notice event", "due_rule": "within 7 calendar days", "owner_role": "project_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L7", "excerpt": ""}], "ui_id": "obl_e991f59af1c7"}], "monitored_obligations": [{"obligation_id": "obl_993222db41e8", "title": "Submit certified payroll reports", "source_clause": "Funding Memo.md::Funding Memo.md:L1", "owner_role": "payroll_compliance_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_6d675f182b71", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:L1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e991f59af1c7", "title": "Provide required notice within 7 calendar days", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L7", "owner_role": "project_manager", "severity_if_missed": "high", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_97b4ec229ff6", "obligation_id": "obl_993222db41e8", "created_at": "2026-04-04T14:28:30.904895Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_97b4ec229ff6"}, {"alert_id": "alert_a101e8aba0fe", "obligation_id": "obl_6d675f182b71", "created_at": "2026-04-04T14:28:30.904895Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_a101e8aba0fe"}], "review_actions": [], "diagnostics": [], "severity_counts": {"critical": 0, "high": 5, "medium": 5, "low": 0}, "obligation_status_counts": {"pending": 0, "due": 1, "late": 1, "satisfied": 1}, "timeline": [{"kind": "monitor", "id": "monitor_20260404T142830904912Z", "created_at": "2026-04-04T14:28:30.904912Z", "summary": "2 alerts, 1 late"}, {"kind": "commit", "id": "commit_20260404T142830902919Z", "created_at": "2026-04-04T14:28:30.902919Z", "summary": "5 carried risks, 3 obligations"}, {"kind": "review", "id": "run_20260404T142830899546Z", "created_at": "2026-04-04T14:28:30.899546Z", "summary": "go_with_conditions / high"}], "summary_metrics": {"analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "must_fix_count": 4, "findings_count": 10, "alerts_count": 2, "documents_count": 4, "obligations_count": 3}};
+    const dashboardData = {"project_id": "riverside-bridge", "project_path": null, "case_record": {"project_id": "riverside-bridge", "latest_run_id": "run_20260404T145819434971Z", "latest_analysis_perspective": "vendor", "latest_recommendation": "go_with_conditions", "latest_overall_risk": "high", "latest_agreement_type": "unknown_agreement_type", "latest_project_sector": "unknown_project_sector", "latest_outcome_status": "unknown_publicly_documented", "total_runs": 1, "run_history": [{"run_id": "run_20260404T145819434971Z", "run_type": "bid_review", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:58:19.434971Z", "recommendation": "go_with_conditions", "overall_risk": "high", "artifact_count": 11}], "latest_commit_id": "commit_20260404T145819438499Z", "total_commits": 1, "latest_obligations_count": 3, "commit_history": [{"commit_id": "commit_20260404T145819438499Z", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:58:19.438499Z", "source_run_id": "run_20260404T145819434971Z", "obligations_count": 3, "accepted_risks_count": 5, "negotiated_changes_count": 0}], "latest_monitoring_run_id": "monitor_20260404T145819440863Z", "total_monitoring_runs": 1, "monitoring_history": [{"run_id": "monitor_20260404T145819440863Z", "created_at": "2026-04-04T14:58:19.440863Z", "source_commit_id": "commit_20260404T145819438499Z", "alerts_count": 2, "due_count": 1, "late_count": 1, "satisfied_count": 1}]}, "latest_run": {"run_id": "run_20260404T145819434971Z", "project_id": "riverside-bridge", "created_at": "2026-04-04T14:58:19.434971Z", "decision_summary": {"project_id": "riverside-bridge", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["Pay-if-paid structure shifts collection risk downstream", "Broad indemnity language may exceed reasonable contractor risk", "No-damages-for-delay language compresses schedule recovery options"], "must_fix_before_bid": ["Seek pay-when-paid language or an outside payment deadline.", "Seek negligence-based limits and remove duty-to-defend language where possible.", "Preserve compensation rights for owner-caused delay, disruption, or resequencing.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "document_inventory": {"project_id": "riverside-bridge", "analysis_perspective": "vendor", "documents": [{"document_id": "doc_0576adcb70", "filename": "Funding Memo.md", "document_type": "funding_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 4}], "missing_required_documents": []}, "procurement_profile": {"project_id": "riverside-bridge", "agreement_type": "unknown_agreement_type", "project_sector": "unknown_project_sector", "payment_mechanism": "unknown_payment_mechanism", "procurement_method": "unknown_procurement_method", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": [], "detected_clause_families": [], "evidence": [], "notes": ["No board, change-order, audit, or project-status artifacts were supplied with the contract package."]}, "outcome_evidence": {"project_id": "riverside-bridge", "outcome_status": "unknown_publicly_documented", "governance_artifacts_present": [], "events": [], "coverage_gaps": ["No governance or status documents were supplied, so public outcome evidence is incomplete."], "monitoring_recommendations": ["Collect at least one board action, project status, or audit source so the package has a documented public outcome baseline.", "Preserve later change-order and settlement records because those documents are often the best public evidence of delivery stress."]}, "obligations_count": 3, "context_profile": {"signals": [], "notes": ["Internal-only context is intentionally omitted from the external artifact."], "internal_only": false}}, "latest_commit": {"commit_id": "commit_20260404T145819438499Z", "project_id": "riverside-bridge", "created_at": "2026-04-04T14:58:19.438499Z", "source_run_id": "run_20260404T145819434971Z", "decision_summary": {"project_id": "riverside-bridge", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["Pay-if-paid structure shifts collection risk downstream", "Broad indemnity language may exceed reasonable contractor risk", "No-damages-for-delay language compresses schedule recovery options"], "must_fix_before_bid": ["Seek pay-when-paid language or an outside payment deadline.", "Seek negligence-based limits and remove duty-to-defend language where possible.", "Preserve compensation rights for owner-caused delay, disruption, or resequencing.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "procurement_profile": {"project_id": "riverside-bridge", "agreement_type": "unknown_agreement_type", "project_sector": "unknown_project_sector", "payment_mechanism": "unknown_payment_mechanism", "procurement_method": "unknown_procurement_method", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": [], "detected_clause_families": [], "evidence": [], "notes": ["No board, change-order, audit, or project-status artifacts were supplied with the contract package."]}, "outcome_status": "unknown_publicly_documented", "negotiated_changes": [], "obligations_count": 3}, "latest_monitoring": {"run_id": "monitor_20260404T145819440863Z", "project_id": "riverside-bridge", "created_at": "2026-04-04T14:58:19.440863Z", "source_commit_id": "commit_20260404T145819438499Z", "as_of_date": "2026-04-04", "monitored_obligations": [{"obligation_id": "obl_993222db41e8", "title": "Submit certified payroll reports", "source_clause": "Funding Memo.md::Funding Memo.md:L1", "owner_role": "payroll_compliance_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_6d675f182b71", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:L1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e991f59af1c7", "title": "Provide required notice within 7 calendar days", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L7", "owner_role": "project_manager", "severity_if_missed": "high", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_97b4ec229ff6", "obligation_id": "obl_993222db41e8", "created_at": "2026-04-04T14:58:19.440839Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_97b4ec229ff6"}, {"alert_id": "alert_a101e8aba0fe", "obligation_id": "obl_6d675f182b71", "created_at": "2026-04-04T14:58:19.440839Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_a101e8aba0fe"}]}, "documents": [{"document_id": "doc_0576adcb70", "filename": "Funding Memo.md", "document_type": "funding_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 4}], "findings": [{"id": "contract_risk_analyst:payment_terms", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "payment_terms", "severity": "high", "title": "Pay-if-paid structure shifts collection risk downstream", "summary": "Payment appears conditioned on owner payment to the prime contractor.", "recommended_action": "Seek pay-when-paid language or an outside payment deadline.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "Section 7.2 Payment Terms Subcontractor shall be paid on a pay-if-paid basis and payment is conditioned upon receipt of payment from the owner."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:payment_terms"}, {"id": "contract_risk_analyst:indemnity", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "indemnity", "severity": "high", "title": "Broad indemnity language may exceed reasonable contractor risk", "summary": "The package appears to require expansive defense and indemnity obligations.", "recommended_action": "Seek negligence-based limits and remove duty-to-defend language where possible.", "confidence": 0.68, "evidence": [{"document_id": "doc_914932d86c", "location": "General Conditions.md:L1", "excerpt": "Section 4.3 Indemnity Contractor shall defend, indemnify, and hold harmless the owner, whether caused in part by the owner or not."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:indemnity"}, {"id": "contract_risk_analyst:delay_exposure", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "delay_exposure", "severity": "high", "title": "No-damages-for-delay language compresses schedule recovery options", "summary": "Delay remedies appear limited to time extensions rather than monetary recovery.", "recommended_action": "Preserve compensation rights for owner-caused delay, disruption, or resequencing.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L4", "excerpt": "Section 8.4 Delays No damages for delay shall be allowed. The sole remedy for delay is an extension of time."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:delay_exposure"}, {"id": "insurance_requirements_analyst:additional_insured", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "additional_insured", "severity": "high", "title": "Additional-insured requirement needs broker review", "summary": "The package appears to require owner-side additional-insured coverage language.", "recommended_action": "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "Section 10 Insurance Additional insured status is required for ongoing and completed operations. Waiver of subrogation applies. Coverage sh"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:additional_insured"}, {"id": "insurance_requirements_analyst:waiver_subrogation", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "waiver_subrogation", "severity": "medium", "title": "Waiver-of-subrogation language may exceed current program assumptions", "summary": "The package includes waiver-of-subrogation requirements that can affect program cost and claims posture.", "recommended_action": "Confirm carrier availability and price impact before bid submission.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "Section 10 Insurance Additional insured status is required for ongoing and completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required befo"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:waiver_subrogation"}, {"id": "insurance_requirements_analyst:primary_noncontributory", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "primary_noncontributory", "severity": "medium", "title": "Primary and noncontributory wording should be confirmed against available endorsements", "summary": "The insurance stack appears to require primary/noncontributory positioning.", "recommended_action": "Confirm exact endorsement wording and whether it is available on required lines.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "is required for ongoing and completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required before starting work."}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:primary_noncontributory"}, {"id": "insurance_requirements_analyst:completed_operations", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "completed_operations", "severity": "medium", "title": "Completed-operations duration may carry longer-tail cost than expected", "summary": "The package appears to impose completed-operations coverage requirements after project completion.", "recommended_action": "Confirm duration, limits, and compatibility with current carrier terms.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "Section 10 Insurance Additional insured status is required for ongoing and completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insu"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:completed_operations"}, {"id": "funding_compliance_analyst:davis_bacon", "analysis_perspective": "vendor", "role": "funding_compliance_analyst", "category": "davis_bacon", "severity": "high", "title": "Davis-Bacon obligations likely apply", "summary": "The package references federal wage requirements that can materially affect payroll administration.", "recommended_action": "Confirm wage determinations, certified payroll workflow, and subcontractor compliance readiness.", "confidence": 0.68, "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "Section 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals a"}], "uncertainty_notes": [], "source_group": "compliance", "ui_id": "funding_compliance_analyst:davis_bacon"}, {"id": "funding_compliance_analyst:certified_payroll", "analysis_perspective": "vendor", "role": "funding_compliance_analyst", "category": "certified_payroll", "severity": "medium", "title": "Certified payroll administration appears required", "summary": "The package appears to require recurring payroll reporting.", "recommended_action": "Assign payroll compliance ownership and confirm weekly reporting capability before bid submission.", "confidence": 0.68, "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "ction 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply."}], "uncertainty_notes": [], "source_group": "compliance", "ui_id": "funding_compliance_analyst:certified_payroll"}, {"id": "funding_compliance_analyst:dbe_participation", "analysis_perspective": "vendor", "role": "funding_compliance_analyst", "category": "dbe_participation", "severity": "medium", "title": "DBE participation and documentation may require bid-stage planning", "summary": "The package references disadvantaged-business participation or reporting requirements.", "recommended_action": "Confirm bid-stage documentation and post-award tracking expectations.", "confidence": 0.68, "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "deral aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply."}], "uncertainty_notes": [], "source_group": "compliance", "ui_id": "funding_compliance_analyst:dbe_participation"}], "obligations": [{"id": "obl_993222db41e8", "source_clause": "Funding Memo.md::Funding Memo.md:L1", "source_document_id": "doc_0576adcb70", "source_excerpt": "ction 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply.", "title": "Submit certified payroll reports", "obligation_type": "recurring_reporting", "trigger": "during covered work", "due_rule": "weekly during covered work", "owner_role": "payroll_compliance_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_0576adcb70", "location": "Funding Memo.md:L1", "excerpt": "ction 2 Federal Funding This project uses federal aid and Davis-Bacon prevailing wage requirements. Certified payroll must be submitted weekly. DBE participation goals apply."}], "ui_id": "obl_993222db41e8"}, {"id": "obl_6d675f182b71", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:L1", "source_document_id": "doc_6f78fa0858", "source_excerpt": "completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required before starting work.", "title": "Provide certificates of insurance before starting work", "obligation_type": "pre_start_requirement", "trigger": "before mobilization or notice to proceed", "due_rule": "before starting work", "owner_role": "risk_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:L1", "excerpt": "completed operations. Waiver of subrogation applies. Coverage shall be primary and noncontributory. Certificates of insurance are required before starting work."}], "ui_id": "obl_6d675f182b71"}, {"id": "obl_e991f59af1c7", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L7", "source_document_id": "doc_2b13cd1fb4", "source_excerpt": "", "title": "Provide required notice within 7 calendar days", "obligation_type": "notice_deadline", "trigger": "contractual notice event", "due_rule": "within 7 calendar days", "owner_role": "project_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L7", "excerpt": ""}], "ui_id": "obl_e991f59af1c7"}], "monitored_obligations": [{"obligation_id": "obl_993222db41e8", "title": "Submit certified payroll reports", "source_clause": "Funding Memo.md::Funding Memo.md:L1", "owner_role": "payroll_compliance_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_6d675f182b71", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:L1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e991f59af1c7", "title": "Provide required notice within 7 calendar days", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L7", "owner_role": "project_manager", "severity_if_missed": "high", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_97b4ec229ff6", "obligation_id": "obl_993222db41e8", "created_at": "2026-04-04T14:58:19.440839Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_97b4ec229ff6"}, {"alert_id": "alert_a101e8aba0fe", "obligation_id": "obl_6d675f182b71", "created_at": "2026-04-04T14:58:19.440839Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_a101e8aba0fe"}], "review_actions": [], "diagnostics": [], "severity_counts": {"critical": 0, "high": 5, "medium": 5, "low": 0}, "obligation_status_counts": {"pending": 0, "due": 1, "late": 1, "satisfied": 1}, "timeline": [{"kind": "monitor", "id": "monitor_20260404T145819440863Z", "created_at": "2026-04-04T14:58:19.440863Z", "summary": "2 alerts, 1 late"}, {"kind": "commit", "id": "commit_20260404T145819438499Z", "created_at": "2026-04-04T14:58:19.438499Z", "summary": "5 carried risks, 3 obligations"}, {"kind": "review", "id": "run_20260404T145819434971Z", "created_at": "2026-04-04T14:58:19.434971Z", "summary": "go_with_conditions / high"}], "summary_metrics": {"analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "must_fix_count": 4, "findings_count": 10, "alerts_count": 2, "documents_count": 4, "obligations_count": 3}};
     const initialReportMode = "external";
     const fixedReportMode = initialReportMode === "external";
     const reviewStorageKey = `contract-intelligence-review-actions:${dashboardData.project_id}`;
@@ -1028,10 +1114,10 @@
         return;
       }
       node.innerHTML = `
-        <div class="summary-pill" style="align-items:flex-start; gap:12px; background:rgba(201,107,44,0.12); border-color:rgba(201,107,44,0.24);">
+        <div class="summary-pill warning-pill">
           <div>
             <strong>Local review cache reset</strong>
-            <div class="note" style="margin-top:6px;">${safe(localCacheWarning)}</div>
+            <div class="note note-tight">${safe(localCacheWarning)}</div>
           </div>
           <button type="button" class="action-button subtle" data-reset-local-review-cache="true">Clear local cache</button>
         </div>

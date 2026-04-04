@@ -3,26 +3,35 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111d">
   <title>Contract Intelligence Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <style>
     :root {
-      color-scheme: light;
-      --sand: #f4efe6;
-      --paper: #fbf8f2;
-      --panel: rgba(255, 255, 255, 0.92);
-      --panel-strong: #ffffff;
-      --ink: #132238;
-      --muted: #5c6874;
-      --line: rgba(19, 34, 56, 0.10);
-      --accent: #0f7662;
-      --accent-2: #c96b2c;
-      --risk: #9e2a2b;
-      --warn: #a16207;
-      --glow: rgba(15, 118, 98, 0.18);
-      --shadow: 0 18px 60px rgba(19, 34, 56, 0.10);
-      --radius-xl: 28px;
-      --radius-lg: 20px;
-      --radius-md: 14px;
+      color-scheme: dark;
+      --bg: #07111d;
+      --bg-deep: #030711;
+      --panel: rgba(8, 19, 34, 0.82);
+      --panel-strong: rgba(13, 29, 51, 0.94);
+      --panel-soft: rgba(9, 20, 36, 0.68);
+      --ink: #edf4ff;
+      --muted: #95a8c2;
+      --line: rgba(148, 163, 184, 0.17);
+      --line-strong: rgba(125, 211, 252, 0.24);
+      --accent: #48e5c2;
+      --accent-2: #ff9666;
+      --accent-3: #7dc3ff;
+      --risk: #ff7687;
+      --warn: #ffbc69;
+      --good: #66efc6;
+      --glow: rgba(72, 229, 194, 0.22);
+      --shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+      --radius-xl: 32px;
+      --radius-lg: 24px;
+      --radius-md: 18px;
     }
 
     * { box-sizing: border-box; }
@@ -31,57 +40,94 @@
       margin: 0;
       color: var(--ink);
       background:
-        radial-gradient(circle at 0% 0%, rgba(201, 107, 44, 0.14), transparent 30%),
-        radial-gradient(circle at 100% 20%, rgba(15, 118, 98, 0.18), transparent 36%),
-        linear-gradient(180deg, #f7f0e6 0%, #f4f6f7 44%, #eef2f3 100%);
-      font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+        radial-gradient(circle at 12% 10%, rgba(72, 229, 194, 0.14), transparent 24%),
+        radial-gradient(circle at 88% 12%, rgba(255, 150, 102, 0.18), transparent 24%),
+        radial-gradient(circle at 50% 85%, rgba(125, 195, 255, 0.12), transparent 32%),
+        linear-gradient(180deg, #08111d 0%, #060c16 48%, #04070e 100%);
+      font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI Variable Text", sans-serif;
       min-height: 100vh;
     }
 
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(rgba(125, 195, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(125, 195, 255, 0.05) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 92%);
+      opacity: 0.34;
+    }
+
     .shell {
+      position: relative;
       max-width: 1440px;
       margin: 0 auto;
       padding: 28px 18px 56px;
+    }
+
+    .shell::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 0% 0%, rgba(72, 229, 194, 0.08), transparent 26%),
+        radial-gradient(circle at 100% 20%, rgba(255, 150, 102, 0.10), transparent 26%);
+      z-index: 0;
     }
 
     .masthead {
       position: relative;
       overflow: hidden;
       background:
-        linear-gradient(135deg, rgba(255,255,255,0.90), rgba(255,255,255,0.74)),
-        linear-gradient(135deg, rgba(15,118,98,0.08), rgba(201,107,44,0.10));
-      border: 1px solid rgba(255,255,255,0.65);
+        linear-gradient(160deg, rgba(12, 27, 47, 0.96), rgba(7, 16, 29, 0.88)),
+        var(--panel-strong);
+      border: 1px solid var(--line);
       border-radius: var(--radius-xl);
       box-shadow: var(--shadow);
-      padding: 28px;
-      backdrop-filter: blur(12px);
+      padding: 30px;
+      backdrop-filter: blur(18px);
+      z-index: 1;
+    }
+
+    .masthead::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(135deg, rgba(125, 195, 255, 0.14), transparent 34%, transparent 64%, rgba(72, 229, 194, 0.10));
     }
 
     .masthead::after {
       content: "";
       position: absolute;
-      inset: auto -10% -40% 50%;
-      height: 220px;
-      background: radial-gradient(circle, rgba(15,118,98,0.10), transparent 65%);
+      inset: auto -10% -46% 44%;
+      height: 260px;
+      background: radial-gradient(circle, rgba(72, 229, 194, 0.16), transparent 65%);
       pointer-events: none;
     }
 
     .eyebrow {
-      font: 700 0.74rem/1.2 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.75rem/1.2 "IBM Plex Mono", monospace;
       letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--accent);
+      color: var(--accent-3);
       margin-bottom: 14px;
     }
 
     h1, h2, h3 {
       margin: 0;
       color: var(--ink);
+      font-family: "Space Grotesk", "Avenir Next", sans-serif;
+      letter-spacing: -0.03em;
     }
 
     h1 {
-      font: 700 clamp(2.2rem, 5vw, 4.2rem)/0.94 "Avenir Next Condensed", "Avenir Next", "Segoe UI Variable Display", sans-serif;
-      letter-spacing: -0.04em;
+      font: 700 clamp(2.5rem, 5vw, 4.4rem)/0.92 "Space Grotesk", "Avenir Next", sans-serif;
       max-width: 12ch;
     }
 
@@ -89,8 +135,8 @@
       margin-top: 14px;
       max-width: 72ch;
       color: var(--muted);
-      font-size: 1.02rem;
-      line-height: 1.6;
+      font-size: 1rem;
+      line-height: 1.72;
     }
 
     .hero-grid {
@@ -104,16 +150,28 @@
     .card,
     .workspace,
     .subpanel {
-      background: var(--panel);
+      background:
+        linear-gradient(180deg, rgba(12, 27, 47, 0.86), rgba(7, 16, 29, 0.72)),
+        var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      box-shadow: 0 10px 35px rgba(19, 34, 56, 0.06);
-      backdrop-filter: blur(10px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(18px);
     }
 
     .hero-panel {
+      position: relative;
       padding: 22px;
       min-height: 100%;
+    }
+
+    .hero-panel::before,
+    .workspace::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(125, 195, 255, 0.08), transparent 36%, transparent 70%, rgba(72, 229, 194, 0.06));
     }
 
     .kpis {
@@ -126,19 +184,19 @@
     .kpi {
       padding: 18px;
       border-radius: var(--radius-md);
-      background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(255,255,255,0.80));
-      border: 1px solid rgba(19, 34, 56, 0.08);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.92), rgba(10, 22, 39, 0.80));
+      border: 1px solid rgba(125, 211, 252, 0.12);
     }
 
     .kpi .value {
-      font: 700 1.9rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 700 1.9rem/1 "Space Grotesk", "Avenir Next", sans-serif;
       letter-spacing: -0.04em;
       margin-bottom: 6px;
     }
 
     .kpi .label {
       color: var(--muted);
-      font: 600 0.86rem/1.3 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.74rem/1.4 "IBM Plex Mono", monospace;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
@@ -156,24 +214,24 @@
       gap: 8px;
       padding: 9px 14px;
       border-radius: 999px;
-      font: 700 0.8rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
-      letter-spacing: 0.05em;
+      font: 600 0.74rem/1 "IBM Plex Mono", monospace;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      background: rgba(255,255,255,0.88);
-      border: 1px solid rgba(19, 34, 56, 0.08);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(125, 211, 252, 0.16);
     }
 
-    .badge.risk { color: var(--risk); }
-    .badge.warn { color: var(--warn); }
-    .badge.good { color: var(--accent); }
+    .badge.risk { color: var(--risk); border-color: rgba(255, 118, 135, 0.22); }
+    .badge.warn { color: var(--warn); border-color: rgba(255, 188, 105, 0.22); }
+    .badge.good { color: var(--good); border-color: rgba(102, 239, 198, 0.22); }
 
     .mode-switch {
       display: inline-flex;
       gap: 8px;
       padding: 6px;
       border-radius: 999px;
-      background: rgba(19,34,56,0.06);
-      border: 1px solid rgba(19,34,56,0.08);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(125, 211, 252, 0.12);
       margin-bottom: 10px;
     }
 
@@ -185,9 +243,9 @@
       padding: 10px 14px;
       border-radius: 999px;
       cursor: pointer;
-      font: 700 0.82rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.75rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       transition: background 150ms ease, color 150ms ease, transform 150ms ease;
     }
 
@@ -196,14 +254,14 @@
     }
 
     .mode-button.is-active {
-      background: linear-gradient(135deg, rgba(15,118,98,0.18), rgba(255,255,255,0.95));
+      background: linear-gradient(135deg, rgba(72, 229, 194, 0.18), rgba(125, 195, 255, 0.10));
       color: var(--ink);
-      box-shadow: inset 0 0 0 1px rgba(15,118,98,0.18);
+      box-shadow: inset 0 0 0 1px rgba(72, 229, 194, 0.18);
     }
 
     .mode-caption {
       color: var(--muted);
-      font: 500 0.92rem/1.5 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.92rem/1.6 "IBM Plex Sans", sans-serif;
       margin: 0 0 16px;
     }
 
@@ -220,10 +278,21 @@
       gap: 8px;
       padding: 10px 12px;
       border-radius: 14px;
-      background: rgba(255,255,255,0.86);
-      border: 1px solid rgba(19,34,56,0.08);
-      font: 700 0.8rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(125, 211, 252, 0.12);
+      font: 600 0.76rem/1 "IBM Plex Mono", monospace;
       color: var(--ink);
+    }
+
+    .warning-pill {
+      align-items: flex-start;
+      gap: 12px;
+      background: rgba(255, 150, 102, 0.10);
+      border-color: rgba(255, 188, 105, 0.22);
+    }
+
+    .note-tight {
+      margin-top: 6px;
     }
 
     .confidence-wrap {
@@ -233,14 +302,14 @@
     .confidence-track {
       height: 12px;
       border-radius: 999px;
-      background: linear-gradient(90deg, rgba(158,42,43,0.16), rgba(201,107,44,0.18), rgba(15,118,98,0.18));
+      background: linear-gradient(90deg, rgba(255, 118, 135, 0.14), rgba(255, 188, 105, 0.16), rgba(72, 229, 194, 0.16));
       overflow: hidden;
     }
 
     .confidence-fill {
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #d86d4f, #0f7662);
+      background: linear-gradient(90deg, #ff9666, #48e5c2);
       box-shadow: 0 0 28px var(--glow);
     }
 
@@ -259,10 +328,10 @@
     }
 
     .rail h2 {
-      font: 700 1rem/1.1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.82rem/1.1 "IBM Plex Mono", monospace;
       margin-bottom: 14px;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.12em;
       color: var(--muted);
     }
 
@@ -273,14 +342,14 @@
 
     .nav-button {
       appearance: none;
-      border: 1px solid rgba(19, 34, 56, 0.08);
+      border: 1px solid rgba(125, 211, 252, 0.12);
       border-radius: 16px;
-      background: rgba(255,255,255,0.75);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.82), rgba(10, 22, 39, 0.72));
       padding: 14px 16px;
       text-align: left;
       cursor: pointer;
       color: var(--ink);
-      font: 700 0.92rem/1.2 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.88rem/1.2 "Space Grotesk", sans-serif;
       transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
     }
 
@@ -288,7 +357,7 @@
       display: block;
       margin-top: 6px;
       color: var(--muted);
-      font: 500 0.76rem/1.4 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 500 0.72rem/1.4 "IBM Plex Mono", monospace;
       text-transform: uppercase;
       letter-spacing: 0.06em;
     }
@@ -296,11 +365,12 @@
     .nav-button:hover,
     .nav-button[aria-selected="true"] {
       transform: translateX(3px);
-      background: linear-gradient(135deg, rgba(15,118,98,0.12), rgba(255,255,255,0.92));
-      border-color: rgba(15,118,98,0.28);
+      background: linear-gradient(135deg, rgba(72, 229, 194, 0.14), rgba(125, 195, 255, 0.08));
+      border-color: rgba(72, 229, 194, 0.28);
     }
 
     .workspace {
+      position: relative;
       overflow: hidden;
       padding: 18px;
     }
@@ -334,6 +404,8 @@
     .section-head p {
       margin: 8px 0 0;
       max-width: 70ch;
+      color: var(--muted);
+      line-height: 1.6;
     }
 
     .control-row {
@@ -346,11 +418,11 @@
     .control-row input,
     .control-row select {
       appearance: none;
-      border: 1px solid rgba(19,34,56,0.12);
-      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(125, 211, 252, 0.12);
+      background: rgba(7, 17, 29, 0.86);
       border-radius: 12px;
       padding: 12px 14px;
-      font: 500 0.92rem/1 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.92rem/1 "IBM Plex Sans", sans-serif;
       color: var(--ink);
       min-width: 180px;
     }
@@ -364,11 +436,11 @@
     .chip {
       border-radius: 999px;
       padding: 8px 12px;
-      background: rgba(15,118,98,0.08);
-      border: 1px solid rgba(15,118,98,0.14);
-      font: 700 0.76rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      background: rgba(72, 229, 194, 0.10);
+      border: 1px solid rgba(72, 229, 194, 0.16);
+      font: 600 0.74rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
       color: var(--accent);
     }
 
@@ -396,13 +468,21 @@
     .stat-card {
       padding: 18px;
       border-radius: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(255,255,255,0.78));
-      border: 1px solid rgba(19,34,56,0.08);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.86), rgba(10, 22, 39, 0.70));
+      border: 1px solid rgba(125, 211, 252, 0.12);
     }
 
     .stat-card .number {
-      font: 700 2rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 700 2rem/1 "Space Grotesk", sans-serif;
       letter-spacing: -0.05em;
+    }
+
+    .stat-card .label {
+      margin-top: 8px;
+      color: var(--muted);
+      font: 600 0.72rem/1.4 "IBM Plex Mono", monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
 
     .stack {
@@ -418,9 +498,9 @@
     .doc-card,
     .review-card,
     .detail-card {
-      border: 1px solid rgba(19,34,56,0.08);
+      border: 1px solid rgba(125, 211, 252, 0.12);
       border-radius: 18px;
-      background: rgba(255,255,255,0.88);
+      background: linear-gradient(180deg, rgba(12, 27, 47, 0.86), rgba(8, 18, 33, 0.72));
       padding: 16px;
     }
 
@@ -432,7 +512,7 @@
     .doc-card h3,
     .review-card h3,
     .detail-card h3 {
-      font: 700 1rem/1.25 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 1rem/1.25 "Space Grotesk", sans-serif;
       margin-bottom: 8px;
     }
 
@@ -443,14 +523,14 @@
 
     .interactive-card:hover {
       transform: translateY(-1px);
-      border-color: rgba(15,118,98,0.22);
-      box-shadow: 0 12px 28px rgba(19,34,56,0.08);
+      border-color: rgba(72, 229, 194, 0.22);
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
     }
 
     .interactive-card.active {
-      border-color: rgba(15,118,98,0.32);
-      box-shadow: 0 14px 34px rgba(15,118,98,0.12);
-      background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(236,248,245,0.92));
+      border-color: rgba(72, 229, 194, 0.32);
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
+      background: linear-gradient(180deg, rgba(17, 35, 60, 0.96), rgba(9, 20, 36, 0.88));
     }
 
     .meta {
@@ -465,11 +545,11 @@
       align-items: center;
       padding: 6px 10px;
       border-radius: 999px;
-      background: rgba(19,34,56,0.05);
+      background: rgba(255,255,255,0.05);
       color: var(--muted);
-      font: 700 0.72rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.7rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
 
     .severity-critical { color: var(--risk); }
@@ -489,7 +569,7 @@
       top: 0;
       bottom: 0;
       width: 2px;
-      background: linear-gradient(180deg, rgba(15,118,98,0.26), rgba(201,107,44,0.24));
+      background: linear-gradient(180deg, rgba(72, 229, 194, 0.30), rgba(255, 150, 102, 0.24));
     }
 
     .timeline-item {
@@ -506,7 +586,7 @@
       height: 12px;
       border-radius: 999px;
       background: var(--accent);
-      box-shadow: 0 0 0 6px rgba(15,118,98,0.12);
+      box-shadow: 0 0 0 6px rgba(72, 229, 194, 0.12);
     }
 
     .columns {
@@ -518,8 +598,8 @@
     .column {
       border-radius: 18px;
       padding: 14px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.82), rgba(255,255,255,0.64));
-      border: 1px solid rgba(19,34,56,0.08);
+      background: linear-gradient(180deg, rgba(18, 37, 63, 0.82), rgba(10, 22, 39, 0.66));
+      border: 1px solid rgba(125, 211, 252, 0.12);
       min-height: 220px;
     }
 
@@ -536,14 +616,14 @@
       top: 18px;
       border-radius: 20px;
       padding: 18px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.94), rgba(249,252,251,0.82));
-      border: 1px solid rgba(19,34,56,0.08);
-      box-shadow: 0 16px 40px rgba(19,34,56,0.08);
+      background: linear-gradient(180deg, rgba(15, 31, 53, 0.94), rgba(8, 18, 33, 0.84));
+      border: 1px solid rgba(125, 211, 252, 0.14);
+      box-shadow: 0 20px 56px rgba(0, 0, 0, 0.34);
     }
 
     .detail-divider {
       height: 1px;
-      background: rgba(19,34,56,0.10);
+      background: rgba(148, 163, 184, 0.14);
       margin: 16px 0;
     }
 
@@ -567,9 +647,9 @@
     .review-form label {
       display: grid;
       gap: 6px;
-      font: 700 0.78rem/1.25 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.74rem/1.3 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
       color: var(--muted);
     }
 
@@ -578,11 +658,11 @@
     .review-form textarea {
       width: 100%;
       appearance: none;
-      border: 1px solid rgba(19,34,56,0.12);
-      background: rgba(255,255,255,0.96);
+      border: 1px solid rgba(125, 211, 252, 0.12);
+      background: rgba(7, 17, 29, 0.84);
       border-radius: 12px;
       padding: 12px 14px;
-      font: 500 0.92rem/1.35 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.92rem/1.35 "IBM Plex Sans", sans-serif;
       color: var(--ink);
     }
 
@@ -599,60 +679,66 @@
 
     .action-button {
       appearance: none;
-      border: 1px solid rgba(15,118,98,0.18);
-      background: linear-gradient(135deg, rgba(15,118,98,0.12), rgba(255,255,255,0.94));
+      border: 1px solid rgba(72, 229, 194, 0.18);
+      background: linear-gradient(135deg, rgba(72, 229, 194, 0.12), rgba(125, 195, 255, 0.06));
       color: var(--ink);
       border-radius: 12px;
       padding: 10px 14px;
       cursor: pointer;
-      font: 700 0.82rem/1 "Avenir Next", "Segoe UI Variable Display", sans-serif;
+      font: 600 0.75rem/1 "IBM Plex Mono", monospace;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
+      letter-spacing: 0.08em;
     }
 
     .action-button.subtle {
-      border-color: rgba(19,34,56,0.10);
-      background: rgba(255,255,255,0.90);
+      border-color: rgba(148, 163, 184, 0.14);
+      background: rgba(255,255,255,0.04);
     }
 
     .note {
       margin: 0;
       color: var(--muted);
-      font: 500 0.88rem/1.5 "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      font: 500 0.88rem/1.6 "IBM Plex Sans", sans-serif;
     }
 
     .doc-table {
       width: 100%;
       border-collapse: collapse;
-      background: rgba(255,255,255,0.84);
+      background: rgba(7, 17, 29, 0.76);
       border-radius: 18px;
       overflow: hidden;
-      border: 1px solid rgba(19,34,56,0.08);
+      border: 1px solid rgba(125, 211, 252, 0.12);
     }
 
     .doc-table th,
     .doc-table td {
       padding: 12px 14px;
       text-align: left;
-      border-bottom: 1px solid rgba(19,34,56,0.08);
-      font-family: "Avenir Next", "Segoe UI Variable Text", sans-serif;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.10);
+      font-family: "IBM Plex Sans", sans-serif;
       font-size: 0.92rem;
     }
 
     .doc-table th {
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: 0.74rem;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.1em;
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .doc-table tr:last-child th,
+    .doc-table tr:last-child td {
+      border-bottom: none;
     }
 
     .empty {
       padding: 28px 20px;
       text-align: center;
       color: var(--muted);
-      border: 1px dashed rgba(19,34,56,0.16);
+      border: 1px dashed rgba(125, 211, 252, 0.18);
       border-radius: 18px;
-      background: rgba(255,255,255,0.54);
+      background: rgba(255,255,255,0.03);
     }
 
     @media (max-width: 1120px) {
@@ -946,7 +1032,7 @@
   </div>
 
   <script>
-    const dashboardData = {"project_id": "caltrans-cmgc-context", "project_path": null, "case_record": {"project_id": "caltrans-cmgc-context", "latest_run_id": "run_20260404T142830875363Z", "latest_analysis_perspective": "vendor", "latest_recommendation": "go_with_conditions", "latest_overall_risk": "high", "latest_agreement_type": "cmgc_preconstruction_services", "latest_project_sector": "bridges", "latest_outcome_status": "scope_rescope", "total_runs": 1, "run_history": [{"run_id": "run_20260404T142830875363Z", "run_type": "bid_review", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:28:30.875363Z", "recommendation": "go_with_conditions", "overall_risk": "high", "artifact_count": 11}], "latest_commit_id": "commit_20260404T142830880658Z", "total_commits": 1, "latest_obligations_count": 3, "commit_history": [{"commit_id": "commit_20260404T142830880658Z", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:28:30.880658Z", "source_run_id": "run_20260404T142830875363Z", "obligations_count": 3, "accepted_risks_count": 2, "negotiated_changes_count": 0}], "latest_monitoring_run_id": "monitor_20260404T142830883043Z", "total_monitoring_runs": 1, "monitoring_history": [{"run_id": "monitor_20260404T142830883043Z", "created_at": "2026-04-04T14:28:30.883043Z", "source_commit_id": "commit_20260404T142830880658Z", "alerts_count": 2, "due_count": 1, "late_count": 1, "satisfied_count": 1}]}, "latest_run": {"run_id": "run_20260404T142830875363Z", "project_id": "caltrans-cmgc-context", "created_at": "2026-04-04T14:28:30.875363Z", "decision_summary": {"project_id": "caltrans-cmgc-context", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["CMGC pricing off-ramp may leave preconstruction effort stranded", "Additional-insured requirement needs broker review", "Appropriation contingency can trigger downscope or cancellation risk"], "must_fix_before_bid": ["Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "document_inventory": {"project_id": "caltrans-cmgc-context", "analysis_perspective": "vendor", "documents": [{"document_id": "doc_2a8e2c8ee6", "filename": "Board Resolution.md", "document_type": "board_record", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 5}, {"document_id": "doc_9ea62dd2ed", "filename": "Project Status Dashboard.md", "document_type": "project_status", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_dab4eba677", "filename": "Proposed Budget FY2027.md", "document_type": "budget_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_11a0e4bfd7", "filename": "RFQ Procurement Package.md", "document_type": "procurement_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}], "missing_required_documents": []}, "procurement_profile": {"project_id": "caltrans-cmgc-context", "agreement_type": "cmgc_preconstruction_services", "project_sector": "bridges", "payment_mechanism": "guaranteed_maximum_price", "procurement_method": "qbs_or_rfq", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": ["board_minutes", "project_status", "settlement_resolution"], "detected_clause_families": ["appropriation_limit", "gmp_offramp", "independent_cost_estimator", "open_book_cost_model", "public_records_handling", "reporting_wbs"], "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "reconstruction Services Contract does not obligate the owner to award construction services. If the guaranteed maximum price is not accepted, the owner may re-advertise the work."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L5", "excerpt": "Section 2 Funding This agreement is subject to availability of funds appropriated through the Budget Act."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L8", "excerpt": "Section 3 Open Book Contractor shall maintain open-book cost model records. If the agency receives a Public Records Act"}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L11", "excerpt": "Section 4 Estimate Reconciliation Owner may retain an Independent Cost Estimator (ICE) to reconcile estimates."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L14", "excerpt": "Section 5 Reporting Contractor shall provide monthly progress reports by Work Breakdown Structure (WBS)."}], "notes": ["Package includes governance or status records that can support outcome-aware contract analysis.", "CMGC-style preconstruction language was detected; later GMP and construction-award decisions should be tracked separately."]}, "outcome_evidence": {"project_id": "caltrans-cmgc-context", "outcome_status": "scope_rescope", "governance_artifacts_present": ["board_minutes", "project_status", "settlement_resolution"], "events": [{"event_type": "award", "impact_types": [], "summary": "Award activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "project_status", "evidence_source_type": "project_dashboard", "evidence": [{"document_id": "doc_9ea62dd2ed", "location": "Project Status Dashboard.md:paragraph_1", "excerpt": "Project awarded in 2025. Estimated completion 2026. 45 percent complete."}]}, {"event_type": "project_status_update", "impact_types": [], "summary": "A project status or progress update appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "project_status", "evidence_source_type": "project_dashboard", "evidence": [{"document_id": "doc_9ea62dd2ed", "location": "Project Status Dashboard.md:paragraph_1", "excerpt": "Project awarded in 2025. Estimated completion 2026. 45 percent complete."}]}, {"event_type": "change_order", "impact_types": ["scope_change"], "summary": "Change-order activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "board_record", "evidence_source_type": "council_resolution", "evidence": [{"document_id": "doc_2a8e2c8ee6", "location": "Board Resolution.md:paragraph_1", "excerpt": "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall."}]}, {"event_type": "settlement", "impact_types": ["scope_change", "cost_overrun"], "summary": "Settlement or release activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "board_record", "evidence_source_type": "council_resolution", "evidence": [{"document_id": "doc_2a8e2c8ee6", "location": "Board Resolution.md:paragraph_1", "excerpt": "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall."}]}, {"event_type": "scope_change", "impact_types": ["scope_change", "cost_overrun"], "summary": "Rescoping or cost-escalation activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "board_record", "evidence_source_type": "council_resolution", "evidence": [{"document_id": "doc_2a8e2c8ee6", "location": "Board Resolution.md:paragraph_1", "excerpt": "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall."}]}], "coverage_gaps": [], "monitoring_recommendations": ["Track GMP acceptance, independent cost-estimate reconciliation, and any owner decision to re-advertise or defer construction award.", "Preserve later change-order and settlement records because those documents are often the best public evidence of delivery stress."]}, "obligations_count": 3, "context_profile": {"signals": [], "notes": ["Internal-only context is intentionally omitted from the external artifact."], "internal_only": false}}, "latest_commit": {"commit_id": "commit_20260404T142830880658Z", "project_id": "caltrans-cmgc-context", "created_at": "2026-04-04T14:28:30.880658Z", "source_run_id": "run_20260404T142830875363Z", "decision_summary": {"project_id": "caltrans-cmgc-context", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["CMGC pricing off-ramp may leave preconstruction effort stranded", "Additional-insured requirement needs broker review", "Appropriation contingency can trigger downscope or cancellation risk"], "must_fix_before_bid": ["Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "procurement_profile": {"project_id": "caltrans-cmgc-context", "agreement_type": "cmgc_preconstruction_services", "project_sector": "bridges", "payment_mechanism": "guaranteed_maximum_price", "procurement_method": "qbs_or_rfq", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": ["board_minutes", "project_status", "settlement_resolution"], "detected_clause_families": ["appropriation_limit", "gmp_offramp", "independent_cost_estimator", "open_book_cost_model", "public_records_handling", "reporting_wbs"], "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "reconstruction Services Contract does not obligate the owner to award construction services. If the guaranteed maximum price is not accepted, the owner may re-advertise the work."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L5", "excerpt": "Section 2 Funding This agreement is subject to availability of funds appropriated through the Budget Act."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L8", "excerpt": "Section 3 Open Book Contractor shall maintain open-book cost model records. If the agency receives a Public Records Act"}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L11", "excerpt": "Section 4 Estimate Reconciliation Owner may retain an Independent Cost Estimator (ICE) to reconcile estimates."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L14", "excerpt": "Section 5 Reporting Contractor shall provide monthly progress reports by Work Breakdown Structure (WBS)."}], "notes": ["Package includes governance or status records that can support outcome-aware contract analysis.", "CMGC-style preconstruction language was detected; later GMP and construction-award decisions should be tracked separately."]}, "outcome_status": "scope_rescope", "negotiated_changes": [], "obligations_count": 3}, "latest_monitoring": {"run_id": "monitor_20260404T142830883043Z", "project_id": "caltrans-cmgc-context", "created_at": "2026-04-04T14:28:30.883043Z", "source_commit_id": "commit_20260404T142830880658Z", "as_of_date": "2026-04-04", "monitored_obligations": [{"obligation_id": "obl_c4209290ab70", "title": "Provide required notice within 10 business days", "source_clause": "General Conditions.md::General Conditions.md:paragraph_1", "owner_role": "project_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e51092f6dd84", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:paragraph_1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_812351987b94", "title": "Submit monthly progress reports by work breakdown structure", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L14", "owner_role": "project_controls_manager", "severity_if_missed": "medium", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_545efb5cc185", "obligation_id": "obl_c4209290ab70", "created_at": "2026-04-04T14:28:30.883021Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_545efb5cc185"}, {"alert_id": "alert_c18ecaa07a0c", "obligation_id": "obl_e51092f6dd84", "created_at": "2026-04-04T14:28:30.883021Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_c18ecaa07a0c"}]}, "documents": [{"document_id": "doc_2a8e2c8ee6", "filename": "Board Resolution.md", "document_type": "board_record", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 5}, {"document_id": "doc_9ea62dd2ed", "filename": "Project Status Dashboard.md", "document_type": "project_status", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_dab4eba677", "filename": "Proposed Budget FY2027.md", "document_type": "budget_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_11a0e4bfd7", "filename": "RFQ Procurement Package.md", "document_type": "procurement_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}], "findings": [{"id": "contract_risk_analyst:cmgc_offramp", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "cmgc_offramp", "severity": "high", "title": "CMGC pricing off-ramp may leave preconstruction effort stranded", "summary": "The package appears to let the owner reject GMP pricing or decline a later construction award.", "recommended_action": "Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "reconstruction Services Contract does not obligate the owner to award construction services. If the guaranteed maximum price is not accepted, the owner may re-advertise the work."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:cmgc_offramp"}, {"id": "contract_risk_analyst:appropriation_limit", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "appropriation_limit", "severity": "medium", "title": "Appropriation contingency can trigger downscope or cancellation risk", "summary": "Public funding language appears to limit enforceability to appropriated or available funds.", "recommended_action": "Tie any non-appropriation exit to payment for work performed, demobilization, and orderly scope reduction.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L5", "excerpt": "Section 2 Funding This agreement is subject to availability of funds appropriated through the Budget Act."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:appropriation_limit"}, {"id": "insurance_requirements_analyst:additional_insured", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "additional_insured", "severity": "high", "title": "Additional-insured requirement needs broker review", "summary": "The package appears to require owner-side additional-insured coverage language.", "recommended_action": "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:paragraph_1", "excerpt": "Additional insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificat"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:additional_insured"}, {"id": "insurance_requirements_analyst:umbrella_drop_down", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "umbrella_drop_down", "severity": "medium", "title": "Umbrella drop-down wording may exceed standard market terms", "summary": "The package appears to require umbrella or excess coverage to drop down if primary limits are impaired or exhausted.", "recommended_action": "Confirm market availability, price impact, and whether the drop-down feature can be limited to commercially available forms.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:paragraph_1", "excerpt": "Additional insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificates of insurance are required before starting work."}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:umbrella_drop_down"}], "obligations": [{"id": "obl_c4209290ab70", "source_clause": "General Conditions.md::General Conditions.md:paragraph_1", "source_document_id": "doc_914932d86c", "source_excerpt": "Notice of claim must be provided within 10 business days.", "title": "Provide required notice within 10 business days", "obligation_type": "notice_deadline", "trigger": "contractual notice event", "due_rule": "within 10 business days", "owner_role": "project_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_914932d86c", "location": "General Conditions.md:paragraph_1", "excerpt": "Notice of claim must be provided within 10 business days."}], "ui_id": "obl_c4209290ab70"}, {"id": "obl_e51092f6dd84", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:paragraph_1", "source_document_id": "doc_6f78fa0858", "source_excerpt": "al insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificates of insurance are required before starting work.", "title": "Provide certificates of insurance before starting work", "obligation_type": "pre_start_requirement", "trigger": "before mobilization or notice to proceed", "due_rule": "before starting work", "owner_role": "risk_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:paragraph_1", "excerpt": "al insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificates of insurance are required before starting work."}], "ui_id": "obl_e51092f6dd84"}, {"id": "obl_812351987b94", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L14", "source_document_id": "doc_2b13cd1fb4", "source_excerpt": "", "title": "Submit monthly progress reports by work breakdown structure", "obligation_type": "recurring_reporting", "trigger": "during preconstruction or active delivery", "due_rule": "monthly, mapped to WBS elements when required", "owner_role": "project_controls_manager", "severity_if_missed": "medium", "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L14", "excerpt": ""}], "ui_id": "obl_812351987b94"}], "monitored_obligations": [{"obligation_id": "obl_c4209290ab70", "title": "Provide required notice within 10 business days", "source_clause": "General Conditions.md::General Conditions.md:paragraph_1", "owner_role": "project_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e51092f6dd84", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:paragraph_1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_812351987b94", "title": "Submit monthly progress reports by work breakdown structure", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L14", "owner_role": "project_controls_manager", "severity_if_missed": "medium", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_545efb5cc185", "obligation_id": "obl_c4209290ab70", "created_at": "2026-04-04T14:28:30.883021Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_545efb5cc185"}, {"alert_id": "alert_c18ecaa07a0c", "obligation_id": "obl_e51092f6dd84", "created_at": "2026-04-04T14:28:30.883021Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_c18ecaa07a0c"}], "review_actions": [], "diagnostics": [], "severity_counts": {"critical": 0, "high": 2, "medium": 2, "low": 0}, "obligation_status_counts": {"pending": 0, "due": 1, "late": 1, "satisfied": 1}, "timeline": [{"kind": "monitor", "id": "monitor_20260404T142830883043Z", "created_at": "2026-04-04T14:28:30.883043Z", "summary": "2 alerts, 1 late"}, {"kind": "commit", "id": "commit_20260404T142830880658Z", "created_at": "2026-04-04T14:28:30.880658Z", "summary": "2 carried risks, 3 obligations"}, {"kind": "review", "id": "run_20260404T142830875363Z", "created_at": "2026-04-04T14:28:30.875363Z", "summary": "go_with_conditions / high"}], "summary_metrics": {"analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "must_fix_count": 2, "findings_count": 4, "alerts_count": 2, "documents_count": 7, "obligations_count": 3}};
+    const dashboardData = {"project_id": "caltrans-cmgc-context", "project_path": null, "case_record": {"project_id": "caltrans-cmgc-context", "latest_run_id": "run_20260404T145819411156Z", "latest_analysis_perspective": "vendor", "latest_recommendation": "go_with_conditions", "latest_overall_risk": "high", "latest_agreement_type": "cmgc_preconstruction_services", "latest_project_sector": "bridges", "latest_outcome_status": "scope_rescope", "total_runs": 1, "run_history": [{"run_id": "run_20260404T145819411156Z", "run_type": "bid_review", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:58:19.411156Z", "recommendation": "go_with_conditions", "overall_risk": "high", "artifact_count": 11}], "latest_commit_id": "commit_20260404T145819416061Z", "total_commits": 1, "latest_obligations_count": 3, "commit_history": [{"commit_id": "commit_20260404T145819416061Z", "analysis_perspective": "vendor", "created_at": "2026-04-04T14:58:19.416061Z", "source_run_id": "run_20260404T145819411156Z", "obligations_count": 3, "accepted_risks_count": 2, "negotiated_changes_count": 0}], "latest_monitoring_run_id": "monitor_20260404T145819418645Z", "total_monitoring_runs": 1, "monitoring_history": [{"run_id": "monitor_20260404T145819418645Z", "created_at": "2026-04-04T14:58:19.418645Z", "source_commit_id": "commit_20260404T145819416061Z", "alerts_count": 2, "due_count": 1, "late_count": 1, "satisfied_count": 1}]}, "latest_run": {"run_id": "run_20260404T145819411156Z", "project_id": "caltrans-cmgc-context", "created_at": "2026-04-04T14:58:19.411156Z", "decision_summary": {"project_id": "caltrans-cmgc-context", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["CMGC pricing off-ramp may leave preconstruction effort stranded", "Additional-insured requirement needs broker review", "Appropriation contingency can trigger downscope or cancellation risk"], "must_fix_before_bid": ["Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "document_inventory": {"project_id": "caltrans-cmgc-context", "analysis_perspective": "vendor", "documents": [{"document_id": "doc_2a8e2c8ee6", "filename": "Board Resolution.md", "document_type": "board_record", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 5}, {"document_id": "doc_9ea62dd2ed", "filename": "Project Status Dashboard.md", "document_type": "project_status", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_dab4eba677", "filename": "Proposed Budget FY2027.md", "document_type": "budget_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_11a0e4bfd7", "filename": "RFQ Procurement Package.md", "document_type": "procurement_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}], "missing_required_documents": []}, "procurement_profile": {"project_id": "caltrans-cmgc-context", "agreement_type": "cmgc_preconstruction_services", "project_sector": "bridges", "payment_mechanism": "guaranteed_maximum_price", "procurement_method": "qbs_or_rfq", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": ["board_minutes", "project_status", "settlement_resolution"], "detected_clause_families": ["appropriation_limit", "gmp_offramp", "independent_cost_estimator", "open_book_cost_model", "public_records_handling", "reporting_wbs"], "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "reconstruction Services Contract does not obligate the owner to award construction services. If the guaranteed maximum price is not accepted, the owner may re-advertise the work."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L5", "excerpt": "Section 2 Funding This agreement is subject to availability of funds appropriated through the Budget Act."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L8", "excerpt": "Section 3 Open Book Contractor shall maintain open-book cost model records. If the agency receives a Public Records Act"}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L11", "excerpt": "Section 4 Estimate Reconciliation Owner may retain an Independent Cost Estimator (ICE) to reconcile estimates."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L14", "excerpt": "Section 5 Reporting Contractor shall provide monthly progress reports by Work Breakdown Structure (WBS)."}], "notes": ["Package includes governance or status records that can support outcome-aware contract analysis.", "CMGC-style preconstruction language was detected; later GMP and construction-award decisions should be tracked separately."]}, "outcome_evidence": {"project_id": "caltrans-cmgc-context", "outcome_status": "scope_rescope", "governance_artifacts_present": ["board_minutes", "project_status", "settlement_resolution"], "events": [{"event_type": "award", "impact_types": [], "summary": "Award activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "project_status", "evidence_source_type": "project_dashboard", "evidence": [{"document_id": "doc_9ea62dd2ed", "location": "Project Status Dashboard.md:paragraph_1", "excerpt": "Project awarded in 2025. Estimated completion 2026. 45 percent complete."}]}, {"event_type": "project_status_update", "impact_types": [], "summary": "A project status or progress update appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "project_status", "evidence_source_type": "project_dashboard", "evidence": [{"document_id": "doc_9ea62dd2ed", "location": "Project Status Dashboard.md:paragraph_1", "excerpt": "Project awarded in 2025. Estimated completion 2026. 45 percent complete."}]}, {"event_type": "change_order", "impact_types": ["scope_change"], "summary": "Change-order activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "board_record", "evidence_source_type": "council_resolution", "evidence": [{"document_id": "doc_2a8e2c8ee6", "location": "Board Resolution.md:paragraph_1", "excerpt": "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall."}]}, {"event_type": "settlement", "impact_types": ["scope_change", "cost_overrun"], "summary": "Settlement or release activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "board_record", "evidence_source_type": "council_resolution", "evidence": [{"document_id": "doc_2a8e2c8ee6", "location": "Board Resolution.md:paragraph_1", "excerpt": "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall."}]}, {"event_type": "scope_change", "impact_types": ["scope_change", "cost_overrun"], "summary": "Rescoping or cost-escalation activity appears documented in the supplied package.", "confidence": 0.72, "source_document_type": "board_record", "evidence_source_type": "council_resolution", "evidence": [{"document_id": "doc_2a8e2c8ee6", "location": "Board Resolution.md:paragraph_1", "excerpt": "Resolution approving Change Order No. 4 and settlement agreement because of cost escalation and budget shortfall."}]}], "coverage_gaps": [], "monitoring_recommendations": ["Track GMP acceptance, independent cost-estimate reconciliation, and any owner decision to re-advertise or defer construction award.", "Preserve later change-order and settlement records because those documents are often the best public evidence of delivery stress."]}, "obligations_count": 3, "context_profile": {"signals": [], "notes": ["Internal-only context is intentionally omitted from the external artifact."], "internal_only": false}}, "latest_commit": {"commit_id": "commit_20260404T145819416061Z", "project_id": "caltrans-cmgc-context", "created_at": "2026-04-04T14:58:19.416061Z", "source_run_id": "run_20260404T145819411156Z", "decision_summary": {"project_id": "caltrans-cmgc-context", "analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "top_reasons": ["CMGC pricing off-ramp may leave preconstruction effort stranded", "Additional-insured requirement needs broker review", "Appropriation contingency can trigger downscope or cancellation risk"], "must_fix_before_bid": ["Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.", "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate."], "human_review_required": true}, "procurement_profile": {"project_id": "caltrans-cmgc-context", "agreement_type": "cmgc_preconstruction_services", "project_sector": "bridges", "payment_mechanism": "guaranteed_maximum_price", "procurement_method": "qbs_or_rfq", "public_text_quality": "structured_or_searchable", "governance_artifacts_present": ["board_minutes", "project_status", "settlement_resolution"], "detected_clause_families": ["appropriation_limit", "gmp_offramp", "independent_cost_estimator", "open_book_cost_model", "public_records_handling", "reporting_wbs"], "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "reconstruction Services Contract does not obligate the owner to award construction services. If the guaranteed maximum price is not accepted, the owner may re-advertise the work."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L5", "excerpt": "Section 2 Funding This agreement is subject to availability of funds appropriated through the Budget Act."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L8", "excerpt": "Section 3 Open Book Contractor shall maintain open-book cost model records. If the agency receives a Public Records Act"}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L11", "excerpt": "Section 4 Estimate Reconciliation Owner may retain an Independent Cost Estimator (ICE) to reconcile estimates."}, {"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L14", "excerpt": "Section 5 Reporting Contractor shall provide monthly progress reports by Work Breakdown Structure (WBS)."}], "notes": ["Package includes governance or status records that can support outcome-aware contract analysis.", "CMGC-style preconstruction language was detected; later GMP and construction-award decisions should be tracked separately."]}, "outcome_status": "scope_rescope", "negotiated_changes": [], "obligations_count": 3}, "latest_monitoring": {"run_id": "monitor_20260404T145819418645Z", "project_id": "caltrans-cmgc-context", "created_at": "2026-04-04T14:58:19.418645Z", "source_commit_id": "commit_20260404T145819416061Z", "as_of_date": "2026-04-04", "monitored_obligations": [{"obligation_id": "obl_c4209290ab70", "title": "Provide required notice within 10 business days", "source_clause": "General Conditions.md::General Conditions.md:paragraph_1", "owner_role": "project_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e51092f6dd84", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:paragraph_1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_812351987b94", "title": "Submit monthly progress reports by work breakdown structure", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L14", "owner_role": "project_controls_manager", "severity_if_missed": "medium", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_545efb5cc185", "obligation_id": "obl_c4209290ab70", "created_at": "2026-04-04T14:58:19.418621Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_545efb5cc185"}, {"alert_id": "alert_c18ecaa07a0c", "obligation_id": "obl_e51092f6dd84", "created_at": "2026-04-04T14:58:19.418621Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_c18ecaa07a0c"}]}, "documents": [{"document_id": "doc_2a8e2c8ee6", "filename": "Board Resolution.md", "document_type": "board_record", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_914932d86c", "filename": "General Conditions.md", "document_type": "general_conditions", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_6f78fa0858", "filename": "Insurance Requirements.md", "document_type": "insurance_requirements", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_2b13cd1fb4", "filename": "Prime Contract Agreement.md", "document_type": "prime_contract", "required_for_bid_review": true, "text_available": true, "text_source": "plain_text", "text_quality": "high", "clause_count": 5}, {"document_id": "doc_9ea62dd2ed", "filename": "Project Status Dashboard.md", "document_type": "project_status", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_dab4eba677", "filename": "Proposed Budget FY2027.md", "document_type": "budget_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}, {"document_id": "doc_11a0e4bfd7", "filename": "RFQ Procurement Package.md", "document_type": "procurement_document", "required_for_bid_review": false, "text_available": true, "text_source": "plain_text", "text_quality": "medium", "clause_count": 1}], "findings": [{"id": "contract_risk_analyst:cmgc_offramp", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "cmgc_offramp", "severity": "high", "title": "CMGC pricing off-ramp may leave preconstruction effort stranded", "summary": "The package appears to let the owner reject GMP pricing or decline a later construction award.", "recommended_action": "Clarify recovery if the GMP is rejected and confirm that preconstruction services are fully compensable on their own.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L1", "excerpt": "reconstruction Services Contract does not obligate the owner to award construction services. If the guaranteed maximum price is not accepted, the owner may re-advertise the work."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:cmgc_offramp"}, {"id": "contract_risk_analyst:appropriation_limit", "analysis_perspective": "vendor", "role": "contract_risk_analyst", "category": "appropriation_limit", "severity": "medium", "title": "Appropriation contingency can trigger downscope or cancellation risk", "summary": "Public funding language appears to limit enforceability to appropriated or available funds.", "recommended_action": "Tie any non-appropriation exit to payment for work performed, demobilization, and orderly scope reduction.", "confidence": 0.68, "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L5", "excerpt": "Section 2 Funding This agreement is subject to availability of funds appropriated through the Budget Act."}], "uncertainty_notes": [], "source_group": "commercial", "ui_id": "contract_risk_analyst:appropriation_limit"}, {"id": "insurance_requirements_analyst:additional_insured", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "additional_insured", "severity": "high", "title": "Additional-insured requirement needs broker review", "summary": "The package appears to require owner-side additional-insured coverage language.", "recommended_action": "Confirm endorsement form and limit the requirement to ongoing/completed operations as appropriate.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:paragraph_1", "excerpt": "Additional insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificat"}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:additional_insured"}, {"id": "insurance_requirements_analyst:umbrella_drop_down", "analysis_perspective": "vendor", "role": "insurance_requirements_analyst", "category": "umbrella_drop_down", "severity": "medium", "title": "Umbrella drop-down wording may exceed standard market terms", "summary": "The package appears to require umbrella or excess coverage to drop down if primary limits are impaired or exhausted.", "recommended_action": "Confirm market availability, price impact, and whether the drop-down feature can be limited to commercially available forms.", "confidence": 0.68, "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:paragraph_1", "excerpt": "Additional insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificates of insurance are required before starting work."}], "uncertainty_notes": [], "source_group": "insurance", "ui_id": "insurance_requirements_analyst:umbrella_drop_down"}], "obligations": [{"id": "obl_c4209290ab70", "source_clause": "General Conditions.md::General Conditions.md:paragraph_1", "source_document_id": "doc_914932d86c", "source_excerpt": "Notice of claim must be provided within 10 business days.", "title": "Provide required notice within 10 business days", "obligation_type": "notice_deadline", "trigger": "contractual notice event", "due_rule": "within 10 business days", "owner_role": "project_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_914932d86c", "location": "General Conditions.md:paragraph_1", "excerpt": "Notice of claim must be provided within 10 business days."}], "ui_id": "obl_c4209290ab70"}, {"id": "obl_e51092f6dd84", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:paragraph_1", "source_document_id": "doc_6f78fa0858", "source_excerpt": "al insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificates of insurance are required before starting work.", "title": "Provide certificates of insurance before starting work", "obligation_type": "pre_start_requirement", "trigger": "before mobilization or notice to proceed", "due_rule": "before starting work", "owner_role": "risk_manager", "severity_if_missed": "high", "evidence": [{"document_id": "doc_6f78fa0858", "location": "Insurance Requirements.md:paragraph_1", "excerpt": "al insured status is required. Umbrella coverage shall drop down if primary insurance is exhausted. Certificates of insurance are required before starting work."}], "ui_id": "obl_e51092f6dd84"}, {"id": "obl_812351987b94", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L14", "source_document_id": "doc_2b13cd1fb4", "source_excerpt": "", "title": "Submit monthly progress reports by work breakdown structure", "obligation_type": "recurring_reporting", "trigger": "during preconstruction or active delivery", "due_rule": "monthly, mapped to WBS elements when required", "owner_role": "project_controls_manager", "severity_if_missed": "medium", "evidence": [{"document_id": "doc_2b13cd1fb4", "location": "Prime Contract Agreement.md:L14", "excerpt": ""}], "ui_id": "obl_812351987b94"}], "monitored_obligations": [{"obligation_id": "obl_c4209290ab70", "title": "Provide required notice within 10 business days", "source_clause": "General Conditions.md::General Conditions.md:paragraph_1", "owner_role": "project_manager", "severity_if_missed": "high", "status": "late", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_e51092f6dd84", "title": "Provide certificates of insurance before starting work", "source_clause": "Insurance Requirements.md::Insurance Requirements.md:paragraph_1", "owner_role": "risk_manager", "severity_if_missed": "high", "status": "due", "summary": "Reference-demo monitoring marks this obligation as currently due.", "next_due_at": null, "last_satisfied_at": null, "notes": []}, {"obligation_id": "obl_812351987b94", "title": "Submit monthly progress reports by work breakdown structure", "source_clause": "Prime Contract Agreement.md::Prime Contract Agreement.md:L14", "owner_role": "project_controls_manager", "severity_if_missed": "medium", "status": "satisfied", "summary": "Reference-demo monitoring marks this obligation as satisfied for the current cycle.", "next_due_at": null, "last_satisfied_at": null, "notes": []}], "alerts": [{"alert_id": "alert_545efb5cc185", "obligation_id": "obl_c4209290ab70", "created_at": "2026-04-04T14:58:19.418621Z", "severity": "high", "alert_type": "late", "status": "open", "summary": "Reference-demo monitoring marks this obligation as overdue for operator attention.", "ui_id": "alert_545efb5cc185"}, {"alert_id": "alert_c18ecaa07a0c", "obligation_id": "obl_e51092f6dd84", "created_at": "2026-04-04T14:58:19.418621Z", "severity": "high", "alert_type": "due", "status": "open", "summary": "Reference-demo monitoring marks this obligation as currently due.", "ui_id": "alert_c18ecaa07a0c"}], "review_actions": [], "diagnostics": [], "severity_counts": {"critical": 0, "high": 2, "medium": 2, "low": 0}, "obligation_status_counts": {"pending": 0, "due": 1, "late": 1, "satisfied": 1}, "timeline": [{"kind": "monitor", "id": "monitor_20260404T145819418645Z", "created_at": "2026-04-04T14:58:19.418645Z", "summary": "2 alerts, 1 late"}, {"kind": "commit", "id": "commit_20260404T145819416061Z", "created_at": "2026-04-04T14:58:19.416061Z", "summary": "2 carried risks, 3 obligations"}, {"kind": "review", "id": "run_20260404T145819411156Z", "created_at": "2026-04-04T14:58:19.411156Z", "summary": "go_with_conditions / high"}], "summary_metrics": {"analysis_perspective": "vendor", "recommendation": "go_with_conditions", "overall_risk": "high", "confidence": 0.76, "must_fix_count": 2, "findings_count": 4, "alerts_count": 2, "documents_count": 7, "obligations_count": 3}};
     const initialReportMode = "external";
     const fixedReportMode = initialReportMode === "external";
     const reviewStorageKey = `contract-intelligence-review-actions:${dashboardData.project_id}`;
@@ -1028,10 +1114,10 @@
         return;
       }
       node.innerHTML = `
-        <div class="summary-pill" style="align-items:flex-start; gap:12px; background:rgba(201,107,44,0.12); border-color:rgba(201,107,44,0.24);">
+        <div class="summary-pill warning-pill">
           <div>
             <strong>Local review cache reset</strong>
-            <div class="note" style="margin-top:6px;">${safe(localCacheWarning)}</div>
+            <div class="note note-tight">${safe(localCacheWarning)}</div>
           </div>
           <button type="button" class="action-button subtle" data-reset-local-review-cache="true">Clear local cache</button>
         </div>

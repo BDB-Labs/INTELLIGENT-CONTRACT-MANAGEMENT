@@ -3,56 +3,119 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111d">
   <title>ICM Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div class="background-grid" aria-hidden="true"></div>
+  <div class="background-orb background-orb-left" aria-hidden="true"></div>
+  <div class="background-orb background-orb-right" aria-hidden="true"></div>
   <div class="page-shell">
-    <header class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">Public Demo</p>
-        <h1>ICM Contract Intelligence</h1>
-        <p class="lead">
-          A sanitized public demo of the contract-intelligence workflow for public-infrastructure and roadway agreements.
-          These examples use curated sample packages and show intake analysis, committed-state carry-forward, obligations,
-          and monitoring posture without exposing internal-only context.
-        </p>
-        <div class="hero-actions">
-          <a class="button button-primary" href="#demo-cases">Explore demo cases</a>
-          <a class="button button-secondary" href="https://github.com/BDB-Labs/INTELLIGENT-CONTRACT-MANAGEMENT">View repository</a>
-        </div>
+    <header class="topbar">
+      <a class="wordmark" href="/">
+        <span class="wordmark-mark">ICM</span>
+        <span class="wordmark-copy">
+          <strong>Contract Intelligence</strong>
+          <span>Public artifact surface</span>
+        </span>
+      </a>
+      <div class="topbar-status">
+        <span class="status-chip">Read-only runtime</span>
+        <span class="status-chip status-chip-live">Live demo on Vercel</span>
       </div>
-      <aside class="hero-panel">
-        <p class="panel-label">What this demo shows</p>
-        <ul>
-          <li>Perspective-aware intake review</li>
-          <li>Clause and risk findings</li>
-          <li>Committed obligations</li>
-          <li>Monitoring and alert posture</li>
-          <li>Sanitized external reporting</li>
-        </ul>
-      </aside>
     </header>
 
     <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Public Demo Surface</p>
+          <h1>Contract intelligence, staged like a live operating system.</h1>
+          <p class="lead">
+            A sanitized public demo of the contract-intelligence workflow for public-infrastructure and roadway agreements.
+            These sample packages show intake review, committed-state carry-forward, obligations, and monitoring posture
+            through an external-facing artifact surface without exposing internal strategy context.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#demo-cases">Explore demo cases</a>
+            <a class="button button-secondary" href="https://github.com/BDB-Labs/INTELLIGENT-CONTRACT-MANAGEMENT">View repository</a>
+          </div>
+          <div class="hero-meta-grid">
+            <article class="hero-meta-card">
+              <p class="meta-label">Sanitization model</p>
+              <h2>External-safe by construction</h2>
+              <p>Internal-only context, local paths, and operator notes are intentionally removed before publication.</p>
+            </article>
+            <article class="hero-meta-card">
+              <p class="meta-label">Reference flow</p>
+              <h2>Review -> commit -> monitor</h2>
+              <p>The demo preserves lifecycle continuity so each case reads like a living operating record, not a static screenshot.</p>
+            </article>
+          </div>
+        </div>
+        <aside class="hero-panel">
+          <div class="panel-header">
+            <p class="panel-label">Signal Deck</p>
+            <span class="panel-pulse">Live</span>
+          </div>
+          <div class="signal-stack">
+            <article class="signal-blade">
+              <span>Surface</span>
+              <strong>Public / read-only</strong>
+            </article>
+            <article class="signal-blade">
+              <span>Runtime</span>
+              <strong>Vercel front door + generated case artifacts</strong>
+            </article>
+            <article class="signal-blade">
+              <span>Data mode</span>
+              <strong>Sanitized external dashboards</strong>
+            </article>
+          </div>
+          <div class="hero-telemetry">
+            <div>
+              <p class="meta-label">Build cadence</p>
+              <strong id="hero-generated-at">Awaiting manifest</strong>
+            </div>
+            <div>
+              <p class="meta-label">Case coverage</p>
+              <strong id="hero-case-count">0 case surfaces</strong>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section id="signal-strip" class="signal-strip">
+        <article class="loading-card signal-card">
+          <p>Loading build telemetry…</p>
+        </article>
+      </section>
+
       <section class="overview-grid">
         <article class="info-card">
+          <p class="meta-label">Intake layer</p>
           <h2>How to read this demo</h2>
           <p>
-            Each case below links to a generated external dashboard built from a curated sample contract package.
-            The dashboards are shareable artifacts, not internal operator views.
+            Each case links to a generated external dashboard built from a curated sample contract package.
+            The dashboards are shareable operating artifacts, not internal operator views.
           </p>
         </article>
         <article class="info-card">
+          <p class="meta-label">Boundary layer</p>
           <h2>What is omitted</h2>
           <p>
-            Internal-only context, local paths, private review actions, and strategy-only notes are removed from these artifacts by design.
+            Internal-only context, private review actions, and strategy-only notes are removed from these artifacts by design.
           </p>
         </article>
         <article class="info-card">
+          <p class="meta-label">Execution layer</p>
           <h2>Reference runtime</h2>
           <p>
-            The real Python/FastAPI reference implementation is intended to run separately on Render while this Vercel surface stays public and read-only.
+            The Python/FastAPI reference implementation is intended to run separately while this Vercel surface stays fast, public, and read-only.
           </p>
         </article>
       </section>
