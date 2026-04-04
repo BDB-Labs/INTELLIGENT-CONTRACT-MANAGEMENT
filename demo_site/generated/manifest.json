@@ -14,7 +14,7 @@
       "obligations_count": 3,
       "alerts_count": 2,
       "documents_count": 7,
-      "dashboard_href": "./cases/caltrans_cmgc_context/dashboard.html",
+      "dashboard_href": "/generated/cases/caltrans_cmgc_context/dashboard.html",
       "highlights": [
         "CMGC pricing off-ramp may leave preconstruction effort stranded",
         "Additional-insured requirement needs broker review",
@@ -33,7 +33,7 @@
       "obligations_count": 0,
       "alerts_count": 0,
       "documents_count": 1,
-      "dashboard_href": "./cases/missing_insurance_package/dashboard.html",
+      "dashboard_href": "/generated/cases/missing_insurance_package/dashboard.html",
       "highlights": [
         "Pay-if-paid structure shifts collection risk downstream",
         "Missing required document: general_conditions",
@@ -51,7 +51,7 @@
       "obligations_count": 3,
       "alerts_count": 2,
       "documents_count": 4,
-      "dashboard_href": "./cases/riverside_bridge/dashboard.html",
+      "dashboard_href": "/generated/cases/riverside_bridge/dashboard.html",
       "highlights": [
         "Pay-if-paid structure shifts collection risk downstream",
         "Broad indemnity language may exceed reasonable contractor risk",

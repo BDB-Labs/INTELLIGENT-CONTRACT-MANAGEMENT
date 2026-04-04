@@ -52,6 +52,7 @@ def test_build_demo_assets_generates_manifest_and_dashboards(tmp_path: Path) -> 
     manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
     assert manifest["site_title"] == "ICM Contract Intelligence Demo"
     assert manifest["cases"][0]["case_id"] == "demo-bridge"
+    assert manifest["cases"][0]["dashboard_href"] == "/generated/cases/demo-bridge/dashboard.html"
     assert result.cases[0].dashboard_path.exists()
     assert "Internal-only context is intentionally omitted from the external artifact." in result.cases[0].dashboard_path.read_text(
         encoding="utf-8"

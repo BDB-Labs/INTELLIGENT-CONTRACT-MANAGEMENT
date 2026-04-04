@@ -252,7 +252,7 @@ def build_demo_assets(
                 "obligations_count": case.obligations_count,
                 "alerts_count": case.alerts_count,
                 "documents_count": case.documents_count,
-                "dashboard_href": f"./cases/{case.case_id}/dashboard.html",
+                "dashboard_href": f"/generated/cases/{case.case_id}/dashboard.html",
                 "highlights": list(case.highlights),
             }
             for case in cases

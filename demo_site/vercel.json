@@ -1,4 +1,10 @@
 {
+  "rewrites": [
+    {
+      "source": "/cases/:caseId/dashboard.html",
+      "destination": "/generated/cases/:caseId/dashboard.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
