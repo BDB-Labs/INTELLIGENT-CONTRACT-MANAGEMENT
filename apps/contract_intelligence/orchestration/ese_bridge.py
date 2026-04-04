@@ -310,6 +310,7 @@ def build_bid_review_ese_config(
     analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
     knowledge_base_dir: str | Path | None = None,
     entity_name: str | None = None,
+    crm_dir: str | Path | None = None,
 ) -> dict[str, Any]:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
     artifacts_path = resolve_output_directory(
@@ -358,6 +359,41 @@ def build_bid_review_ese_config(
         except Exception as e:
             logger.warning("Failed to load knowledge base: %s", e)
 
+    # Build CRM context if CRM is available
+    crm_context_text = ""
+    if crm_dir and entity_name:
+        try:
+            from ese.crm import ContractCRM
+
+            crm = ContractCRM(crm_dir)
+            crm_data = crm.get_crm_context_for_knowledge_base(entity_name)
+            if crm_data.get("found"):
+                contacts_str = ", ".join(
+                    f"{c['name']} ({c['title']})"
+                    for c in crm_data.get("key_contacts", [])
+                )
+                crm_context_text = (
+                    f"\n\n## CRM INTELLIGENCE FOR {entity_name.upper()}\n"
+                    f"- Relationship health: {crm_data['relationship_health']} ({crm_data['health_score']}/10)\n"
+                    f"- Total interactions: {crm_data['total_interactions']}\n"
+                    f"- Total projects: {crm_data['total_projects']}\n"
+                    f"- Risk profile: {crm_data.get('risk_profile', 'unknown')}\n"
+                    f"- Key contacts: {contacts_str}\n"
+                )
+                recent = crm_data.get("recent_interactions", [])
+                if recent:
+                    crm_context_text += "- Recent interactions:\n"
+                    for ri in recent[:5]:
+                        crm_context_text += f"  - {ri['date']} [{ri['type']}]: {ri['summary']} (impact: {ri['relationship_impact']})\n"
+                logger.info(
+                    "CRM context injected: %d characters", len(crm_context_text)
+                )
+        except Exception as e:
+            logger.warning("Failed to load CRM data: %s", e)
+
+    # Combine RAG and CRM context
+    combined_context = rag_context + crm_context_text
+
     role_definitions = {role.key: role for role in BID_REVIEW_ROLE_CATALOG}
     roles_cfg: dict[str, Any] = {}
     for role_key in _ordered_role_keys():
@@ -365,13 +401,14 @@ def build_bid_review_ese_config(
         prompt = _prompt_for_role(
             role_key, role_def.output_artifact, analysis_perspective=perspective
         )
-        # Inject RAG context into advisory roles
-        if rag_context and role_key in {
+        # Inject combined context into advisory roles
+        if combined_context and role_key in {
             "relationship_advisor",
             "negotiation_strategist",
             "context_intelligence_analyst",
+            "relationship_strategy_analyst",
         }:
-            prompt = f"{prompt}\n\n## HISTORICAL INTELLIGENCE (RAG)\n{rag_context}"
+            prompt = f"{prompt}\n{combined_context}"
         roles_cfg[role_key] = {
             "temperature": 0.2,
             "prompt": prompt,
