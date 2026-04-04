@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import subprocess
 import re
 import zlib
@@ -12,6 +13,7 @@ from xml.etree import ElementTree
 from apps.contract_intelligence.domain.enums import DocumentType
 from apps.contract_intelligence.ingestion.document_classifier import classify_document
 
+logger = logging.getLogger(__name__)
 
 PLAIN_TEXT_SUFFIXES = {
     ".txt",
@@ -23,6 +25,10 @@ PLAIN_TEXT_SUFFIXES = {
     ".csv",
     ".rst",
 }
+
+# Extended format support
+SPREADSHEET_SUFFIXES = {".xlsx", ".xls"}
+PRESENTATION_SUFFIXES = {".pptx", ".ppt"}
 
 IGNORED_PATH_PARTS = {
     ".git",
@@ -69,11 +75,56 @@ def _extract_docx_text(path: Path) -> str:
     paragraphs: list[str] = []
     namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
     for paragraph in root.findall(".//w:p", namespace):
-        text_parts = [node.text for node in paragraph.findall(".//w:t", namespace) if node.text]
+        text_parts = [
+            node.text for node in paragraph.findall(".//w:t", namespace) if node.text
+        ]
         line = "".join(text_parts).strip()
         if line:
             paragraphs.append(line)
     return "\n".join(paragraphs).strip()
+
+
+def _extract_xlsx_text(path: Path) -> str:
+    """Extract text from Excel spreadsheets as tabular text."""
+    import openpyxl
+
+    text_parts: list[str] = []
+    try:
+        wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
+            text_parts.append(f"\n[Sheet: {sheet_name}]")
+            row_count = 0
+            for row in ws.iter_rows(values_only=True):
+                cells = [str(cell) if cell is not None else "" for cell in row]
+                text_parts.append(" | ".join(c.strip() for c in cells if c.strip()))
+                row_count += 1
+                if row_count > 1000:
+                    text_parts.append("[...truncated at 1000 rows...]")
+                    break
+        wb.close()
+    except Exception as e:
+        logger.warning("XLSX extraction failed for %s: %s", path.name, e)
+    return "\n".join(text_parts).strip()
+
+
+def _extract_pptx_text(path: Path) -> str:
+    """Extract text from PowerPoint presentations."""
+    from pptx import Presentation
+
+    text_parts: list[str] = []
+    try:
+        prs = Presentation(str(path))
+        for i, slide in enumerate(prs.slides, 1):
+            text_parts.append(f"\n[Slide {i}]")
+            for shape in slide.shapes:
+                if hasattr(shape, "has_text_frame") and shape.has_text_frame:  # type: ignore[attr-defined]
+                    for para in shape.text_frame.paragraphs:  # type: ignore[attr-defined]
+                        if para.text.strip():
+                            text_parts.append(para.text)
+    except Exception as e:
+        logger.warning("PPTX extraction failed for %s: %s", path.name, e)
+    return "\n".join(text_parts).strip()
 
 
 def _decode_pdf_literal_string(raw: str) -> str:
@@ -84,7 +135,9 @@ def _decode_pdf_literal_string(raw: str) -> str:
 def _extract_pdf_stream_text(path: Path) -> str:
     pdf_bytes = path.read_bytes()
     fragments: list[str] = []
-    for match in re.finditer(rb"stream\r?\n(.*?)\r?\nendstream", pdf_bytes, flags=re.DOTALL):
+    for match in re.finditer(
+        rb"stream\r?\n(.*?)\r?\nendstream", pdf_bytes, flags=re.DOTALL
+    ):
         stream = match.group(1)
         candidates = [stream]
         for wbits in (zlib.MAX_WBITS, -zlib.MAX_WBITS):
@@ -120,7 +173,9 @@ def _extract_pdf_spotlight_text(path: Path) -> str:
 
 
 def _clause_id(relative_path: str, location: str, heading: str) -> str:
-    digest = hashlib.sha1(f"{relative_path}:{location}:{heading}".encode("utf-8")).hexdigest()[:10]
+    digest = hashlib.sha1(
+        f"{relative_path}:{location}:{heading}".encode("utf-8")
+    ).hexdigest()[:10]
     return f"clause_{digest}"
 
 
@@ -136,7 +191,9 @@ def _is_clause_heading(line: str) -> bool:
 def _paragraph_clauses(relative_path: str, text: str) -> tuple[ClauseSpan, ...]:
     clauses: list[ClauseSpan] = []
     for index, block in enumerate(re.split(r"\n\s*\n", text), start=1):
-        clean = "\n".join(line.strip() for line in block.splitlines() if line.strip()).strip()
+        clean = "\n".join(
+            line.strip() for line in block.splitlines() if line.strip()
+        ).strip()
         if not clean:
             continue
         heading = clean.splitlines()[0][:80] if "\n" in clean else f"Paragraph {index}"
@@ -153,7 +210,11 @@ def _paragraph_clauses(relative_path: str, text: str) -> tuple[ClauseSpan, ...]:
 
 
 def extract_clause_spans(relative_path: str, text: str) -> tuple[ClauseSpan, ...]:
-    lines = [(line_no, line.strip()) for line_no, line in enumerate(text.splitlines(), start=1) if line.strip()]
+    lines = [
+        (line_no, line.strip())
+        for line_no, line in enumerate(text.splitlines(), start=1)
+        if line.strip()
+    ]
     clauses: list[ClauseSpan] = []
     current_heading: str | None = None
     current_location: str | None = None
@@ -164,7 +225,11 @@ def extract_clause_spans(relative_path: str, text: str) -> tuple[ClauseSpan, ...
             if current_heading and current_lines:
                 clauses.append(
                     ClauseSpan(
-                        clause_id=_clause_id(relative_path, current_location or f"{relative_path}:L{line_no}", current_heading),
+                        clause_id=_clause_id(
+                            relative_path,
+                            current_location or f"{relative_path}:L{line_no}",
+                            current_heading,
+                        ),
                         heading=current_heading,
                         location=current_location or f"{relative_path}:L{line_no}",
                         text="\n".join(current_lines).strip(),
@@ -179,7 +244,11 @@ def extract_clause_spans(relative_path: str, text: str) -> tuple[ClauseSpan, ...
     if current_heading and current_lines:
         clauses.append(
             ClauseSpan(
-                clause_id=_clause_id(relative_path, current_location or f"{relative_path}:L1", current_heading),
+                clause_id=_clause_id(
+                    relative_path,
+                    current_location or f"{relative_path}:L1",
+                    current_heading,
+                ),
                 heading=current_heading,
                 location=current_location or f"{relative_path}:L1",
                 text="\n".join(current_lines).strip(),
@@ -191,7 +260,12 @@ def extract_clause_spans(relative_path: str, text: str) -> tuple[ClauseSpan, ...
     return _paragraph_clauses(relative_path, text)
 
 
-SUPPORTED_TEXT_SUFFIXES = PLAIN_TEXT_SUFFIXES | {".pdf", ".docx"}
+SUPPORTED_TEXT_SUFFIXES = (
+    PLAIN_TEXT_SUFFIXES
+    | {".pdf", ".docx"}
+    | SPREADSHEET_SUFFIXES
+    | PRESENTATION_SUFFIXES
+)
 MAX_DOCUMENT_BYTES = 8 * 1024 * 1024
 TEXT_SAMPLE_BYTES = 4096
 
@@ -229,6 +303,25 @@ def _extract_text_quality(text: str) -> str:
 
 
 def _load_pdf_text(path: Path) -> tuple[str, str, str]:
+    # Try pypdf first (proper PDF text extraction)
+    try:
+        import pypdf
+
+        reader = pypdf.PdfReader(str(path))
+        text_parts: list[str] = []
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text and page_text.strip():
+                text_parts.append(page_text)
+        if text_parts:
+            text = "\n\n".join(text_parts)
+            quality = _extract_text_quality(text)
+            if quality != "none":
+                return text, "pypdf", quality
+    except Exception:
+        pass
+
+    # Fall back to existing methods
     candidates = [
         (_extract_pdf_spotlight_text(path), "pdf_spotlight"),
         (_extract_pdf_stream_text(path), "pdf_stream"),
@@ -240,7 +333,8 @@ def _load_pdf_text(path: Path) -> tuple[str, str, str]:
     for text, source in candidates:
         quality = _extract_text_quality(text)
         if ranked_quality[quality] > ranked_quality[best_quality] or (
-            ranked_quality[quality] == ranked_quality[best_quality] and len(text) > len(best_text)
+            ranked_quality[quality] == ranked_quality[best_quality]
+            and len(text) > len(best_text)
         ):
             best_text = text
             best_source = source
@@ -259,6 +353,12 @@ def _load_text(path: Path) -> tuple[str, str, str]:
             return text, "docx_xml", _extract_text_quality(text)
         except (KeyError, ValueError, zipfile.BadZipFile, ElementTree.ParseError):
             return "", "unavailable", "none"
+    if suffix in SPREADSHEET_SUFFIXES:
+        text = _extract_xlsx_text(path)
+        return text, "spreadsheet", _extract_text_quality(text)
+    if suffix in PRESENTATION_SUFFIXES:
+        text = _extract_pptx_text(path)
+        return text, "presentation", _extract_text_quality(text)
     if suffix == ".pdf":
         return _load_pdf_text(path)
     if not _is_probably_binary(path):
@@ -273,12 +373,17 @@ def iter_project_documents(project_dir: Path) -> list[LoadedDocument]:
         if not path.is_file():
             continue
         relative_path = path.relative_to(project_dir).as_posix()
-        if any(part in IGNORED_PATH_PARTS for part in path.relative_to(project_dir).parts):
+        if any(
+            part in IGNORED_PATH_PARTS for part in path.relative_to(project_dir).parts
+        ):
             continue
         suffix = path.suffix.lower()
         classified_from_name = classify_document(path.name)
         if path.stat().st_size > MAX_DOCUMENT_BYTES:
-            if suffix not in SUPPORTED_TEXT_SUFFIXES and classified_from_name is DocumentType.OTHER:
+            if (
+                suffix not in SUPPORTED_TEXT_SUFFIXES
+                and classified_from_name is DocumentType.OTHER
+            ):
                 continue
             text, text_source, text_quality = "", "skipped_oversize", "none"
         elif suffix not in SUPPORTED_TEXT_SUFFIXES and _is_probably_binary(path):

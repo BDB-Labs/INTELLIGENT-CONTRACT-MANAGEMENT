@@ -7,6 +7,7 @@ import inspect
 import json
 import logging
 import os
+import re
 import textwrap
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -1111,6 +1112,126 @@ def _persist_run_outputs(
     return summary_path
 
 
+def _self_reflect_role_output(
+    *,
+    role: str,
+    output: str,
+    role_prompt: str,
+    adapter: Callable[..., str] | RoleAdapter,
+    model: str,
+    cfg: Dict[str, Any],
+    context: Mapping[str, str] | None = None,
+    max_rounds: int = 1,
+    min_score: float = 0.6,
+) -> dict[str, Any] | None:
+    """Self-reflect on role output and optionally regenerate if quality is low."""
+    reflection_prompt = textwrap.dedent(
+        f"""
+        You are reviewing your own previous output for quality and completeness.
+
+        ROLE: {role}
+        ORIGINAL PROMPT: {role_prompt[:2000]}
+
+        YOUR PREVIOUS OUTPUT:
+        {output[:8000]}
+
+        Evaluate your output on these criteria (score 0.0 to 1.0):
+        1. COMPLETENESS: Did you address all aspects of the prompt?
+        2. EVIDENCE: Are your claims supported by the provided context?
+        3. SPECIFICITY: Is your output specific and actionable, not generic?
+        4. STRUCTURE: Does your output follow the expected format?
+        5. CERTAINTY: Did you properly flag uncertainty where evidence is thin?
+
+        Return a JSON object with:
+        - overall_score: float 0.0-1.0
+        - issues: list of specific issues found
+        - suggestions: list of concrete improvements
+        - needs_regeneration: boolean (true if score < 0.6)
+    """
+    ).strip()
+
+    try:
+        reflection_text = _invoke_adapter(
+            adapter,
+            role=f"{role}_self_review",
+            model=model,
+            prompt=reflection_prompt,
+            context=dict(context) if context else {},
+            cfg=cfg,
+        )
+
+        reflection_data = _parse_reflection_json(reflection_text)
+        if reflection_data is None:
+            logger.debug("Reflection output was not valid JSON for role=%s", role)
+            return None
+
+        score = float(reflection_data.get("overall_score", 0.5))
+        issues = reflection_data.get("issues", [])
+        suggestions = reflection_data.get("suggestions", [])
+        needs_regeneration = bool(reflection_data.get("needs_regeneration", False))
+
+        if score >= min_score or not needs_regeneration:
+            logger.debug(
+                "Reflection for role=%s: score=%.2f, no regeneration needed",
+                role,
+                score,
+            )
+            return {"score": score, "issues": issues, "suggestions": suggestions}
+
+        regeneration_prompt = textwrap.dedent(
+            f"""
+            Your previous output was reviewed and scored {score}/1.0.
+            Issues found: {json.dumps(issues)}
+            Suggested improvements: {json.dumps(suggestions)}
+
+            ORIGINAL PROMPT: {role_prompt[:2000]}
+
+            Regenerate your output addressing ALL the issues above.
+            Be more specific, evidence-based, and complete.
+            Flag uncertainty where evidence is thin.
+        """
+        ).strip()
+
+        refined_output = _invoke_adapter(
+            adapter,
+            role=role,
+            model=model,
+            prompt=regeneration_prompt,
+            context=dict(context) if context else {},
+            cfg=cfg,
+        )
+
+        return {
+            "score": score,
+            "issues": issues,
+            "suggestions": suggestions,
+            "refined_output": refined_output,
+        }
+    except Exception as e:
+        logger.debug("Self-reflection failed for role=%s: %s", role, e)
+        return None
+
+
+def _parse_reflection_json(text: str) -> dict[str, Any] | None:
+    """Extract JSON from reflection output."""
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+    json_match = re.search(r"\{[\s\S]*\}", text)
+    if json_match:
+        try:
+            return json.loads(json_match.group())
+        except json.JSONDecodeError:
+            pass
+    return None
+
+
+def _reflection_cfg(cfg: Dict[str, Any]) -> dict[str, Any]:
+    return dict((cfg.get("reflection") or {}))
+
+
 def _execute_role(
     *,
     index: int,
@@ -1150,6 +1271,27 @@ def _execute_role(
         context=context,
         cfg=cfg,
     )
+    reflection_cfg = _reflection_cfg(cfg)
+    if reflection_cfg.get("enabled", False):
+        reflection = _self_reflect_role_output(
+            role=role,
+            output=output,
+            role_prompt=prompt,
+            adapter=adapter,
+            model=model_ref,
+            cfg=cfg,
+            context=context,
+            max_rounds=reflection_cfg.get("max_rounds", 1),
+            min_score=reflection_cfg.get("min_score", 0.6),
+        )
+        if reflection and reflection.get("refined_output"):
+            logger.info(
+                "Self-reflection improved role=%s score=%.2f issues=%d",
+                role,
+                reflection["score"],
+                len(reflection.get("issues", [])),
+            )
+            output = reflection["refined_output"]
     artifact_extension, rendered_output, structured_report = _render_role_output(
         role=role,
         model=model_ref,
