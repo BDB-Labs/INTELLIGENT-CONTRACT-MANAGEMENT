@@ -2219,12 +2219,12 @@ def render_project_dashboard(
 
     html_output = (
         html_template
+        .replace("{{", "{")
+        .replace("}}", "}")
         .replace("__DASHBOARD_PAYLOAD__", payload)
         .replace("__REPORT_MODE_SWITCH__", mode_switch_markup)
         .replace("__REPORT_MODE_COPY__", report_mode_copy)
         .replace("__INITIAL_REPORT_MODE__", mode)
-        .replace("{{", "{")
-        .replace("}}", "}")
     )
 
     destination = (

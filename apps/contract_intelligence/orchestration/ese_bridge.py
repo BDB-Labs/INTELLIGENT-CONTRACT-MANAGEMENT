@@ -4,15 +4,26 @@ from pathlib import Path
 from typing import Any
 
 from apps.contract_intelligence.domain.enums import AnalysisPerspective, DocumentType
-from apps.contract_intelligence.ingestion.document_classifier import missing_required_documents
+from apps.contract_intelligence.ingestion.document_classifier import (
+    missing_required_documents,
+)
 from apps.contract_intelligence.ingestion.project_loader import iter_project_documents
 from apps.contract_intelligence.orchestration.pipeline import bid_review_pipeline
-from apps.contract_intelligence.orchestration.role_catalog import BID_REVIEW_ROLE_CATALOG
-from apps.contract_intelligence.paths import resolve_existing_directory, resolve_output_directory
+from apps.contract_intelligence.orchestration.role_catalog import (
+    BID_REVIEW_ROLE_CATALOG,
+)
+from apps.contract_intelligence.paths import (
+    resolve_existing_directory,
+    resolve_output_directory,
+)
 from ese.config import validate_config, write_config
 from ese.pipeline import run_pipeline
 from ese.provider_runtime import builtin_runtime_adapter, default_api_key_env
-from ese.templates import DEMO_EXECUTION_MODE, resolve_execution_mode, provider_runtime_summary
+from ese.templates import (
+    DEMO_EXECUTION_MODE,
+    resolve_execution_mode,
+    provider_runtime_summary,
+)
 
 
 DEFAULT_MODEL_BY_PROVIDER = {
@@ -88,6 +99,26 @@ ROLE_PROMPT_GUIDANCE = {
         "Make the recommendation explicit in summary and next_steps, and use findings for the reasons that justify it. "
         "Use artifacts to name decision_summary.json."
     ),
+    "relationship_advisor": (
+        "You are the relationship_advisor for a contractor-side construction bid review. "
+        "Assess long-term relationship impact of contract terms based on historical vendor-agency interactions. "
+        "Identify which clauses affect future collaboration potential versus transactional outcomes. "
+        "Provide negotiation strategy guidance: when to hold firm, concede, or seek creative alternatives. "
+        "Consider entity-specific patterns: procurement frequency, budget cycles, political sensitivity. "
+        "Surface relationship risks that aren't immediately apparent from clause language alone. "
+        "Recommend monitoring approaches for relationship health during contract execution. "
+        "Use artifacts to name relationship_advice.json."
+    ),
+    "negotiation_strategist": (
+        "You are the negotiation_strategist for a contractor-side construction bid review. "
+        "Synthesize all technical, contextual, and relationship insights into actionable negotiation recommendations. "
+        "Prioritize issues by combined technical risk and relationship impact. "
+        "Create phase-by-phase negotiation roadmap (pre-bid, bid submission, post-award). "
+        "Identify trade-offs and concession patterns that preserve relationship while managing risk. "
+        "Generate specific, actionable next steps with owners and timelines. "
+        "Balance short-term contractual protection with long-term partnership value. "
+        "Use artifacts to name negotiation_strategy.json."
+    ),
     "obligation_register_builder": (
         "You are the obligation_register_builder for a contractor-side construction bid review. "
         "Identify notice deadlines, reporting duties, pre-start requirements, and other trackable obligations. "
@@ -96,35 +127,49 @@ ROLE_PROMPT_GUIDANCE = {
 }
 
 
-def _normalize_analysis_perspective(value: str | AnalysisPerspective) -> AnalysisPerspective:
+def _normalize_analysis_perspective(
+    value: str | AnalysisPerspective,
+) -> AnalysisPerspective:
     if isinstance(value, AnalysisPerspective):
         return value
     normalized = str(value).strip().lower()
     try:
         return AnalysisPerspective(normalized)
     except ValueError as exc:
-        raise ValueError("analysis_perspective must be either 'vendor' or 'agency'.") from exc
+        raise ValueError(
+            "analysis_perspective must be either 'vendor' or 'agency'."
+        ) from exc
 
 
 def _perspective_label(perspective: AnalysisPerspective) -> str:
-    return "contractor-side" if perspective is AnalysisPerspective.VENDOR else "agency-side"
+    return (
+        "contractor-side"
+        if perspective is AnalysisPerspective.VENDOR
+        else "agency-side"
+    )
 
 
-def _prompt_for_role(role_key: str, output_artifact: str, *, analysis_perspective: AnalysisPerspective) -> str:
+def _prompt_for_role(
+    role_key: str, output_artifact: str, *, analysis_perspective: AnalysisPerspective
+) -> str:
     guidance = ROLE_PROMPT_GUIDANCE[role_key].replace(
         "contractor-side",
         _perspective_label(analysis_perspective),
     )
     if analysis_perspective is AnalysisPerspective.AGENCY:
-        guidance = guidance.replace(
-            "Focus on payment, indemnity, delay, claims, change-order, termination, flow-down, and liability risk.",
-            "Focus on payment, indemnity, delay, claims, change-order, termination, enforceability, bidder reaction, and owner-side risk allocation.",
-        ).replace(
-            "Assess owner posture, negotiation sensitivity, politically rigid issues, and leverage points.",
-            "Assess bidder reaction, negotiation sensitivity, publicly rigid issues, and leverage points from the agency perspective.",
-        ).replace(
-            "Produce an executive recommendation of go, go-with-conditions, or no-go.",
-            "Produce an executive recommendation of issue, issue-with-conditions, or do-not-issue, expressed using the standard go/go-with-conditions/no-go labels.",
+        guidance = (
+            guidance.replace(
+                "Focus on payment, indemnity, delay, claims, change-order, termination, flow-down, and liability risk.",
+                "Focus on payment, indemnity, delay, claims, change-order, termination, enforceability, bidder reaction, and owner-side risk allocation.",
+            )
+            .replace(
+                "Assess owner posture, negotiation sensitivity, politically rigid issues, and leverage points.",
+                "Assess bidder reaction, negotiation sensitivity, publicly rigid issues, and leverage points from the agency perspective.",
+            )
+            .replace(
+                "Produce an executive recommendation of go, go-with-conditions, or no-go.",
+                "Produce an executive recommendation of issue, issue-with-conditions, or do-not-issue, expressed using the standard go/go-with-conditions/no-go labels.",
+            )
         )
     return (
         f"{guidance} "
@@ -145,11 +190,16 @@ def _default_model_for(provider: str) -> str:
 
 
 def _document_priority(document) -> int:
-    required_bonus = 30 if document.document_type in {
-        DocumentType.PRIME_CONTRACT,
-        DocumentType.GENERAL_CONDITIONS,
-        DocumentType.INSURANCE_REQUIREMENTS,
-    } else 0
+    required_bonus = (
+        30
+        if document.document_type
+        in {
+            DocumentType.PRIME_CONTRACT,
+            DocumentType.GENERAL_CONDITIONS,
+            DocumentType.INSURANCE_REQUIREMENTS,
+        }
+        else 0
+    )
     type_priority = {
         DocumentType.PRIME_CONTRACT: 24,
         DocumentType.GENERAL_CONDITIONS: 20,
@@ -194,9 +244,13 @@ def _clause_salience(document, clause) -> int:
     return score
 
 
-def _render_project_context(project_dir: Path, *, max_clauses: int = 18, max_clause_chars: int = 400) -> str:
+def _render_project_context(
+    project_dir: Path, *, max_clauses: int = 18, max_clause_chars: int = 400
+) -> str:
     documents = iter_project_documents(project_dir)
-    missing_docs = missing_required_documents([document.document_type for document in documents])
+    missing_docs = missing_required_documents(
+        [document.document_type for document in documents]
+    )
 
     lines = [
         "Document Inventory:",
@@ -208,7 +262,10 @@ def _render_project_context(project_dir: Path, *, max_clauses: int = 18, max_cla
             f"(type={document.document_type.value}, text_source={document.text_source}, text_quality={document.text_quality}, clauses={len(document.clauses)})"
         )
     if missing_docs:
-        lines.append("Missing required documents: " + ", ".join(item.value for item in missing_docs))
+        lines.append(
+            "Missing required documents: "
+            + ", ".join(item.value for item in missing_docs)
+        )
 
     lines.extend(["", "Clause Excerpts:"])
     ranked_clauses: list[tuple[int, str, str, str]] = []
@@ -250,7 +307,9 @@ def build_bid_review_ese_config(
     analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
 ) -> dict[str, Any]:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
-    artifacts_path = resolve_output_directory(artifacts_dir, label="Artifacts directory")
+    artifacts_path = resolve_output_directory(
+        artifacts_dir, label="Artifacts directory"
+    )
     perspective = _normalize_analysis_perspective(analysis_perspective)
     clean_provider = (provider or "local").strip().lower()
     effective_mode = resolve_execution_mode(
@@ -267,11 +326,15 @@ def build_bid_review_ese_config(
         role_def = role_definitions[role_key]
         roles_cfg[role_key] = {
             "temperature": 0.2,
-            "prompt": _prompt_for_role(role_key, role_def.output_artifact, analysis_perspective=perspective),
+            "prompt": _prompt_for_role(
+                role_key, role_def.output_artifact, analysis_perspective=perspective
+            ),
         }
 
     provider_cfg: dict[str, Any] = {
-        "name": (provider_name or clean_provider).strip() if clean_provider == "custom_api" else clean_provider,
+        "name": (provider_name or clean_provider).strip()
+        if clean_provider == "custom_api"
+        else clean_provider,
         "model": selected_model,
     }
     if clean_provider == "custom_api" and base_url:
@@ -294,10 +357,10 @@ def build_bid_review_ese_config(
                 f"Evaluate this construction contract package from the {perspective.value} perspective and produce "
                 "intake, risk, insurance, compliance, context-profile, procurement-profile, outcome-evidence, challenge, decision, and obligation outputs."
             ),
-        "prompt": _render_project_context(project_path),
-        "project_dir": str(project_path),
-        "analysis_perspective": perspective.value,
-    },
+            "prompt": _render_project_context(project_path),
+            "project_dir": str(project_path),
+            "analysis_perspective": perspective.value,
+        },
         "output": {
             "artifacts_dir": str(artifacts_path),
             "enforce_json": True,
@@ -325,8 +388,13 @@ def build_bid_review_ese_config(
                 f"Live execution for provider '{clean_provider}' requires runtime_adapter in module:function format.",
             )
 
-    if cfg["runtime"]["adapter"] in {"openai", "custom_api"} or clean_provider == "custom_api":
-        cfg["provider"]["api_key_env"] = (api_key_env or default_api_key_env(clean_provider)).strip()
+    if (
+        cfg["runtime"]["adapter"] in {"openai", "custom_api"}
+        or clean_provider == "custom_api"
+    ):
+        cfg["provider"]["api_key_env"] = (
+            api_key_env or default_api_key_env(clean_provider)
+        ).strip()
 
     if cfg["runtime"]["adapter"] == "openai":
         cfg["runtime"]["openai"] = {"base_url": "https://api.openai.com/v1"}
@@ -384,5 +452,7 @@ def run_bid_review_with_ese(
     )
     if config_path:
         write_config(config_path, cfg)
-    summary_path = run_pipeline(cfg=cfg, artifacts_dir=str(cfg["output"]["artifacts_dir"]))
+    summary_path = run_pipeline(
+        cfg=cfg, artifacts_dir=str(cfg["output"]["artifacts_dir"])
+    )
     return cfg, summary_path

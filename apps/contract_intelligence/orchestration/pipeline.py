@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from apps.contract_intelligence.orchestration.role_catalog import BID_REVIEW_ROLE_CATALOG
+from apps.contract_intelligence.orchestration.role_catalog import (
+    BID_REVIEW_ROLE_CATALOG,
+)
 
 
 @dataclass(frozen=True)
@@ -44,6 +46,12 @@ def bid_review_pipeline() -> tuple[PipelineStage, ...]:
             ),
         ),
         PipelineStage(
+            key="advisory",
+            description="Assess long-term relationship impact and provide entity-specific negotiation guidance.",
+            roles=("relationship_advisor",),
+            outputs=("relationship_advice.json",),
+        ),
+        PipelineStage(
             key="challenge",
             description="Apply explicit adversarial review before recommendation synthesis.",
             roles=("adversarial_reviewer",),
@@ -51,9 +59,17 @@ def bid_review_pipeline() -> tuple[PipelineStage, ...]:
         ),
         PipelineStage(
             key="synthesis",
-            description="Assemble the executive packet and obligations preview.",
-            roles=("bid_decision_analyst", "obligation_register_builder"),
-            outputs=("decision_summary.json", "obligations_register.json"),
+            description="Assemble the executive packet, negotiation strategy, and obligations preview.",
+            roles=(
+                "bid_decision_analyst",
+                "negotiation_strategist",
+                "obligation_register_builder",
+            ),
+            outputs=(
+                "decision_summary.json",
+                "negotiation_strategy.json",
+                "obligations_register.json",
+            ),
         ),
     )
 

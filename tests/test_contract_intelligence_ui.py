@@ -123,6 +123,13 @@ def test_render_project_dashboard_external_mode_omits_internal_payload(tmp_path:
     assert "source_project_dir" not in html
     assert "storage_dir" not in html
     assert "Internal-only context is intentionally omitted from the external artifact." in html
+    report_mode_copy = html.split("const reportModeCopy = ", 1)[1].split(";\n\n    const uiState", 1)[0]
+    assert json.loads(report_mode_copy) == {
+        "external": {
+            "lead": "A shareable contract-operating summary for decision posture, committed obligations, procurement structure, and current project readiness.",
+            "caption": "External mode suppresses internal strategy panels and leaves a cleaner client-facing operational surface.",
+        }
+    }
 
 
 def test_render_project_dashboard_surfaces_artifact_diagnostics_and_cache_controls(tmp_path: Path) -> None:
