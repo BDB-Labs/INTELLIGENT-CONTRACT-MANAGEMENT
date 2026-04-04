@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import os
 import re
@@ -21,6 +22,8 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Tokenizer & Text Utilities
@@ -423,7 +426,11 @@ class ContractKnowledgeBase:
         index_path = self._index_path()
         if not index_path.exists():
             return
-        data = json.loads(index_path.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(index_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
+            logger.warning("Failed to load knowledge base index: %s", e)
+            return
         for entry_data in data.get("entries", []):
             entry = KnowledgeEntry(
                 entry_id=entry_data["entry_id"],

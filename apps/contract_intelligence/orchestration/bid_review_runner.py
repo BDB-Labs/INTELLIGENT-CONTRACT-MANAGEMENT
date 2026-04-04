@@ -732,6 +732,9 @@ def compute_project_id(project_dir: Path) -> str:
     return clean or "contract-project"
 
 
+# NOTE: This function is duplicated from ese_bridge.py._normalize_analysis_perspective
+# to avoid a circular import (ese_bridge imports from this module).
+# Keep both implementations in sync if either changes.
 def _normalize_analysis_perspective(
     value: str | AnalysisPerspective,
 ) -> AnalysisPerspective:
