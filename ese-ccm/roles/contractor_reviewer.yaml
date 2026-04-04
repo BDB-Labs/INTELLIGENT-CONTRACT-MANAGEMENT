@@ -1,0 +1,20 @@
+name: contractor_reviewer
+role: risk_analysis
+orientation: contractor_protective
+weights:
+  financial_risk: 0.35
+  liability: 0.30
+  payment_security: 0.25
+  schedule_risk: 0.10
+bias:
+  aggressive_risk_detection: high
+  negotiation_preference: assertive
+focus_areas:
+  - payment_terms
+  - indemnity
+  - delay_damages
+  - insurance
+  - termination
+  - profit_erosion
+output_schema: risk_packet
+prompt_file: prompts/contractor_reviewer.md

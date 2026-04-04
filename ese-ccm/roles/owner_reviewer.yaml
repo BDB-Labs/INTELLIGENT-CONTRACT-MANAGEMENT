@@ -1,0 +1,11 @@
+name: owner_reviewer
+role: feasibility_analysis
+orientation: agency_realism
+weights:
+  enforceability: 0.40
+  public_accountability: 0.30
+  fairness: 0.30
+bias:
+  conservatism: high
+output_schema: risk_packet
+prompt_file: prompts/owner_reviewer.md
