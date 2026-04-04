@@ -727,7 +727,7 @@ NOTICE_DEADLINE_PATTERN = re.compile(
 )
 
 
-def _project_id(project_dir: Path) -> str:
+def compute_project_id(project_dir: Path) -> str:
     clean = re.sub(r"[^a-z0-9]+", "-", project_dir.name.lower()).strip("-")
     return clean or "contract-project"
 
@@ -2132,7 +2132,7 @@ def run_bid_review(
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    project_id = _project_id(project_path)
+    project_id = compute_project_id(project_path)
     documents = iter_project_documents(project_path)
     missing_docs = missing_required_documents(
         [document.document_type for document in documents]

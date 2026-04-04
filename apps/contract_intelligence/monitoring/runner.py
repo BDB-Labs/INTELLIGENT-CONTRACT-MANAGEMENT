@@ -15,9 +15,12 @@ from apps.contract_intelligence.domain.models import (
     MonitoringStatusInput,
     Obligation,
 )
-from apps.contract_intelligence.orchestration.bid_review_runner import _project_id
+from apps.contract_intelligence.orchestration.bid_review_runner import (
+    compute_project_id,
+)
 from apps.contract_intelligence.paths import resolve_existing_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
+from ese.constants import read_json
 
 
 @dataclass(frozen=True)
@@ -30,17 +33,13 @@ class MonitoringResult:
     alerts_count: int
 
 
-def _read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def _status_inputs_by_id(
     path: str | Path | None,
 ) -> tuple[dict[str, MonitoringStatusInput], str | None]:
     if path is None:
         return {}, None
     resolved = Path(path).expanduser().resolve()
-    payload = _read_json(resolved)
+    payload = read_json(resolved)
     if not isinstance(payload, list):
         raise ValueError(f"Expected a JSON list in {resolved}.")
     indexed: dict[str, MonitoringStatusInput] = {}
@@ -218,7 +217,7 @@ def monitor_contract(
     as_of_date: date | None = None,
 ) -> MonitoringResult:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
-    project_id = _project_id(project_path)
+    project_id = compute_project_id(project_path)
     store = FileSystemCaseStore(project_path / ".contract_intelligence")
     latest_commit = store.load_latest_commit_record(project_id)
     obligations = store.load_current_obligations(project_id)

@@ -13,11 +13,17 @@ from apps.contract_intelligence.domain.models import (
     NegotiatedChange,
     ProjectDocumentRecord,
 )
-from apps.contract_intelligence.ingestion.document_classifier import REQUIRED_BID_REVIEW_DOCUMENTS
+from apps.contract_intelligence.ingestion.document_classifier import (
+    REQUIRED_BID_REVIEW_DOCUMENTS,
+)
 from apps.contract_intelligence.ingestion.project_loader import iter_project_documents
-from apps.contract_intelligence.orchestration.bid_review_runner import _extract_obligations, _project_id
+from apps.contract_intelligence.orchestration.bid_review_runner import (
+    _extract_obligations,
+    compute_project_id,
+)
 from apps.contract_intelligence.paths import resolve_existing_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
+from ese.constants import read_json
 
 
 @dataclass(frozen=True)
@@ -37,24 +43,32 @@ class ObligationSnapshotResult:
     obligations_count: int
 
 
-def _read_json(path: Path) -> Any:
+def read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _load_optional_json_list(path: str | Path | None) -> list[dict[str, Any]]:
     if path is None:
         return []
-    payload = _read_json(Path(path).expanduser().resolve())
+    payload = read_json(Path(path).expanduser().resolve())
     if not isinstance(payload, list):
         raise ValueError(f"Expected a JSON list in {path}.")
-    invalid_items = [index for index, item in enumerate(payload, start=1) if not isinstance(item, dict)]
+    invalid_items = [
+        index
+        for index, item in enumerate(payload, start=1)
+        if not isinstance(item, dict)
+    ]
     if invalid_items:
         joined = ", ".join(str(item) for item in invalid_items[:5])
-        raise ValueError(f"Expected object items in {path}; invalid entries at positions {joined}.")
+        raise ValueError(
+            f"Expected object items in {path}; invalid entries at positions {joined}."
+        )
     return [item for item in payload if isinstance(item, dict)]
 
 
-def _validate_json_models(items: list[dict[str, Any]], *, model: type, label: str) -> list[Any]:
+def _validate_json_models(
+    items: list[dict[str, Any]], *, model: type, label: str
+) -> list[Any]:
     validated: list[Any] = []
     for index, item in enumerate(items, start=1):
         try:
@@ -66,11 +80,15 @@ def _validate_json_models(items: list[dict[str, Any]], *, model: type, label: st
 
 def _latest_findings_payloads(artifact_paths: dict[str, str]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
-    for name in ("risk_findings.json", "insurance_findings.json", "compliance_findings.json"):
+    for name in (
+        "risk_findings.json",
+        "insurance_findings.json",
+        "compliance_findings.json",
+    ):
         path = artifact_paths.get(name)
         if not path:
             continue
-        payload = _read_json(Path(path))
+        payload = read_json(Path(path))
         if isinstance(payload, list):
             findings.extend(item for item in payload if isinstance(item, dict))
     return findings
@@ -101,16 +119,15 @@ def _finding_dispositions_from_payload(
     finding_dispositions_file: str | Path | None,
     accepted_risks_file: str | Path | None,
 ) -> list[FindingDisposition]:
-    indexed = {
-        str(item.get("id", "unknown_finding")): item
-        for item in findings
-    }
+    indexed = {str(item.get("id", "unknown_finding")): item for item in findings}
     if not indexed:
         return []
 
     if finding_dispositions_file is not None:
         payload = _load_optional_json_list(finding_dispositions_file)
-        dispositions = _validate_json_models(payload, model=FindingDisposition, label="Finding dispositions")
+        dispositions = _validate_json_models(
+            payload, model=FindingDisposition, label="Finding dispositions"
+        )
         seen: set[str] = set()
         duplicates = [
             item.source_finding_id
@@ -119,11 +136,19 @@ def _finding_dispositions_from_payload(
         ]
         if duplicates:
             joined = ", ".join(duplicates[:5])
-            raise ValueError(f"Finding dispositions contain duplicate finding ids: {joined}")
-        unknown = [item.source_finding_id for item in dispositions if item.source_finding_id not in indexed]
+            raise ValueError(
+                f"Finding dispositions contain duplicate finding ids: {joined}"
+            )
+        unknown = [
+            item.source_finding_id
+            for item in dispositions
+            if item.source_finding_id not in indexed
+        ]
         if unknown:
             joined = ", ".join(unknown[:5])
-            raise ValueError(f"Finding dispositions reference unknown finding ids: {joined}")
+            raise ValueError(
+                f"Finding dispositions reference unknown finding ids: {joined}"
+            )
         by_id = {item.source_finding_id: item for item in dispositions}
         generated: list[FindingDisposition] = []
         for finding_id, finding in indexed.items():
@@ -151,7 +176,9 @@ def _finding_dispositions_from_payload(
             label="Accepted risks",
         )
         accepted_by_id = {item.source_finding_id: item for item in accepted}
-        unknown = [finding_id for finding_id in accepted_by_id if finding_id not in indexed]
+        unknown = [
+            finding_id for finding_id in accepted_by_id if finding_id not in indexed
+        ]
         if unknown:
             joined = ", ".join(unknown[:5])
             raise ValueError(f"Accepted risks reference unknown finding ids: {joined}")
@@ -163,7 +190,9 @@ def _finding_dispositions_from_payload(
                 title=str(finding.get("title", "Unnamed finding")),
                 severity=str(finding.get("severity", "medium")),
                 recommended_action=str(finding.get("recommended_action", "")),
-                disposition="accepted" if finding_id in accepted_by_id else "unresolved",
+                disposition="accepted"
+                if finding_id in accepted_by_id
+                else "unresolved",
                 rationale=(
                     accepted_by_id[finding_id].carry_forward_reason
                     if finding_id in accepted_by_id
@@ -188,7 +217,9 @@ def _finding_dispositions_from_payload(
     ]
 
 
-def _accepted_risks_from_dispositions(dispositions: list[FindingDisposition]) -> list[AcceptedRisk]:
+def _accepted_risks_from_dispositions(
+    dispositions: list[FindingDisposition],
+) -> list[AcceptedRisk]:
     accepted: list[AcceptedRisk] = []
     for item in dispositions:
         if item.disposition != "accepted":
@@ -201,7 +232,8 @@ def _accepted_risks_from_dispositions(dispositions: list[FindingDisposition]) ->
                 title=item.title,
                 severity=item.severity,
                 recommended_action=item.recommended_action,
-                carry_forward_reason=item.rationale or "Explicitly accepted during contract commit.",
+                carry_forward_reason=item.rationale
+                or "Explicitly accepted during contract commit.",
             )
         )
     return accepted
@@ -211,7 +243,8 @@ def _validate_commit_dispositions(dispositions: list[FindingDisposition]) -> Non
     unresolved_blockers = [
         item.title
         for item in dispositions
-        if item.disposition == "unresolved" and item.severity.value in {"high", "critical"}
+        if item.disposition == "unresolved"
+        and item.severity.value in {"high", "critical"}
     ]
     if unresolved_blockers:
         joined = ", ".join(unresolved_blockers[:5])
@@ -229,7 +262,8 @@ def _committed_document_inventory(project_dir: Path) -> list[ProjectDocumentReco
                 document_id=document.document_id,
                 filename=document.relative_path,
                 document_type=document.document_type.value,
-                required_for_bid_review=document.document_type in REQUIRED_BID_REVIEW_DOCUMENTS,
+                required_for_bid_review=document.document_type
+                in REQUIRED_BID_REVIEW_DOCUMENTS,
                 text_available=document.text_available,
                 text_source=document.text_source,
                 text_quality=document.text_quality,
@@ -252,15 +286,19 @@ def commit_contract(
         committed_contract_dir if committed_contract_dir is not None else project_path,
         label="Committed contract directory",
     )
-    project_id = _project_id(project_path)
+    project_id = compute_project_id(project_path)
     store = FileSystemCaseStore(project_path / ".contract_intelligence")
 
     latest_run = store.load_latest_run_record(project_id)
     documents = iter_project_documents(committed_path)
     if not documents:
-        raise FileNotFoundError(f"Committed contract directory does not contain any files: {committed_path}")
+        raise FileNotFoundError(
+            f"Committed contract directory does not contain any files: {committed_path}"
+        )
     if not any(document.text_available for document in documents):
-        raise ValueError(f"Committed contract directory does not contain any readable contract text: {committed_path}")
+        raise ValueError(
+            f"Committed contract directory does not contain any readable contract text: {committed_path}"
+        )
     obligations = _extract_obligations(documents)
 
     finding_dispositions = _finding_dispositions_from_payload(
@@ -310,7 +348,7 @@ def load_committed_obligations(
     output_path: str | Path | None = None,
 ) -> ObligationSnapshotResult:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
-    project_id = _project_id(project_path)
+    project_id = compute_project_id(project_path)
     store = FileSystemCaseStore(project_path / ".contract_intelligence")
     obligations = store.load_current_obligations(project_id)
     current_path = store.case_dir(project_id) / "obligations" / "current.json"
@@ -319,7 +357,8 @@ def load_committed_obligations(
         destination = Path(output_path).expanduser().resolve()
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            json.dumps([item.model_dump(mode="json") for item in obligations], indent=2) + "\n",
+            json.dumps([item.model_dump(mode="json") for item in obligations], indent=2)
+            + "\n",
             encoding="utf-8",
         )
         current_path = destination

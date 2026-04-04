@@ -9,10 +9,14 @@ from typing import Any
 
 from apps.contract_intelligence.evaluation.corpus import default_corpus_dir
 from apps.contract_intelligence.monitoring.runner import monitor_contract
-from apps.contract_intelligence.orchestration.bid_review_runner import _project_id, run_bid_review
+from apps.contract_intelligence.orchestration.bid_review_runner import (
+    compute_project_id,
+    run_bid_review,
+)
 from apps.contract_intelligence.orchestration.commit_runner import commit_contract
 from apps.contract_intelligence.storage import FileSystemCaseStore
 from apps.contract_intelligence.ui.dashboard import render_project_dashboard
+from ese.constants import read_json
 
 
 @dataclass(frozen=True)
@@ -42,15 +46,15 @@ class DemoExportResult:
 
 
 def default_reference_root() -> Path:
-    return Path(__file__).resolve().parents[3] / "artifacts" / "contract_intelligence_reference"
+    return (
+        Path(__file__).resolve().parents[3]
+        / "artifacts"
+        / "contract_intelligence_reference"
+    )
 
 
 def default_demo_site_dir() -> Path:
     return Path(__file__).resolve().parents[3] / "demo_site" / "generated"
-
-
-def _read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _titleize_case(case_id: str) -> str:
@@ -77,10 +81,16 @@ def _copy_inputs(case_dir: Path, destination: Path) -> None:
     shutil.copytree(inputs_dir, destination)
 
 
-def _finding_dispositions_for_demo(artifact_paths: dict[str, Path]) -> list[dict[str, str]]:
+def _finding_dispositions_for_demo(
+    artifact_paths: dict[str, Path],
+) -> list[dict[str, str]]:
     dispositions: list[dict[str, str]] = []
-    for artifact_name in ("risk_findings.json", "insurance_findings.json", "compliance_findings.json"):
-        payload = _read_json(artifact_paths[artifact_name])
+    for artifact_name in (
+        "risk_findings.json",
+        "insurance_findings.json",
+        "compliance_findings.json",
+    ):
+        payload = read_json(artifact_paths[artifact_name])
         for item in payload:
             if not isinstance(item, dict):
                 continue
@@ -93,7 +103,9 @@ def _finding_dispositions_for_demo(artifact_paths: dict[str, Path]) -> list[dict
                     "title": str(item.get("title", "Unnamed finding")),
                     "severity": severity,
                     "recommended_action": str(item.get("recommended_action", "")),
-                    "disposition": "accepted" if severity in {"high", "critical"} else "priced",
+                    "disposition": "accepted"
+                    if severity in {"high", "critical"}
+                    else "priced",
                     "rationale": "Reference-demo disposition generated to show committed-state carry-forward.",
                 }
             )
@@ -102,7 +114,7 @@ def _finding_dispositions_for_demo(artifact_paths: dict[str, Path]) -> list[dict
 
 def _demo_status_inputs(project_dir: Path) -> list[dict[str, str]]:
     store = FileSystemCaseStore(project_dir / ".contract_intelligence")
-    project_id = _project_id(project_dir)
+    project_id = compute_project_id(project_dir)
     obligations = store.load_current_obligations(project_id)
     if not obligations:
         return []
@@ -138,28 +150,42 @@ def _demo_status_inputs(project_dir: Path) -> list[dict[str, str]]:
     return statuses
 
 
-def _case_highlights(run_record: dict[str, Any], monitoring_record: dict[str, Any] | None) -> tuple[str, ...]:
+def _case_highlights(
+    run_record: dict[str, Any], monitoring_record: dict[str, Any] | None
+) -> tuple[str, ...]:
     decision = dict(run_record.get("decision_summary") or {})
-    reasons = [str(item) for item in decision.get("top_reasons", []) if str(item).strip()]
-    must_fix = [str(item) for item in decision.get("must_fix_before_bid", []) if str(item).strip()]
+    reasons = [
+        str(item) for item in decision.get("top_reasons", []) if str(item).strip()
+    ]
+    must_fix = [
+        str(item)
+        for item in decision.get("must_fix_before_bid", [])
+        if str(item).strip()
+    ]
     alerts = monitoring_record.get("alerts", []) if monitoring_record else []
     highlights: list[str] = []
     highlights.extend(reasons[:2])
     if must_fix:
         highlights.append(f"Must-fix before bid: {must_fix[0]}")
     if alerts:
-        highlights.append(f"Monitoring alert posture: {len(alerts)} open alert(s) in the reference lifecycle snapshot.")
+        highlights.append(
+            f"Monitoring alert posture: {len(alerts)} open alert(s) in the reference lifecycle snapshot."
+        )
     return tuple(highlights[:4])
 
 
-def _build_case_export(case_dir: Path, *, reference_root: Path, site_dir: Path) -> DemoCaseExport:
+def _build_case_export(
+    case_dir: Path, *, reference_root: Path, site_dir: Path
+) -> DemoCaseExport:
     workspace_dir = _case_working_dir(case_dir, reference_root)
     artifacts_dir = _artifacts_root(reference_root) / case_dir.name
     _copy_inputs(case_dir, workspace_dir)
 
     bid_result = run_bid_review(project_dir=workspace_dir, artifacts_dir=artifacts_dir)
 
-    dispositions_path = workspace_dir / ".contract_intelligence" / "demo_finding_dispositions.json"
+    dispositions_path = (
+        workspace_dir / ".contract_intelligence" / "demo_finding_dispositions.json"
+    )
     dispositions_path.parent.mkdir(parents=True, exist_ok=True)
     dispositions_path.write_text(
         json.dumps(
@@ -169,13 +195,21 @@ def _build_case_export(case_dir: Path, *, reference_root: Path, site_dir: Path) 
         + "\n",
         encoding="utf-8",
     )
-    commit_contract(project_dir=workspace_dir, finding_dispositions_file=dispositions_path)
+    commit_contract(
+        project_dir=workspace_dir, finding_dispositions_file=dispositions_path
+    )
 
     status_inputs = _demo_status_inputs(workspace_dir)
     if status_inputs:
-        status_inputs_path = workspace_dir / ".contract_intelligence" / "demo_status_inputs.json"
-        status_inputs_path.write_text(json.dumps(status_inputs, indent=2) + "\n", encoding="utf-8")
-        monitor_contract(project_dir=workspace_dir, status_inputs_file=status_inputs_path)
+        status_inputs_path = (
+            workspace_dir / ".contract_intelligence" / "demo_status_inputs.json"
+        )
+        status_inputs_path.write_text(
+            json.dumps(status_inputs, indent=2) + "\n", encoding="utf-8"
+        )
+        monitor_contract(
+            project_dir=workspace_dir, status_inputs_file=status_inputs_path
+        )
 
     case_site_dir = site_dir / "cases" / case_dir.name
     case_site_dir.mkdir(parents=True, exist_ok=True)
@@ -186,18 +220,26 @@ def _build_case_export(case_dir: Path, *, reference_root: Path, site_dir: Path) 
     )
 
     store = FileSystemCaseStore(workspace_dir / ".contract_intelligence")
-    project_id = _project_id(workspace_dir)
+    project_id = compute_project_id(workspace_dir)
     run_record = store.load_latest_run_record(project_id).model_dump(mode="json")
     case_record = store.load_case_record(project_id).model_dump(mode="json")
     monitoring_record = None
     if case_record.get("latest_monitoring_run_id"):
-        monitoring_record = store.load_latest_monitoring_run(project_id).model_dump(mode="json")
+        monitoring_record = store.load_latest_monitoring_run(project_id).model_dump(
+            mode="json"
+        )
 
-    risk_findings = _read_json(bid_result.artifact_paths["risk_findings.json"])
-    insurance_findings = _read_json(bid_result.artifact_paths["insurance_findings.json"])
-    compliance_findings = _read_json(bid_result.artifact_paths["compliance_findings.json"])
-    findings_count = len(risk_findings) + len(insurance_findings) + len(compliance_findings)
-    documents_count = len((run_record.get("document_inventory") or {}).get("documents", []))
+    risk_findings = read_json(bid_result.artifact_paths["risk_findings.json"])
+    insurance_findings = read_json(bid_result.artifact_paths["insurance_findings.json"])
+    compliance_findings = read_json(
+        bid_result.artifact_paths["compliance_findings.json"]
+    )
+    findings_count = (
+        len(risk_findings) + len(insurance_findings) + len(compliance_findings)
+    )
+    documents_count = len(
+        (run_record.get("document_inventory") or {}).get("documents", [])
+    )
     obligations_count = int(run_record.get("obligations_count", 0))
     alerts_count = len((monitoring_record or {}).get("alerts", []))
     decision = dict(run_record.get("decision_summary") or {})
@@ -224,16 +266,32 @@ def build_demo_assets(
     reference_root: str | Path | None = None,
     site_dir: str | Path | None = None,
 ) -> DemoExportResult:
-    corpus_path = Path(corpus_dir).expanduser().resolve() if corpus_dir else default_corpus_dir()
-    reference_path = Path(reference_root).expanduser().resolve() if reference_root else default_reference_root()
-    site_path = Path(site_dir).expanduser().resolve() if site_dir else default_demo_site_dir()
+    corpus_path = (
+        Path(corpus_dir).expanduser().resolve() if corpus_dir else default_corpus_dir()
+    )
+    reference_path = (
+        Path(reference_root).expanduser().resolve()
+        if reference_root
+        else default_reference_root()
+    )
+    site_path = (
+        Path(site_dir).expanduser().resolve() if site_dir else default_demo_site_dir()
+    )
 
     reference_path.mkdir(parents=True, exist_ok=True)
     site_path.mkdir(parents=True, exist_ok=True)
 
     cases: list[DemoCaseExport] = []
-    for case_dir in sorted(path for path in corpus_path.iterdir() if path.is_dir() and (path / "expected.json").exists()):
-        cases.append(_build_case_export(case_dir, reference_root=reference_path, site_dir=site_path))
+    for case_dir in sorted(
+        path
+        for path in corpus_path.iterdir()
+        if path.is_dir() and (path / "expected.json").exists()
+    ):
+        cases.append(
+            _build_case_export(
+                case_dir, reference_root=reference_path, site_dir=site_path
+            )
+        )
 
     generated_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     manifest_payload = {
@@ -259,7 +317,9 @@ def build_demo_assets(
         ],
     }
     manifest_path = site_path / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest_payload, indent=2) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest_payload, indent=2) + "\n", encoding="utf-8"
+    )
 
     return DemoExportResult(
         generated_at=generated_at,

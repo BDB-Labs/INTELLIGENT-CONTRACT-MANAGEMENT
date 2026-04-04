@@ -34,6 +34,7 @@ from apps.contract_intelligence.domain.models import (
     ReviewActionEvent,
     ReviewActionRecord,
 )
+from ese.constants import read_json
 
 
 @dataclass(frozen=True)
@@ -69,16 +70,14 @@ class PersistedMonitoringState:
 def _write_json(path: Path, payload: object) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     rendered = json.dumps(payload, indent=2) + "\n"
-    with NamedTemporaryFile("w", encoding="utf-8", dir=path.parent, delete=False) as handle:
+    with NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False
+    ) as handle:
         handle.write(rendered)
         handle.flush()
         os.fsync(handle.fileno())
         temp_name = handle.name
     os.replace(temp_name, path)
-
-
-def _read_json(path: Path) -> object:
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 class FileSystemCaseStore:
@@ -111,44 +110,57 @@ class FileSystemCaseStore:
 
     def load_case_record(self, project_id: str) -> CaseRecord:
         path = self.case_record_path(project_id)
-        return CaseRecord.model_validate(_read_json(path))
+        return CaseRecord.model_validate(read_json(path))
 
     def load_run_record(self, project_id: str, run_id: str) -> BidReviewRunRecord:
         path = self.case_dir(project_id) / "runs" / f"{run_id}.json"
-        return BidReviewRunRecord.model_validate(_read_json(path))
+        return BidReviewRunRecord.model_validate(read_json(path))
 
     def load_latest_run_record(self, project_id: str) -> BidReviewRunRecord:
         case_record = self.load_case_record(project_id)
         return self.load_run_record(project_id, case_record.latest_run_id)
 
-    def load_commit_record(self, project_id: str, commit_id: str) -> ContractCommitRecord:
+    def load_commit_record(
+        self, project_id: str, commit_id: str
+    ) -> ContractCommitRecord:
         path = self.case_dir(project_id) / "commits" / f"{commit_id}.json"
-        return ContractCommitRecord.model_validate(_read_json(path))
+        return ContractCommitRecord.model_validate(read_json(path))
 
     def load_latest_commit_record(self, project_id: str) -> ContractCommitRecord:
         case_record = self.load_case_record(project_id)
         if not case_record.latest_commit_id:
-            raise FileNotFoundError(f"No committed contract record exists for project '{project_id}'.")
+            raise FileNotFoundError(
+                f"No committed contract record exists for project '{project_id}'."
+            )
         return self.load_commit_record(project_id, case_record.latest_commit_id)
 
     def load_current_obligations(self, project_id: str) -> list[Obligation]:
         path = self.case_dir(project_id) / "obligations" / "current.json"
-        return [Obligation.model_validate(item) for item in _read_json(path)]
+        return [Obligation.model_validate(item) for item in read_json(path)]
 
     def load_latest_monitoring_run(self, project_id: str) -> MonitoringRunRecord:
         case_record = self.load_case_record(project_id)
         if not case_record.latest_monitoring_run_id:
-            raise FileNotFoundError(f"No monitoring run exists for project '{project_id}'.")
-        path = self.case_dir(project_id) / "monitoring" / "runs" / f"{case_record.latest_monitoring_run_id}.json"
-        return MonitoringRunRecord.model_validate(_read_json(path))
+            raise FileNotFoundError(
+                f"No monitoring run exists for project '{project_id}'."
+            )
+        path = (
+            self.case_dir(project_id)
+            / "monitoring"
+            / "runs"
+            / f"{case_record.latest_monitoring_run_id}.json"
+        )
+        return MonitoringRunRecord.model_validate(read_json(path))
 
     def load_current_review_actions(self, project_id: str) -> list[ReviewActionRecord]:
         path = self.case_dir(project_id) / "review_actions" / "current.json"
         if not path.exists():
             return []
-        payload = _read_json(path)
+        payload = read_json(path)
         if not isinstance(payload, list):
-            raise ValueError(f"Review-action snapshot is malformed for project '{project_id}'.")
+            raise ValueError(
+                f"Review-action snapshot is malformed for project '{project_id}'."
+            )
         return [ReviewActionRecord.model_validate(item) for item in payload]
 
     def persist_review_action(
@@ -171,7 +183,9 @@ class FileSystemCaseStore:
             existing = indexed.get(action_key)
             persisted = review_action.model_copy(
                 update={
-                    "created_at": existing.created_at if existing else review_action.created_at,
+                    "created_at": existing.created_at
+                    if existing
+                    else review_action.created_at,
                     "updated_at": review_action.updated_at,
                 }
             )
@@ -180,7 +194,9 @@ class FileSystemCaseStore:
                 indexed.values(),
                 key=lambda item: (item.kind, item.ui_id),
             )
-            _write_json(current_path, [item.model_dump(mode="json") for item in ordered])
+            _write_json(
+                current_path, [item.model_dump(mode="json") for item in ordered]
+            )
             _write_json(
                 history_dir / f"{event_id}.json",
                 ReviewActionEvent(
@@ -223,7 +239,9 @@ class FileSystemCaseStore:
                 remaining.append(item)
             if not removed:
                 return False
-            _write_json(current_path, [item.model_dump(mode="json") for item in remaining])
+            _write_json(
+                current_path, [item.model_dump(mode="json") for item in remaining]
+            )
             _write_json(
                 history_dir / f"{event_id}.json",
                 ReviewActionEvent(
@@ -235,8 +253,12 @@ class FileSystemCaseStore:
                     disposition=removed_action.disposition if removed_action else None,
                     owner=removed_action.owner if removed_action else "",
                     note=removed_action.note if removed_action else "",
-                    source_run_id=removed_action.source_run_id if removed_action else None,
-                    source_commit_id=removed_action.source_commit_id if removed_action else None,
+                    source_run_id=removed_action.source_run_id
+                    if removed_action
+                    else None,
+                    source_commit_id=removed_action.source_commit_id
+                    if removed_action
+                    else None,
                     occurred_at=event_time,
                 ).model_dump(mode="json"),
             )
@@ -298,7 +320,7 @@ class FileSystemCaseStore:
 
             existing_history: list[CaseRunIndexEntry] = []
             if case_record_path.exists():
-                payload = _read_json(case_record_path)
+                payload = read_json(case_record_path)
                 existing_history = [
                     CaseRunIndexEntry.model_validate(item)
                     for item in payload.get("run_history", [])
@@ -309,7 +331,9 @@ class FileSystemCaseStore:
                 ]
                 latest_commit_id = payload.get("latest_commit_id")
                 total_commits = int(payload.get("total_commits", 0))
-                latest_obligations_count = int(payload.get("latest_obligations_count", 0))
+                latest_obligations_count = int(
+                    payload.get("latest_obligations_count", 0)
+                )
                 latest_monitoring_run_id = payload.get("latest_monitoring_run_id")
                 total_monitoring_runs = int(payload.get("total_monitoring_runs", 0))
                 monitoring_history = [
@@ -397,8 +421,13 @@ class FileSystemCaseStore:
         current_obligations_path = case_dir / "obligations" / "current.json"
         lock_handle = self._lock_case(project_id)
         try:
-            _write_json(obligations_path, [item.model_dump(mode="json") for item in obligations])
-            _write_json(current_obligations_path, [item.model_dump(mode="json") for item in obligations])
+            _write_json(
+                obligations_path, [item.model_dump(mode="json") for item in obligations]
+            )
+            _write_json(
+                current_obligations_path,
+                [item.model_dump(mode="json") for item in obligations],
+            )
 
             commit_record = ContractCommitRecord(
                 commit_id=commit_id,
@@ -406,7 +435,9 @@ class FileSystemCaseStore:
                 analysis_perspective=analysis_perspective,
                 created_at=timestamp,
                 source_project_dir=str(Path(source_project_dir).expanduser().resolve()),
-                committed_contract_dir=str(Path(committed_contract_dir).expanduser().resolve()),
+                committed_contract_dir=str(
+                    Path(committed_contract_dir).expanduser().resolve()
+                ),
                 source_run_id=source_run_id,
                 decision_summary=decision_summary,
                 procurement_profile=procurement_profile,
@@ -490,13 +521,19 @@ class FileSystemCaseStore:
             _write_json(monitoring_run_path, run_payload)
             _write_json(monitoring_snapshot_path, run_payload)
             _write_json(alerts_path, [item.model_dump(mode="json") for item in alerts])
-            _write_json(alerts_history_path, [item.model_dump(mode="json") for item in alerts])
+            _write_json(
+                alerts_history_path, [item.model_dump(mode="json") for item in alerts]
+            )
 
             case_record = self.load_case_record(project_id)
             monitoring_history = list(case_record.monitoring_history)
             due_count = sum(1 for item in monitored_obligations if item.status == "due")
-            late_count = sum(1 for item in monitored_obligations if item.status == "late")
-            satisfied_count = sum(1 for item in monitored_obligations if item.status == "satisfied")
+            late_count = sum(
+                1 for item in monitored_obligations if item.status == "late"
+            )
+            satisfied_count = sum(
+                1 for item in monitored_obligations if item.status == "satisfied"
+            )
             monitoring_history.append(
                 MonitoringRunIndexEntry(
                     run_id=run_id,

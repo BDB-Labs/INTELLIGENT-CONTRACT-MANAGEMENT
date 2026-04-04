@@ -4,21 +4,16 @@ import json
 from pathlib import Path
 from typing import Any
 
-from apps.contract_intelligence.orchestration.bid_review_runner import _project_id
+from apps.contract_intelligence.orchestration.bid_review_runner import (
+    compute_project_id,
+)
 from apps.contract_intelligence.paths import resolve_existing_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
 
 
-def _read_json(path: str | Path | None) -> Any:
-    if not path:
-        return None
-    target = Path(path)
-    if not target.exists():
-        return None
-    return json.loads(target.read_text(encoding="utf-8"))
-
-
-def _load_json_artifact(path: str | Path | None, *, label: str, diagnostics: list[str]) -> Any:
+def _load_json_artifact(
+    path: str | Path | None, *, label: str, diagnostics: list[str]
+) -> Any:
     if not path:
         diagnostics.append(f"Artifact path missing for {label}.")
         return None
@@ -77,32 +72,43 @@ def _lifecycle_timeline(case_record: dict[str, Any]) -> list[dict[str, Any]]:
                 ),
             }
         )
-    return sorted(entries, key=lambda item: str(item.get("created_at", "")), reverse=True)
+    return sorted(
+        entries, key=lambda item: str(item.get("created_at", "")), reverse=True
+    )
 
 
 def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
-    project_id = _project_id(project_path)
+    project_id = compute_project_id(project_path)
     store = FileSystemCaseStore(project_path / ".contract_intelligence")
     case_record = store.load_case_record(project_id).model_dump(mode="json")
     latest_run = store.load_latest_run_record(project_id).model_dump(mode="json")
 
     diagnostics: list[str] = []
     artifact_paths = latest_run.get("artifact_paths", {})
-    risk_findings = _load_json_artifact(
-        artifact_paths.get("risk_findings.json"),
-        label="risk findings",
-        diagnostics=diagnostics,
-    ) or []
-    insurance_findings = _load_json_artifact(
-        artifact_paths.get("insurance_findings.json"),
-        label="insurance findings",
-        diagnostics=diagnostics,
-    ) or []
-    compliance_findings = _load_json_artifact(
-        artifact_paths.get("compliance_findings.json"),
-        label="compliance findings",
-        diagnostics=diagnostics,
-    ) or []
+    risk_findings = (
+        _load_json_artifact(
+            artifact_paths.get("risk_findings.json"),
+            label="risk findings",
+            diagnostics=diagnostics,
+        )
+        or []
+    )
+    insurance_findings = (
+        _load_json_artifact(
+            artifact_paths.get("insurance_findings.json"),
+            label="insurance findings",
+            diagnostics=diagnostics,
+        )
+        or []
+    )
+    compliance_findings = (
+        _load_json_artifact(
+            artifact_paths.get("compliance_findings.json"),
+            label="compliance findings",
+            diagnostics=diagnostics,
+        )
+        or []
+    )
 
     findings: list[dict[str, Any]] = []
     for source_name, payload in (
@@ -114,7 +120,9 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
             if isinstance(finding, dict):
                 enriched = dict(finding)
                 enriched["source_group"] = source_name
-                enriched["ui_id"] = str(enriched.get("id") or f"{source_name}_finding_{index}")
+                enriched["ui_id"] = str(
+                    enriched.get("id") or f"{source_name}_finding_{index}"
+                )
                 findings.append(enriched)
 
     latest_commit = (
@@ -130,19 +138,28 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
     obligations = []
     if case_record.get("latest_commit_id"):
         try:
-            for index, item in enumerate(store.load_current_obligations(project_id), start=1):
+            for index, item in enumerate(
+                store.load_current_obligations(project_id), start=1
+            ):
                 payload = item.model_dump(mode="json")
                 payload["ui_id"] = str(payload.get("id") or f"obligation_{index}")
                 obligations.append(payload)
         except (FileNotFoundError, ValueError):
-            diagnostics.append("Committed obligations could not be loaded from the current lifecycle snapshot.")
-    review_actions = [item.model_dump(mode="json") for item in store.load_current_review_actions(project_id)]
+            diagnostics.append(
+                "Committed obligations could not be loaded from the current lifecycle snapshot."
+            )
+    review_actions = [
+        item.model_dump(mode="json")
+        for item in store.load_current_review_actions(project_id)
+    ]
 
     alerts = latest_monitoring.get("alerts", []) if latest_monitoring else []
     for index, item in enumerate(alerts, start=1):
         if isinstance(item, dict):
             item.setdefault("ui_id", str(item.get("alert_id") or f"alert_{index}"))
-    monitored_obligations = latest_monitoring.get("monitored_obligations", []) if latest_monitoring else []
+    monitored_obligations = (
+        latest_monitoring.get("monitored_obligations", []) if latest_monitoring else []
+    )
     documents = latest_run.get("document_inventory", {}).get("documents", [])
     decision = latest_run.get("decision_summary", {})
     severity_counts = _severity_counts(findings)
@@ -172,7 +189,10 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
         "obligation_status_counts": obligation_status_counts,
         "timeline": _lifecycle_timeline(case_record),
         "summary_metrics": {
-            "analysis_perspective": decision.get("analysis_perspective", case_record.get("latest_analysis_perspective", "vendor")),
+            "analysis_perspective": decision.get(
+                "analysis_perspective",
+                case_record.get("latest_analysis_perspective", "vendor"),
+            ),
             "recommendation": decision.get("recommendation", "unknown"),
             "overall_risk": decision.get("overall_risk", "unknown"),
             "confidence": decision.get("confidence", 0),
@@ -190,11 +210,7 @@ def _external_dashboard_data(data: dict[str, Any]) -> dict[str, Any]:
     case_record.pop("source_project_dir", None)
     case_record.pop("storage_dir", None)
     case_record["run_history"] = [
-        {
-            key: value
-            for key, value in dict(item).items()
-            if key != "artifacts_dir"
-        }
+        {key: value for key, value in dict(item).items() if key != "artifacts_dir"}
         for item in case_record.get("run_history", [])
         if isinstance(item, dict)
     ]
@@ -211,7 +227,9 @@ def _external_dashboard_data(data: dict[str, Any]) -> dict[str, Any]:
         "obligations_count": latest_run.get("obligations_count", 0),
         "context_profile": {
             "signals": [],
-            "notes": ["Internal-only context is intentionally omitted from the external artifact."],
+            "notes": [
+                "Internal-only context is intentionally omitted from the external artifact."
+            ],
             "internal_only": False,
         },
     }
@@ -240,7 +258,9 @@ def _external_dashboard_data(data: dict[str, Any]) -> dict[str, Any]:
             "created_at": latest_monitoring_raw.get("created_at"),
             "source_commit_id": latest_monitoring_raw.get("source_commit_id"),
             "as_of_date": latest_monitoring_raw.get("as_of_date"),
-            "monitored_obligations": latest_monitoring_raw.get("monitored_obligations", []),
+            "monitored_obligations": latest_monitoring_raw.get(
+                "monitored_obligations", []
+            ),
             "alerts": latest_monitoring_raw.get("alerts", []),
         }
 
@@ -2304,8 +2324,7 @@ def render_project_dashboard(
 """
 
     html_output = (
-        html_template
-        .replace("{{", "{")
+        html_template.replace("{{", "{")
         .replace("}}", "}")
         .replace("__DASHBOARD_PAYLOAD__", payload)
         .replace("__REPORT_MODE_SWITCH__", mode_switch_markup)
