@@ -112,36 +112,6 @@ class ContractCRM:
         return self.storage_dir / "interactions.json"
 
     def _load(self) -> None:
-        for path, collection, cls in [
-            (self._entities_path(), "entities", Entity),
-            (self._contacts_path(), "contacts", Contact),
-            (self._interactions_path(), "interactions", Interaction),
-        ]:
-            if not path.exists():
-                continue
-            data = json.loads(path.read_text(encoding="utf-8"))
-            for item_data in data.get(collection, []):
-                obj = cls(
-                    **{
-                        k: v
-                        for k, v in item_data.items()
-                        if k in cls.__dataclass_fields__
-                    }
-                )
-                getattr(self, collection)[
-                    getattr(
-                        obj,
-                        f"{cls.__name__.lower()}_id"
-                        if cls != Entity
-                        else "entity_id"
-                        if cls == Entity
-                        else "contact_id"
-                        if cls == Contact
-                        else "interaction_id",
-                    )
-                ] = obj
-
-        # Rebuild properly
         self.entities = {}
         self.contacts = {}
         self.interactions = {}

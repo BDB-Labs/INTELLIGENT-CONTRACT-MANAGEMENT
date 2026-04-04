@@ -9,7 +9,12 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from apps.contract_intelligence.domain.models import AlertRecord, MonitoredObligation, MonitoringStatusInput, Obligation
+from apps.contract_intelligence.domain.models import (
+    AlertRecord,
+    MonitoredObligation,
+    MonitoringStatusInput,
+    Obligation,
+)
 from apps.contract_intelligence.orchestration.bid_review_runner import _project_id
 from apps.contract_intelligence.paths import resolve_existing_directory
 from apps.contract_intelligence.storage import FileSystemCaseStore
@@ -29,7 +34,9 @@ def _read_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _status_inputs_by_id(path: str | Path | None) -> tuple[dict[str, MonitoringStatusInput], str | None]:
+def _status_inputs_by_id(
+    path: str | Path | None,
+) -> tuple[dict[str, MonitoringStatusInput], str | None]:
     if path is None:
         return {}, None
     resolved = Path(path).expanduser().resolve()
@@ -39,15 +46,21 @@ def _status_inputs_by_id(path: str | Path | None) -> tuple[dict[str, MonitoringS
     indexed: dict[str, MonitoringStatusInput] = {}
     for index, item in enumerate(payload, start=1):
         if not isinstance(item, dict):
-            raise ValueError(f"Expected object items in {resolved}; item {index} is invalid.")
+            raise ValueError(
+                f"Expected object items in {resolved}; item {index} is invalid."
+            )
         try:
             record = MonitoringStatusInput.model_validate(item)
         except ValidationError as exc:
             if "status" in str(exc):
-                raise ValueError("status must be one of pending, due, late, or satisfied") from exc
+                raise ValueError(
+                    "status must be one of pending, due, late, or satisfied"
+                ) from exc
             raise ValueError(f"Status input item {index} is invalid: {exc}") from exc
         if record.obligation_id in indexed:
-            raise ValueError(f"Duplicate obligation_id '{record.obligation_id}' in {resolved}.")
+            raise ValueError(
+                f"Duplicate obligation_id '{record.obligation_id}' in {resolved}."
+            )
         indexed[record.obligation_id] = record
     return indexed, str(resolved)
 
@@ -61,21 +74,45 @@ def _status_from_due_dates(
 ) -> tuple[str, str]:
     if next_due_at is None:
         if obligation.obligation_type == "recurring_reporting":
-            return "pending", "Recurring reporting obligation is awaiting a scheduled next_due_at value."
+            return (
+                "pending",
+                "Recurring reporting obligation is awaiting a scheduled next_due_at value.",
+            )
         if obligation.obligation_type == "pre_start_requirement":
-            return "pending", "Pre-start requirement remains open until mobilization readiness is confirmed."
+            return (
+                "pending",
+                "Pre-start requirement remains open until mobilization readiness is confirmed.",
+            )
         if obligation.obligation_type == "notice_deadline":
-            return "pending", "Event-driven notice obligation remains open until a triggering event occurs."
-        return "pending", "Obligation is open and awaiting an operational status update."
+            return (
+                "pending",
+                "Event-driven notice obligation remains open until a triggering event occurs.",
+            )
+        return (
+            "pending",
+            "Obligation is open and awaiting an operational status update.",
+        )
 
     due_date = next_due_at.date()
     if last_satisfied_at is not None and last_satisfied_at >= next_due_at:
-        return "satisfied", "Operational inputs show this obligation was satisfied for the current due cycle."
+        return (
+            "satisfied",
+            "Operational inputs show this obligation was satisfied for the current due cycle.",
+        )
     if as_of_date > due_date:
-        return "late", "Operational inputs show the due date has passed without a satisfaction record."
+        return (
+            "late",
+            "Operational inputs show the due date has passed without a satisfaction record.",
+        )
     if as_of_date == due_date:
-        return "due", "Operational inputs show the obligation is due as of the monitoring date."
-    return "pending", "Operational inputs show the obligation is scheduled for a future due date."
+        return (
+            "due",
+            "Operational inputs show the obligation is due as of the monitoring date.",
+        )
+    return (
+        "pending",
+        "Operational inputs show the obligation is scheduled for a future due date.",
+    )
 
 
 def _default_status(
@@ -85,17 +122,17 @@ def _default_status(
     last_satisfied_at: datetime | None,
     as_of_date: date,
 ) -> tuple[str, str]:
-    if obligation.obligation_type in {"recurring_reporting", "pre_start_requirement", "notice_deadline"}:
+    if obligation.obligation_type in {
+        "recurring_reporting",
+        "pre_start_requirement",
+        "notice_deadline",
+    }:
         return _status_from_due_dates(
             obligation=obligation,
             next_due_at=next_due_at,
             last_satisfied_at=last_satisfied_at,
             as_of_date=as_of_date,
         )
-    if obligation.obligation_type == "pre_start_requirement":
-        return "pending", "Pre-start requirement remains open until mobilization readiness is confirmed."
-    if obligation.obligation_type == "notice_deadline":
-        return "pending", "Event-driven notice obligation remains open until a triggering event occurs."
     return "pending", "Obligation is open and awaiting an operational status update."
 
 
@@ -113,8 +150,16 @@ def _monitored_obligation(
         last_satisfied_at=last_satisfied_at,
         as_of_date=as_of_date,
     )
-    status = status_input.status if status_input and status_input.status is not None else default_status
-    summary = status_input.summary if status_input and status_input.summary is not None else default_summary
+    status = (
+        status_input.status
+        if status_input and status_input.status is not None
+        else default_status
+    )
+    summary = (
+        status_input.summary
+        if status_input and status_input.summary is not None
+        else default_summary
+    )
 
     notes: list[str] = []
     if status_input:
@@ -134,15 +179,23 @@ def _monitored_obligation(
     )
 
 
-def _alerts_for(monitored: list[MonitoredObligation], *, as_of_date: date) -> list[AlertRecord]:
+def _alerts_for(
+    monitored: list[MonitoredObligation], *, as_of_date: date
+) -> list[AlertRecord]:
     alerts: list[AlertRecord] = []
     now = datetime.now(timezone.utc)
     for obligation in monitored:
         if obligation.status not in {"due", "late"}:
             continue
-        due_cycle = obligation.next_due_at.isoformat() if obligation.next_due_at else as_of_date.isoformat()
+        due_cycle = (
+            obligation.next_due_at.isoformat()
+            if obligation.next_due_at
+            else as_of_date.isoformat()
+        )
         digest = hashlib.sha1(
-            f"{obligation.obligation_id}|{obligation.status}|{due_cycle}".encode("utf-8")
+            f"{obligation.obligation_id}|{obligation.status}|{due_cycle}".encode(
+                "utf-8"
+            )
         ).hexdigest()[:12]
         alerts.append(
             AlertRecord(
@@ -173,7 +226,9 @@ def monitor_contract(
     effective_as_of_date = as_of_date or date.today()
 
     monitored = [
-        _monitored_obligation(item, status_inputs.get(item.id), as_of_date=effective_as_of_date)
+        _monitored_obligation(
+            item, status_inputs.get(item.id), as_of_date=effective_as_of_date
+        )
         for item in obligations
     ]
     alerts = _alerts_for(monitored, as_of_date=effective_as_of_date)
