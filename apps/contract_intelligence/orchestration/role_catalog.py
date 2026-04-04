@@ -55,6 +55,14 @@ BID_REVIEW_ROLE_CATALOG: tuple[DomainRole, ...] = (
         stage="analysis",
     ),
     DomainRole(
+        key="relationship_advisor",
+        purpose="Provide long-term relationship impact assessment and negotiation strategy guidance based on historical patterns and entity-specific context.",
+        output_artifact="relationship_advice.json",
+        output_schema="relationship_advice.schema.json",
+        prompt_file="relationship_advisor.md",
+        stage="advisory",
+    ),
+    DomainRole(
         key="context_intelligence_analyst",
         purpose="Extract internal-only budget, oversight, schedule, and public-visibility signals from context documents.",
         output_artifact="context_profile.json",
@@ -87,6 +95,14 @@ BID_REVIEW_ROLE_CATALOG: tuple[DomainRole, ...] = (
         stage="synthesis",
     ),
     DomainRole(
+        key="negotiation_strategist",
+        purpose="Synthesize all technical, contextual, and relationship insights into actionable negotiation recommendations with implementation roadmap.",
+        output_artifact="negotiation_strategy.json",
+        output_schema="negotiation_strategy.schema.json",
+        prompt_file="negotiation_strategist.md",
+        stage="synthesis",
+    ),
+    DomainRole(
         key="obligation_register_builder",
         purpose="Convert contract terms into trackable obligations and notice triggers.",
         output_artifact="obligations_register.json",
@@ -110,4 +126,6 @@ def role_keys() -> tuple[str, ...]:
 
 
 def artifact_contract() -> dict[str, str]:
-    return {role.output_artifact: role.output_schema for role in BID_REVIEW_ROLE_CATALOG}
+    return {
+        role.output_artifact: role.output_schema for role in BID_REVIEW_ROLE_CATALOG
+    }
