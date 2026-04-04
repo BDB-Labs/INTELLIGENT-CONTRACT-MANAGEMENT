@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,8 @@ from ese.templates import (
     resolve_execution_mode,
     provider_runtime_summary,
 )
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_MODEL_BY_PROVIDER = {
@@ -305,6 +308,8 @@ def build_bid_review_ese_config(
     base_url: str | None = None,
     fail_on_high: bool = False,
     analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
+    knowledge_base_dir: str | Path | None = None,
+    entity_name: str | None = None,
 ) -> dict[str, Any]:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
     artifacts_path = resolve_output_directory(
@@ -320,15 +325,56 @@ def build_bid_review_ese_config(
     )
     selected_model = (model or "").strip() or _default_model_for(clean_provider)
 
+    # Build RAG context if knowledge base is available
+    rag_context = ""
+    if knowledge_base_dir:
+        try:
+            from ese.knowledge_base import ContractKnowledgeBase
+
+            kb = ContractKnowledgeBase(knowledge_base_dir)
+            if len(kb) > 0:
+                # Extract key issues from project context for RAG query
+                project_context = _render_project_context(project_path)
+                key_issues = []
+                for term in [
+                    "pay-if-paid",
+                    "indemnif",
+                    "termination",
+                    "change order",
+                    "insurance",
+                    "davis-bacon",
+                    "certified payroll",
+                ]:
+                    if term.lower() in project_context.lower():
+                        key_issues.append(term)
+                rag_context = kb.build_rag_context(
+                    entity_name=entity_name or "",
+                    project_type="construction",
+                    key_issues=key_issues if key_issues else None,
+                    max_entries=5,
+                )
+                if rag_context:
+                    logger.info("RAG context injected: %d characters", len(rag_context))
+        except Exception as e:
+            logger.warning("Failed to load knowledge base: %s", e)
+
     role_definitions = {role.key: role for role in BID_REVIEW_ROLE_CATALOG}
     roles_cfg: dict[str, Any] = {}
     for role_key in _ordered_role_keys():
         role_def = role_definitions[role_key]
+        prompt = _prompt_for_role(
+            role_key, role_def.output_artifact, analysis_perspective=perspective
+        )
+        # Inject RAG context into advisory roles
+        if rag_context and role_key in {
+            "relationship_advisor",
+            "negotiation_strategist",
+            "context_intelligence_analyst",
+        }:
+            prompt = f"{prompt}\n\n## HISTORICAL INTELLIGENCE (RAG)\n{rag_context}"
         roles_cfg[role_key] = {
             "temperature": 0.2,
-            "prompt": _prompt_for_role(
-                role_key, role_def.output_artifact, analysis_perspective=perspective
-            ),
+            "prompt": prompt,
         }
 
     provider_cfg: dict[str, Any] = {
