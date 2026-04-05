@@ -12,6 +12,7 @@ desktop_config = importlib.import_module("ese.desktop.config")
 desktop_runtime = importlib.import_module("ese.desktop.runtime")
 platform_catalog = importlib.import_module("ese.platform.catalog")
 dashboard_module = importlib.import_module("ese.dashboard")
+workbench_module = importlib.import_module("apps.contract_intelligence.ui.workbench")
 
 DesktopLaunchConfig = desktop_config.DesktopLaunchConfig
 get_surface_spec = desktop_config.get_surface_spec
@@ -23,20 +24,22 @@ list_surface_specs = platform_catalog.list_surface_specs
 catalog_payload = dashboard_module._catalog_payload
 config_preview_payload = dashboard_module._config_preview_payload
 save_config_payload = dashboard_module._save_config_payload
+render_workbench_html = workbench_module.render_workbench_html
 
 
 def test_surface_registry_falls_back_to_dashboard_surface() -> None:
     surface = get_surface_spec("unknown-surface")
 
-    assert surface.key == "ese-dashboard"
-    assert surface.title == "Run Studio"
+    assert surface.key == "icm-workbench"
+    assert surface.title == "Operator Workbench"
 
 
 def test_render_splash_html_includes_brand_copy() -> None:
-    surface = get_surface_spec("ese-dashboard")
+    surface = get_surface_spec("icm-workbench")
     html = render_splash_html(surface)
 
-    assert "ESE Control Center" in html
+    assert "Intelligent Contract Management" in html
+    assert "Powered by Ensemble Systems Engineering" in html
     assert "macOS-first, multi-platform-ready" in html
     assert surface.subtitle in html
 
@@ -53,6 +56,8 @@ def test_build_server_command_uses_module_entrypoint_in_dev_mode() -> None:
 
     assert command[:3] == [sys.executable, "-m", "ese.desktop.app"]
     assert "--server" in command
+    assert "--surface" in command
+    assert "icm-workbench" in command
     assert "9001" in command
     assert "ese.config.yaml" in command
 
@@ -80,6 +85,7 @@ def test_catalog_payload_exposes_commands_and_surfaces() -> None:
 
     assert "doctor" in command_names
     assert "platforms" in command_names
+    assert "icm-workbench" in surface_names
     assert "ese-dashboard" in surface_names
     assert payload["platforms"]
 
@@ -121,3 +127,12 @@ def test_save_config_payload_writes_generated_config(tmp_path: Path) -> None:
     assert payload["config_path"] == str(target)
     assert target.exists()
     assert "feature-delivery" in target.read_text(encoding="utf-8")
+
+
+def test_workbench_html_exposes_contract_lifecycle_commands() -> None:
+    html = render_workbench_html()
+
+    assert "Intelligent Contract Management" in html
+    assert "Deterministic review" in html
+    assert "AI ensemble review" in html
+    assert "/projects/render-dashboard" in html

@@ -284,6 +284,74 @@ def test_contract_intelligence_api_serves_reference_manifest_and_dashboard(monke
     assert "Internal-only context is intentionally omitted from the external artifact." in dashboard_response.text
 
 
+def test_contract_intelligence_api_serves_workbench_and_output_routes(tmp_path: Path) -> None:
+    workbench_response = client.get("/workbench")
+    assert workbench_response.status_code == 200
+    assert "Intelligent Contract Management" in workbench_response.text
+    assert "Powered by Ensemble Systems Engineering" in workbench_response.text
+
+    project_dir = tmp_path / "api-workbench"
+    _write_project_package(project_dir)
+
+    analyze_response = client.post(
+        "/projects/analyze",
+        json={"project_dir": str(project_dir), "analysis_perspective": "vendor"},
+    )
+    assert analyze_response.status_code == 200
+
+    render_response = client.post(
+        "/projects/render-dashboard",
+        json={"project_dir": str(project_dir), "mode": "internal"},
+    )
+    assert render_response.status_code == 200
+    render_payload = render_response.json()
+    assert render_payload["report_mode"] == "internal"
+    assert Path(render_payload["dashboard_path"]).exists()
+
+    preview_response = client.get(
+        "/projects/dashboard/view",
+        params={"project_dir": str(project_dir), "mode": "external"},
+    )
+    assert preview_response.status_code == 200
+    assert "Contract Intelligence Dashboard" in preview_response.text
+
+    dispositions_path = _write_finding_dispositions(project_dir, tmp_path / "workbench_dispositions.json")
+    commit_response = client.post(
+        "/projects/commit",
+        json={"project_dir": str(project_dir), "finding_dispositions_file": str(dispositions_path)},
+    )
+    assert commit_response.status_code == 200
+
+    obligations_export = tmp_path / "obligations-export.json"
+    obligations_response = client.post(
+        "/projects/extract-obligations",
+        json={"project_dir": str(project_dir), "output_path": str(obligations_export)},
+    )
+    assert obligations_response.status_code == 200
+    assert obligations_response.json()["obligations_count"] >= 1
+    assert obligations_export.exists()
+
+
+def test_contract_intelligence_api_exposes_ensemble_review_endpoint(tmp_path: Path) -> None:
+    project_dir = tmp_path / "api-ensemble"
+    _write_project_package(project_dir)
+
+    response = client.post(
+        "/projects/ensemble-review",
+        json={
+            "project_dir": str(project_dir),
+            "provider": "local",
+            "execution_mode": "demo",
+            "analysis_perspective": "agency",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["analysis_perspective"] == "agency"
+    assert Path(payload["summary_path"]).exists()
+    assert payload["provider_runtime"]["ese_bridge"] is True
+
+
 def test_contract_intelligence_api_optional_reference_auth(monkeypatch, tmp_path: Path) -> None:
     corpus_dir = tmp_path / "corpus"
     case_dir = corpus_dir / "demo-auth"

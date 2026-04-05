@@ -16,8 +16,8 @@ class DesktopLaunchConfig:
     host: str = "127.0.0.1"
     port: int = 0
     config_path: str | None = None
-    surface: str = "ese-dashboard"
-    window_title: str = "ESE Control Center"
+    surface: str = "icm-workbench"
+    window_title: str | None = None
     width: int = 1500
     height: int = 980
     min_width: int = 1180

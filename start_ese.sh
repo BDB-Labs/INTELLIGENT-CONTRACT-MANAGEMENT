@@ -56,7 +56,7 @@ run_dashboard() {
 }
 
 run_desktop() {
-  exec "${UV_BIN}" run ese desktop --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
+  exec "${UV_BIN}" run ese desktop --surface ese-dashboard --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
 }
 
 run_task() {

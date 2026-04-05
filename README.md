@@ -68,12 +68,16 @@ prefix CLI calls with `uv run`.
 
 ## One-Command Local Start
 
-There is now a local control surface: the ESE dashboard and native desktop shell.
+There are now two local control surfaces:
+
+- `./start_ese.sh` for the generic ESE dashboard and framework shell
+- `./start_icm.sh` for the contract-specific Intelligent Contract Management workbench
 
 From the repo root, the simplest way to start everything is:
 
 ```bash
 ./start_ese.sh
+./start_icm.sh
 ```
 
 That script will:
@@ -228,8 +232,8 @@ Optional signing:
 
 The build script outputs:
 
-- `dist/macos/ESE Control Center.app`
-- `dist/macos/ESE-Control-Center-macOS-<arch>.dmg`
+- `dist/macos/Intelligent Contract Management.app`
+- `dist/macos/Intelligent-Contract-Management-macOS-<arch>.dmg`
 
 ## Contract Intelligence Application
 

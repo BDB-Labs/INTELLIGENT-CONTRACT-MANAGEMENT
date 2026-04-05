@@ -4,15 +4,15 @@ import argparse
 import time
 import webbrowser
 
-from ese.dashboard import serve_dashboard
 from ese.desktop.branding import render_splash_html
 from ese.desktop.config import DesktopLaunchConfig, get_surface_spec
-from ese.desktop.runtime import SubprocessDashboardRuntime
+from ese.desktop.runtime import SubprocessSurfaceRuntime
+from ese.desktop.server import serve_desktop_surface
 
 
 def launch_desktop_app(config: DesktopLaunchConfig | None = None) -> None:
     launch_config = config or DesktopLaunchConfig()
-    runtime = SubprocessDashboardRuntime(launch_config)
+    runtime = SubprocessSurfaceRuntime(launch_config)
     surface = get_surface_spec(launch_config.surface)
 
     try:
@@ -30,7 +30,7 @@ def launch_desktop_app(config: DesktopLaunchConfig | None = None) -> None:
             return
 
         window = webview.create_window(
-            launch_config.window_title,
+            launch_config.window_title or surface.window_title or surface.headline,
             html=render_splash_html(surface),
             width=launch_config.width,
             height=launch_config.height,
@@ -48,27 +48,27 @@ def launch_desktop_app(config: DesktopLaunchConfig | None = None) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Launch the ESE desktop shell.")
+    parser = argparse.ArgumentParser(description="Launch the desktop shell.")
     parser.add_argument(
         "--server",
         action="store_true",
-        help="Run only the dashboard server. Used by the desktop shell launcher.",
+        help="Run only the surface server. Used by the desktop shell launcher.",
     )
     parser.add_argument(
         "--artifacts-dir",
         default="artifacts",
-        help="Artifacts directory used by the dashboard surface.",
+        help="Artifacts directory used by the selected surface.",
     )
-    parser.add_argument("--host", default="127.0.0.1", help="Dashboard host.")
-    parser.add_argument("--port", default=0, type=int, help="Dashboard port.")
+    parser.add_argument("--host", default="127.0.0.1", help="Surface host.")
+    parser.add_argument("--port", default=0, type=int, help="Surface port.")
     parser.add_argument(
         "--config",
         default=None,
-        help="Optional config path to prefill the dashboard.",
+        help="Optional config path for surfaces that accept a config file.",
     )
     parser.add_argument(
         "--surface",
-        default="ese-dashboard",
+        default="icm-workbench",
         help="Desktop surface key to launch.",
     )
     parser.add_argument(
@@ -87,12 +87,16 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     args = _parser().parse_args(argv)
     if args.server:
-        serve_dashboard(
-            artifacts_dir=args.artifacts_dir,
-            host=args.host,
-            port=args.port,
-            open_browser=False,
-            config_path=args.config,
+        serve_desktop_surface(
+            DesktopLaunchConfig(
+                artifacts_dir=args.artifacts_dir,
+                host=args.host,
+                port=args.port,
+                config_path=args.config,
+                surface=args.surface,
+                debug=args.debug,
+                browser_fallback=not args.no_browser_fallback,
+            )
         )
         return
 

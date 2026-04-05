@@ -10,18 +10,18 @@ if [[ "$(uname -s)" != "Darwin" ]]; then
 fi
 
 UV_BIN="${UV:-uv}"
-APP_NAME="ESE Control Center"
-BUNDLE_ID="${BUNDLE_ID:-com.bdblabs.ese-control-center}"
+APP_NAME="Intelligent Contract Management"
+BUNDLE_ID="${BUNDLE_ID:-com.bdblabs.intelligent-contract-management}"
 ARCH="$(uname -m)"
 DIST_ROOT="${ROOT_DIR}/dist/macos"
 BUILD_ROOT="${ROOT_DIR}/build/macos"
 PYINSTALLER_ROOT="${ROOT_DIR}/build/pyinstaller"
 ICON_ROOT="${BUILD_ROOT}/icon"
-ICONSET_DIR="${ICON_ROOT}/ESEControlCenter.iconset"
-ICON_PNG="${ICON_ROOT}/ESEControlCenter.png"
-ICON_ICNS="${ICON_ROOT}/ESEControlCenter.icns"
+ICONSET_DIR="${ICON_ROOT}/IntelligentContractManagement.iconset"
+ICON_PNG="${ICON_ROOT}/IntelligentContractManagement.png"
+ICON_ICNS="${ICON_ROOT}/IntelligentContractManagement.icns"
 STAGING_DIR="${BUILD_ROOT}/dmg-staging"
-DMG_PATH="${DIST_ROOT}/ESE-Control-Center-macOS-${ARCH}.dmg"
+DMG_PATH="${DIST_ROOT}/Intelligent-Contract-Management-macOS-${ARCH}.dmg"
 
 mkdir -p "${DIST_ROOT}" "${BUILD_ROOT}" "${ICON_ROOT}"
 

@@ -111,6 +111,18 @@ Build the Vercel demo assets and the Render reference workspaces:
 uv run python -m apps.contract_intelligence build-demo
 ```
 
+Launch the contract-specific desktop workbench on macOS:
+
+```bash
+./start_icm.sh
+```
+
+Or launch the desktop shell directly through the shared launcher contract:
+
+```bash
+uv run ese desktop --surface icm-workbench
+```
+
 ## Product behavior notes
 
 - supported source types currently include `.md`, `.txt`, `.json`, `.yaml`,

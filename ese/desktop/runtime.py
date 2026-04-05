@@ -31,6 +31,8 @@ def build_server_command(config: DesktopLaunchConfig) -> list[str]:
             config.host,
             "--port",
             str(config.port),
+            "--surface",
+            config.surface,
             *(["--config", config.config_path] if config.config_path else []),
         ]
 
@@ -45,17 +47,19 @@ def build_server_command(config: DesktopLaunchConfig) -> list[str]:
         config.host,
         "--port",
         str(config.port),
+        "--surface",
+        config.surface,
         *(["--config", config.config_path] if config.config_path else []),
     ]
 
 
-def runtime_paths(app_name: str = "ese-control-center") -> RuntimePaths:
+def runtime_paths(app_name: str = "surface-runtime") -> RuntimePaths:
     root = Path.home() / "Library" / "Logs" / app_name
     root.mkdir(parents=True, exist_ok=True)
     return RuntimePaths(
         log_dir=root,
-        stdout_log=root / "dashboard-stdout.log",
-        stderr_log=root / "dashboard-stderr.log",
+        stdout_log=root / "surface-stdout.log",
+        stderr_log=root / "surface-stderr.log",
     )
 
 
@@ -65,16 +69,17 @@ def allocate_local_port() -> int:
         return int(sock.getsockname()[1])
 
 
-class SubprocessDashboardRuntime:
+class SubprocessSurfaceRuntime:
     def __init__(self, config: DesktopLaunchConfig) -> None:
         bound_port = config.port or allocate_local_port()
+        surface = get_surface_spec(config.surface)
         self.config = DesktopLaunchConfig(
             artifacts_dir=config.artifacts_dir,
             host=config.host,
             port=bound_port,
             config_path=config.config_path,
             surface=config.surface,
-            window_title=config.window_title,
+            window_title=config.window_title or surface.window_title,
             width=config.width,
             height=config.height,
             min_width=config.min_width,
@@ -82,9 +87,9 @@ class SubprocessDashboardRuntime:
             debug=config.debug,
             browser_fallback=config.browser_fallback,
         )
-        self.surface = get_surface_spec(config.surface)
+        self.surface = surface
         self.process: subprocess.Popen[str] | None = None
-        self.paths = runtime_paths()
+        self.paths = runtime_paths(surface.runtime_slug)
 
     @property
     def bound_port(self) -> int:
@@ -118,7 +123,7 @@ class SubprocessDashboardRuntime:
         while time.time() < deadline:
             if self.process is not None and self.process.poll() is not None:
                 raise RuntimeError(
-                    "Desktop dashboard runtime exited before it became ready. "
+                    "Desktop surface runtime exited before it became ready. "
                     f"See logs in {self.paths.log_dir}."
                 )
             try:
@@ -129,7 +134,7 @@ class SubprocessDashboardRuntime:
                 time.sleep(0.2)
                 continue
         raise TimeoutError(
-            "Timed out waiting for the desktop dashboard runtime to become ready. "
+            "Timed out waiting for the desktop surface runtime to become ready. "
             f"See logs in {self.paths.log_dir}."
         )
 
@@ -144,3 +149,6 @@ class SubprocessDashboardRuntime:
                 self.process.kill()
                 self.process.wait(timeout=5)
         self.process = None
+
+
+SubprocessDashboardRuntime = SubprocessSurfaceRuntime

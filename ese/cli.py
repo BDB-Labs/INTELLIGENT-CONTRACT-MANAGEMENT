@@ -839,7 +839,7 @@ def desktop(
         None, help="Optional config path to prefill the dashboard"
     ),
     surface: str = typer.Option(
-        "ese-dashboard", help="Desktop surface key to launch"
+        "icm-workbench", help="Desktop surface key to launch"
     ),
     debug: bool = typer.Option(False, help="Enable desktop shell debug mode"),
     browser_fallback: bool = typer.Option(
@@ -848,7 +848,7 @@ def desktop(
         help="Open the system browser if the native webview runtime is unavailable",
     ),
 ):
-    """Launch the native desktop shell for ESE surfaces."""
+    """Launch the native desktop shell for the selected surface."""
     launch_desktop_app(
         DesktopLaunchConfig(
             artifacts_dir=artifacts_dir,

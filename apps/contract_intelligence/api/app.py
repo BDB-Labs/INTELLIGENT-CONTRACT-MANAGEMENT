@@ -9,31 +9,49 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.background import BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, ValidationError
 
-logger = logging.getLogger(__name__)
-
+from apps.contract_intelligence.demo import (
+    build_demo_assets,
+    default_demo_site_dir,
+    default_reference_root,
+)
 from apps.contract_intelligence.domain.enums import AnalysisPerspective
 from apps.contract_intelligence.domain.models import AlertRecord, ReviewActionRecord
+from apps.contract_intelligence.evaluation.corpus import (
+    default_corpus_dir,
+    evaluate_corpus,
+)
 from apps.contract_intelligence.monitoring.runner import monitor_contract
 from apps.contract_intelligence.orchestration.bid_review_runner import (
     compute_project_id,
     run_bid_review,
 )
-from apps.contract_intelligence.orchestration.commit_runner import commit_contract
+from apps.contract_intelligence.orchestration.commit_runner import (
+    commit_contract,
+    load_committed_obligations,
+)
+from apps.contract_intelligence.orchestration.ese_bridge import run_bid_review_with_ese
 from apps.contract_intelligence.paths import (
     resolve_guarded_existing_directory,
     resolve_guarded_existing_file,
     resolve_guarded_optional_existing_directory,
     resolve_guarded_output_directory,
+    resolve_guarded_output_file,
     validate_allowed_roots_configured,
 )
 from apps.contract_intelligence.storage import FileSystemCaseStore
+from apps.contract_intelligence.ui import render_project_dashboard
+from apps.contract_intelligence.ui.workbench import render_workbench_html
 from ese.constants import read_json
+from ese.logging_config import configure_logging
+
+logger = logging.getLogger(__name__)
 
 
 def _docs_enabled() -> bool:
@@ -83,9 +101,6 @@ def _authenticated(request: Request) -> bool:
         password, expected_password
     )
 
-
-from ese.logging_config import configure_logging
-
 _logging_configured = False
 _logging_lock = threading.Lock()
 
@@ -122,6 +137,12 @@ app = FastAPI(
 )
 
 
+def serve_contract_intelligence_api(*, host: str = "127.0.0.1", port: int = 8000) -> None:
+    import uvicorn
+
+    uvicorn.run(app, host=host, port=port, log_level=os.getenv("LOG_LEVEL", "info").lower())
+
+
 @app.middleware("http")
 async def _reference_auth_middleware(request: Request, call_next):
     if not _authenticated(request):
@@ -149,6 +170,43 @@ class MonitorProjectRequest(BaseModel):
     project_dir: str
     status_inputs_file: str | None = None
     async_mode: bool = False
+
+
+class EnsembleAnalyzeProjectRequest(BaseModel):
+    project_dir: str
+    provider: str = "local"
+    execution_mode: str = "demo"
+    artifacts_dir: str | None = "artifacts/contract_intelligence_ese"
+    model: str | None = None
+    runtime_adapter: str | None = None
+    provider_name: str | None = None
+    base_url: str | None = None
+    api_key_env: str | None = None
+    analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
+    fail_on_high: bool = False
+    write_config_path: str | None = None
+
+
+class ExtractObligationsRequest(BaseModel):
+    project_dir: str
+    output_path: str | None = None
+
+
+class RenderDashboardRequest(BaseModel):
+    project_dir: str
+    mode: str = "internal"
+    output_path: str | None = None
+
+
+class EvaluateCorpusRequest(BaseModel):
+    corpus_dir: str = str(default_corpus_dir())
+    artifacts_dir: str | None = None
+
+
+class BuildDemoRequest(BaseModel):
+    corpus_dir: str = str(default_corpus_dir())
+    reference_root: str = str(default_reference_root())
+    site_dir: str = str(default_demo_site_dir())
 
 
 class ReviewActionUpsertRequest(BaseModel):
@@ -210,6 +268,17 @@ def _validated_output_dir(path: str | Path | None, *, label: str) -> str | None:
     return str(resolved)
 
 
+def _validated_output_file(path: str | Path | None, *, label: str) -> str | None:
+    if path is None:
+        return None
+    try:
+        resolved = resolve_guarded_output_file(path, label=label)
+    except ValueError as exc:
+        status = 403 if "outside the configured allowed roots" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    return str(resolved)
+
+
 def _validated_input_file(file_path: str | Path | None, *, label: str) -> str | None:
     if not file_path:
         return None
@@ -221,6 +290,17 @@ def _validated_input_file(file_path: str | Path | None, *, label: str) -> str | 
     except ValueError as exc:
         status = 403 if "outside the configured allowed roots" in str(exc) else 400
         raise HTTPException(status_code=status, detail=str(exc)) from exc
+
+
+def _validated_existing_directory(path: str | Path, *, label: str) -> str:
+    try:
+        resolved = resolve_guarded_existing_directory(path, label=label)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=400, detail=f"{label} does not exist.") from exc
+    except ValueError as exc:
+        status = 403 if "outside the configured allowed roots" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    return str(resolved)
 
 
 def _store_for(project_dir: str | Path) -> tuple[FileSystemCaseStore, str]:
@@ -475,6 +555,11 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/favicon.ico")
+def favicon() -> Response:
+    return Response(status_code=204)
+
+
 @app.get("/health/ready")
 def readiness() -> dict[str, object]:
     """Enhanced readiness check that verifies dependencies."""
@@ -510,6 +595,11 @@ def root() -> str:
     return _reference_landing_html()
 
 
+@app.get("/workbench", response_class=HTMLResponse)
+def workbench() -> str:
+    return render_workbench_html()
+
+
 @app.get("/reference", response_class=HTMLResponse)
 def reference_home() -> str:
     return _reference_landing_html()
@@ -526,6 +616,63 @@ def reference_case_dashboard(case_id: str) -> FileResponse:
     if not target.exists():
         raise _not_found(f"No reference dashboard exists for case '{case_id}'.")
     return FileResponse(target, media_type="text/html")
+
+
+@app.post("/evaluation/corpus")
+def evaluate_corpus_cases(request: EvaluateCorpusRequest) -> dict[str, object]:
+    results = evaluate_corpus(
+        corpus_dir=_validated_existing_directory(request.corpus_dir, label="Corpus directory"),
+        artifacts_root=_validated_output_dir(request.artifacts_dir, label="Artifacts directory"),
+    )
+    passed_cases = sum(1 for item in results if item.passed)
+    return {
+        "corpus_dir": str(request.corpus_dir),
+        "passed_cases": passed_cases,
+        "total_cases": len(results),
+        "results": [
+            {
+                "case_id": item.case_id,
+                "passed": item.passed,
+                "failures": list(item.failures),
+                "artifacts_dir": str(item.artifacts_dir),
+            }
+            for item in results
+        ],
+    }
+
+
+@app.post("/reference/build-demo")
+def build_reference_demo(request: BuildDemoRequest) -> dict[str, object]:
+    result = build_demo_assets(
+        corpus_dir=_validated_existing_directory(request.corpus_dir, label="Corpus directory"),
+        reference_root=_validated_output_dir(request.reference_root, label="Reference root")
+        or request.reference_root,
+        site_dir=_validated_output_dir(request.site_dir, label="Site directory")
+        or request.site_dir,
+    )
+    return {
+        "generated_at": result.generated_at,
+        "reference_root": str(result.reference_root),
+        "site_dir": str(result.site_dir),
+        "manifest_path": str(result.manifest_path),
+        "cases": [
+            {
+                "case_id": case.case_id,
+                "title": case.title,
+                "dashboard_path": str(case.dashboard_path),
+                "project_id": case.project_id,
+                "recommendation": case.recommendation,
+                "overall_risk": case.overall_risk,
+                "analysis_perspective": case.analysis_perspective,
+                "findings_count": case.findings_count,
+                "obligations_count": case.obligations_count,
+                "alerts_count": case.alerts_count,
+                "documents_count": case.documents_count,
+                "highlights": list(case.highlights),
+            }
+            for case in result.cases
+        ],
+    }
 
 
 def _background_analyze(
@@ -590,6 +737,50 @@ def analyze_project(
         "run_record_path": str(result.run_record_path),
         "recommendation": result.decision_summary.recommendation.value,
         "overall_risk": result.decision_summary.overall_risk.value,
+    }
+
+
+@app.post("/projects/ensemble-review")
+def ensemble_review_project(request: EnsembleAnalyzeProjectRequest) -> dict[str, object]:
+    project_path = _validated_project_path(request.project_dir)
+    artifacts_dir = _validated_output_dir(
+        request.artifacts_dir,
+        label="Artifacts directory",
+    )
+    write_config_path = _validated_output_file(
+        request.write_config_path,
+        label="Config output path",
+    )
+
+    try:
+        cfg, summary_path = run_bid_review_with_ese(
+            project_dir=project_path,
+            provider=request.provider,
+            execution_mode=request.execution_mode,
+            artifacts_dir=artifacts_dir or "artifacts/contract_intelligence_ese",
+            model=request.model,
+            api_key_env=request.api_key_env,
+            runtime_adapter=request.runtime_adapter,
+            provider_name=request.provider_name,
+            base_url=request.base_url,
+            fail_on_high=request.fail_on_high,
+            analysis_perspective=request.analysis_perspective,
+            config_path=write_config_path,
+        )
+    except FileNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    runtime = dict(cfg.get("provider_runtime") or {})
+    return {
+        "project_id": compute_project_id(project_path),
+        "analysis_perspective": request.analysis_perspective.value,
+        "summary_path": str(summary_path),
+        "artifacts_dir": str((cfg.get("output") or {}).get("artifacts_dir") or ""),
+        "config_path": write_config_path,
+        "runtime_adapter": str((cfg.get("runtime") or {}).get("adapter") or ""),
+        "provider_runtime": runtime,
     }
 
 
@@ -744,6 +935,65 @@ def monitor_project(
         "alerts_path": str(result.alerts_path),
         "alerts_count": result.alerts_count,
     }
+
+
+@app.post("/projects/extract-obligations")
+def extract_obligations(request: ExtractObligationsRequest) -> dict[str, object]:
+    try:
+        result = load_committed_obligations(
+            project_dir=_validated_project_path(request.project_dir),
+            output_path=_validated_output_file(request.output_path, label="Output path"),
+        )
+    except FileNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "project_id": result.project_id,
+        "obligations_path": str(result.obligations_path),
+        "obligations_count": result.obligations_count,
+    }
+
+
+@app.post("/projects/render-dashboard")
+def render_dashboard(request: RenderDashboardRequest) -> dict[str, object]:
+    project_path = _validated_project_path(request.project_dir)
+    try:
+        dashboard_path = render_project_dashboard(
+            project_dir=project_path,
+            output_path=_validated_output_file(request.output_path, label="Output path"),
+            report_mode=request.mode,
+        )
+    except FileNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    view_href = "/projects/dashboard/view?" + urlencode(
+        {"project_dir": str(project_path), "mode": request.mode}
+    )
+    return {
+        "project_id": compute_project_id(project_path),
+        "report_mode": "external" if str(request.mode).lower() == "external" else "internal",
+        "dashboard_path": str(dashboard_path),
+        "view_href": view_href,
+    }
+
+
+@app.get("/projects/dashboard/view")
+def view_project_dashboard(
+    project_dir: str = Query(..., description="Absolute or relative path to the project folder"),
+    mode: str = Query("internal", description="internal or external dashboard output"),
+) -> FileResponse:
+    project_path = _validated_project_path(project_dir)
+    try:
+        dashboard_path = render_project_dashboard(project_dir=project_path, report_mode=mode)
+    except FileNotFoundError as exc:
+        raise _not_found(str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return FileResponse(dashboard_path, media_type="text/html")
 
 
 @app.get("/projects/state")
