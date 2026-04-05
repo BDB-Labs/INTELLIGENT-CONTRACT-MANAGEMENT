@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 try:
     import fcntl
@@ -85,6 +91,9 @@ class FileSystemCaseStore:
 
     def __init__(self, storage_root: str | Path) -> None:
         self.storage_root = Path(storage_root).expanduser().resolve()
+        self._case_record_cache: dict[str, CaseRecord] = {}
+        self._run_record_cache: dict[tuple[str, str], BidReviewRunRecord] = {}
+        self._commit_record_cache: dict[tuple[str, str], ContractCommitRecord] = {}
 
     def case_dir(self, project_id: str) -> Path:
         return self.storage_root / project_id
@@ -95,12 +104,24 @@ class FileSystemCaseStore:
     def _lock_path(self, project_id: str) -> Path:
         return self.case_dir(project_id) / ".case.lock"
 
-    def _lock_case(self, project_id: str):
+    def _lock_case(self, project_id: str, timeout: float = 5.0):
+        """Acquire an exclusive lock on the case with timeout."""
         lock_path = self._lock_path(project_id)
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         handle = lock_path.open("a+", encoding="utf-8")
         if fcntl is not None:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            start_time = time.monotonic()
+            while True:
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    return handle
+                except BlockingIOError:
+                    if time.monotonic() - start_time >= timeout:
+                        handle.close()
+                        raise TimeoutError(
+                            f"Failed to acquire lock for project '{project_id}' within {timeout}s"
+                        )
+                    time.sleep(0.1)
         return handle
 
     def _unlock_case(self, handle) -> None:
@@ -109,12 +130,21 @@ class FileSystemCaseStore:
         handle.close()
 
     def load_case_record(self, project_id: str) -> CaseRecord:
+        if project_id in self._case_record_cache:
+            return self._case_record_cache[project_id]
         path = self.case_record_path(project_id)
-        return CaseRecord.model_validate(read_json(path))
+        record = CaseRecord.model_validate(read_json(path))
+        self._case_record_cache[project_id] = record
+        return record
 
     def load_run_record(self, project_id: str, run_id: str) -> BidReviewRunRecord:
+        cache_key = (project_id, run_id)
+        if cache_key in self._run_record_cache:
+            return self._run_record_cache[cache_key]
         path = self.case_dir(project_id) / "runs" / f"{run_id}.json"
-        return BidReviewRunRecord.model_validate(read_json(path))
+        record = BidReviewRunRecord.model_validate(read_json(path))
+        self._run_record_cache[cache_key] = record
+        return record
 
     def load_latest_run_record(self, project_id: str) -> BidReviewRunRecord:
         case_record = self.load_case_record(project_id)
@@ -123,8 +153,13 @@ class FileSystemCaseStore:
     def load_commit_record(
         self, project_id: str, commit_id: str
     ) -> ContractCommitRecord:
+        cache_key = (project_id, commit_id)
+        if cache_key in self._commit_record_cache:
+            return self._commit_record_cache[cache_key]
         path = self.case_dir(project_id) / "commits" / f"{commit_id}.json"
-        return ContractCommitRecord.model_validate(read_json(path))
+        record = ContractCommitRecord.model_validate(read_json(path))
+        self._commit_record_cache[cache_key] = record
+        return record
 
     def load_latest_commit_record(self, project_id: str) -> ContractCommitRecord:
         case_record = self.load_case_record(project_id)

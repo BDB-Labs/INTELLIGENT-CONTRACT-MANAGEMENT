@@ -110,7 +110,7 @@ class DashboardJobStore:
             self._update(job_id, status="running")
             try:
                 result = func(**kwargs)
-            except Exception as err:  # noqa: BLE001
+            except (Exception, BaseException) as err:
                 self._update(job_id, status="failed", error=str(err))
                 return
             self._update(job_id, status="completed", result=result)
@@ -1676,7 +1676,7 @@ def serve_dashboard(
         while not _shutdown_requested:
             server.handle_request()
     except KeyboardInterrupt:
-        pass
+        logger.debug("Dashboard server received interrupt signal")
     finally:
         logger.info("Shutting down dashboard server...")
         server.server_close()

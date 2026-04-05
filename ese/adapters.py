@@ -28,6 +28,21 @@ DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_CUSTOM_API_KEY_ENV = "CUSTOM_API_KEY"
 DEFAULT_RETRYABLE_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
 
+# Retry configuration constants
+RETRY_JITTER_FACTOR_MIN = 0.9
+RETRY_JITTER_FACTOR_MAX = 1.1
+
+# Timeout defaults (seconds)
+DEFAULT_TIMEOUT_SECONDS = 60.0
+DEFAULT_HEALTH_CHECK_TIMEOUT = 10.0
+
+# Default retry configuration
+DEFAULT_MAX_RETRIES = 2
+DEFAULT_RETRY_BACKOFF_SECONDS = 1.0
+
+# Local runtime configuration
+LOCAL_RUNTIME_API_KEY = "ollama"  # API key for local Ollama runtime
+
 
 class CircuitState(Enum):
     CLOSED = "closed"
@@ -106,6 +121,7 @@ def _get_circuit_breaker(adapter_name: str) -> CircuitBreaker:
 
 
 # Connection pooling with thread-safe HTTP opener
+# Using global state with lock is intentional for connection reuse across threads
 _http_opener_lock = threading.Lock()
 _http_opener: urllib.request.OpenerDirector | None = None
 
@@ -324,7 +340,7 @@ def _openai_payload(
     cfg: Mapping[str, Any],
 ) -> dict[str, Any]:
     runtime_cfg = _runtime_cfg(cfg)
-    _ = context
+    # Context is available for future use but not currently needed in payload
 
     instructions = "Respond in concise Markdown focused on actionable output."
     if _json_output_enabled(cfg):
@@ -419,8 +435,13 @@ def _redact_error_text(text: str) -> str:
     return redacted
 
 
+RETRY_JITTER_MIN = 0.9
+RETRY_JITTER_MAX = 1.1
+
+
 def _retry_delay(retry_backoff_seconds: float, attempt: int) -> float:
-    return retry_backoff_seconds * attempt * random.uniform(0.9, 1.1)
+    jitter_factor = random.uniform(RETRY_JITTER_FACTOR_MIN, RETRY_JITTER_FACTOR_MAX)
+    return retry_backoff_seconds * attempt * jitter_factor
 
 
 def _execute_responses_request(
@@ -495,7 +516,7 @@ def _execute_responses_request(
             raise AdapterExecutionError(
                 f"{provider_name} request failed ({last_error})"
             ) from err
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as err:
+        except (urllib.error.URLError, TimeoutError, OSError) as err:
             # Record failure in circuit breaker
             if circuit_breaker is not None:
                 circuit_breaker.record_failure()
@@ -668,7 +689,7 @@ def local_adapter(
     base_url = _local_base_url(cfg)
     api_key = None
     if bool(local_cfg.get("use_openai_compat_auth", True)):
-        api_key = "ollama"
+        api_key = LOCAL_RUNTIME_API_KEY
     url = f"{base_url}/responses"
 
     return _execute_responses_request(
@@ -710,7 +731,7 @@ def check_adapter_health(
                         True,
                         f"OpenAI endpoint reachable at {base_url} (circuit: {cb.state.value})",
                     )
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as e:
+        except (urllib.error.URLError, TimeoutError) as e:
             return False, f"OpenAI endpoint unreachable: {e}"
         except Exception as e:
             logger.exception("Unexpected error checking OpenAI health")
@@ -732,7 +753,7 @@ def check_adapter_health(
                         True,
                         f"Local endpoint reachable at {base_url} (circuit: {cb.state.value})",
                     )
-        except (urllib.error.URLError, TimeoutError, socket.timeout) as e:
+        except (urllib.error.URLError, TimeoutError) as e:
             return False, f"Local endpoint unreachable: {e}"
         except Exception as e:
             logger.exception("Unexpected error checking local health")
@@ -746,11 +767,15 @@ def check_adapter_health(
             request = urllib.request.Request(
                 url, headers={"Authorization": f"Bearer {api_key}"}
             )
-            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+            opener = _get_http_opener()
+            with opener.open(request, timeout=10) as response:  # noqa: S310
                 if response.status == 200:
                     return True, f"Custom API endpoint reachable at {base_url}"
-        except Exception as e:
+        except (urllib.error.URLError, TimeoutError) as e:
             return False, f"Custom API endpoint unreachable: {e}"
+        except Exception as e:
+            logger.exception("Unexpected error checking custom API health")
+            return False, f"Custom API endpoint error: {e}"
 
     return False, f"Unknown adapter: {adapter_name}"
 

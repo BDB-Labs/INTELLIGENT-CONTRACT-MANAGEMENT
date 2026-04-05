@@ -39,6 +39,9 @@ from apps.contract_intelligence.paths import (
     resolve_output_directory,
 )
 from apps.contract_intelligence.storage import FileSystemCaseStore
+from apps.contract_intelligence.orchestration.utils import (
+    normalize_analysis_perspective,
+)
 
 
 SEVERITY_ORDER = {
@@ -49,17 +52,28 @@ SEVERITY_ORDER = {
 }
 
 # Confidence score constants for finding and decision calculations
-_SINGLE_EVIDENCE_CONFIDENCE = 0.68
-_MULTI_EVIDENCE_CONFIDENCE = 0.78
-_MAX_FINDING_CONFIDENCE = 0.90
-_PUBLIC_OVERLAY_CONFIDENCE = 0.72
-_NO_OVERLAY_CONFIDENCE = 0.56
-_BASE_DECISION_CONFIDENCE = 0.84
-_MISSING_DOC_PENALTY = 0.08
-_UNREADABLE_DOC_PENALTY = 0.04
-_HIGH_FINDING_PENALTY = 0.08
-_MAX_UNREADABLE_PENALTY_COUNT = 3
-_MIN_DECISION_CONFIDENCE = 0.35
+# These values determine how confidence is calculated based on evidence
+_SINGLE_EVIDENCE_CONFIDENCE = 0.68  # Base confidence with single evidence source
+_MULTI_EVIDENCE_CONFIDENCE = 0.78  # Higher confidence with multiple evidence sources
+_MAX_FINDING_CONFIDENCE = 0.90  # Cap on individual finding confidence
+_PUBLIC_OVERLAY_CONFIDENCE = 0.72  # Confidence modifier for public sector
+_NO_OVERLAY_CONFIDENCE = 0.56  # Base confidence without overlay analysis
+_BASE_DECISION_CONFIDENCE = 0.84  # Starting confidence for decision
+_MISSING_DOC_PENALTY = 0.08  # Confidence reduction per missing document
+_UNREADABLE_DOC_PENALTY = 0.04  # Confidence reduction per unreadable document
+_HIGH_FINDING_PENALTY = 0.08  # Additional penalty for high-severity findings
+_MAX_UNREADABLE_PENALTY_COUNT = 3  # Maximum unreadable docs that affect confidence
+_MIN_DECISION_CONFIDENCE = 0.35  # Floor for decision confidence
+
+# Priority scoring constants
+_PRIORITY_SCORE_CRITICAL = 10  # Score for critical priority items
+_PRIORITY_SCORE_HIGH = 8  # Score for high priority items
+_PRIORITY_SCORE_MEDIUM = 5  # Score for medium priority items
+_PRIORITY_SCORE_LOW = 2  # Score for low priority items
+_PRIORITY_SCORE_DEFAULT = 5  # Default score if none specified
+_PRIORITY_THRESHOLD_HOLD_FIRM = 8  # Threshold for hold-firm negotiation stance
+_PRIORITY_THRESHOLD_SEEK_CONCESSION = 6  # Threshold for seeking concessions
+_PRIORITY_THRESHOLD_CREATIVE_SOLUTION = 4  # Threshold for creative solutions
 
 
 _AGENCY_FINDING_OVERRIDES: dict[str, dict[str, str]] = {
@@ -730,23 +744,6 @@ NOTICE_DEADLINE_PATTERN = re.compile(
 def compute_project_id(project_dir: Path) -> str:
     clean = re.sub(r"[^a-z0-9]+", "-", project_dir.name.lower()).strip("-")
     return clean or "contract-project"
-
-
-# NOTE: This function is duplicated from ese_bridge.py._normalize_analysis_perspective
-# to avoid a circular import (ese_bridge imports from this module).
-# Keep both implementations in sync if either changes.
-def _normalize_analysis_perspective(
-    value: str | AnalysisPerspective,
-) -> AnalysisPerspective:
-    if isinstance(value, AnalysisPerspective):
-        return value
-    normalized = str(value).strip().lower()
-    try:
-        return AnalysisPerspective(normalized)
-    except ValueError as exc:
-        raise ValueError(
-            "analysis_perspective must be either 'vendor' or 'agency'."
-        ) from exc
 
 
 def _clause_evidence(
@@ -1486,22 +1483,22 @@ def _negotiation_strategist(
     for finding in risk_findings:
         # Calculate priority score based on severity and relationship impact
         severity_score = {
-            Severity.CRITICAL: 10,
-            Severity.HIGH: 8,
-            Severity.MEDIUM: 5,
-            Severity.LOW: 2,
-        }.get(finding.severity, 5)
+            Severity.CRITICAL: _PRIORITY_SCORE_CRITICAL,
+            Severity.HIGH: _PRIORITY_SCORE_HIGH,
+            Severity.MEDIUM: _PRIORITY_SCORE_MEDIUM,
+            Severity.LOW: _PRIORITY_SCORE_LOW,
+        }.get(finding.severity, _PRIORITY_SCORE_DEFAULT)
 
         # Adjust based on relationship impact
         relationship_adjustment = relationship_advice.relationship_impact_score / 10.0
         priority_score = max(1, min(10, severity_score + relationship_adjustment))
 
         # Determine recommended action
-        if priority_score >= 8:
+        if priority_score >= _PRIORITY_THRESHOLD_HOLD_FIRM:
             action = "hold_firm"
-        elif priority_score >= 6:
+        elif priority_score >= _PRIORITY_THRESHOLD_SEEK_CONCESSION:
             action = "seek_concession"
-        elif priority_score >= 4:
+        elif priority_score >= _PRIORITY_THRESHOLD_CREATIVE_SOLUTION:
             action = "creative_solution"
         else:
             action = "accept_as_is"
@@ -2123,9 +2120,10 @@ def run_bid_review(
     artifacts_dir: str | Path | None = None,
     *,
     analysis_perspective: str | AnalysisPerspective = AnalysisPerspective.VENDOR,
+    idempotency_key: str | None = None,
 ) -> BidReviewRunResult:
     project_path = resolve_existing_directory(project_dir, label="Project directory")
-    perspective = _normalize_analysis_perspective(analysis_perspective)
+    perspective = normalize_analysis_perspective(analysis_perspective)
     output_dir = (
         resolve_output_directory(artifacts_dir, label="Artifacts directory")
         if artifacts_dir
@@ -2136,6 +2134,29 @@ def run_bid_review(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     project_id = compute_project_id(project_path)
+
+    if idempotency_key:
+        store = FileSystemCaseStore(project_path / ".contract_intelligence")
+        try:
+            existing_runs = list((store.case_dir(project_id) / "runs").glob("*.json"))
+            for run_path in existing_runs:
+                try:
+                    run_data = json.loads(run_path.read_text(encoding="utf-8"))
+                    if run_data.get("idempotency_key") == idempotency_key:
+                        run_id = run_path.stem
+                        return BidReviewRunResult(
+                            project_id=project_id,
+                            artifacts_dir=output_dir,
+                            artifact_paths={},
+                            decision_summary=run_data.get("decision_summary", {}),
+                            case_record_path=store.case_record_path(project_id),
+                            run_record_path=run_path,
+                        )
+                except (json.JSONDecodeError, KeyError):
+                    continue
+        except FileNotFoundError:
+            pass
+
     documents = iter_project_documents(project_path)
     missing_docs = missing_required_documents(
         [document.document_type for document in documents]

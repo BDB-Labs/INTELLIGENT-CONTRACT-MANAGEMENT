@@ -607,8 +607,8 @@ def create_admin_app(
                 kb = ContractKnowledgeBase(kb_dir)
                 result["knowledge_entries"] = len(kb)
                 result["kb_summary"] = {"storage": str(kb_dir), "entries": len(kb)}
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to load knowledge base stats: %s", exc)
         if crm_dir:
             try:
                 from ese.crm import ContractCRM
@@ -621,8 +621,8 @@ def create_admin_app(
                     "contacts": len(crm.contacts),
                     "interactions": len(crm.interactions),
                 }
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to load CRM stats: %s", exc)
         return result
 
     @app.get("/admin/system")

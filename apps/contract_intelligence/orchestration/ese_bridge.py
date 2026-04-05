@@ -13,6 +13,10 @@ from apps.contract_intelligence.orchestration.pipeline import bid_review_pipelin
 from apps.contract_intelligence.orchestration.role_catalog import (
     BID_REVIEW_ROLE_CATALOG,
 )
+from apps.contract_intelligence.orchestration.utils import (
+    normalize_analysis_perspective,
+    perspective_label,
+)
 from apps.contract_intelligence.paths import (
     resolve_existing_directory,
     resolve_output_directory,
@@ -130,34 +134,12 @@ ROLE_PROMPT_GUIDANCE = {
 }
 
 
-def _normalize_analysis_perspective(
-    value: str | AnalysisPerspective,
-) -> AnalysisPerspective:
-    if isinstance(value, AnalysisPerspective):
-        return value
-    normalized = str(value).strip().lower()
-    try:
-        return AnalysisPerspective(normalized)
-    except ValueError as exc:
-        raise ValueError(
-            "analysis_perspective must be either 'vendor' or 'agency'."
-        ) from exc
-
-
-def _perspective_label(perspective: AnalysisPerspective) -> str:
-    return (
-        "contractor-side"
-        if perspective is AnalysisPerspective.VENDOR
-        else "agency-side"
-    )
-
-
 def _prompt_for_role(
     role_key: str, output_artifact: str, *, analysis_perspective: AnalysisPerspective
 ) -> str:
     guidance = ROLE_PROMPT_GUIDANCE[role_key].replace(
         "contractor-side",
-        _perspective_label(analysis_perspective),
+        perspective_label(analysis_perspective),
     )
     if analysis_perspective is AnalysisPerspective.AGENCY:
         guidance = (
@@ -316,7 +298,7 @@ def build_bid_review_ese_config(
     artifacts_path = resolve_output_directory(
         artifacts_dir, label="Artifacts directory"
     )
-    perspective = _normalize_analysis_perspective(analysis_perspective)
+    perspective = normalize_analysis_perspective(analysis_perspective)
     clean_provider = (provider or "local").strip().lower()
     effective_mode = resolve_execution_mode(
         provider=clean_provider,

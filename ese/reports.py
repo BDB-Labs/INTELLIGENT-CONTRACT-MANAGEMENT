@@ -38,7 +38,11 @@ def _history_root(path: Path) -> Path:
 
 
 def _timestamp_for(path: Path) -> str:
-    return datetime.fromtimestamp(path.stat().st_mtime).astimezone().isoformat(timespec="seconds")
+    return (
+        datetime.fromtimestamp(path.stat().st_mtime)
+        .astimezone()
+        .isoformat(timespec="seconds")
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -74,11 +78,17 @@ def _document_entries(root: Path, state: dict[str, Any]) -> list[dict[str, str]]
         ("summary", "Summary", root / "ese_summary.md"),
         ("pr_review", "PR Review", root / "pr_review.md"),
         ("code_suggestions_md", "Code Suggestions", root / "code_suggestions.md"),
-        ("code_suggestions_json", "Code Suggestions JSON", root / "code_suggestions.json"),
+        (
+            "code_suggestions_json",
+            "Code Suggestions JSON",
+            root / "code_suggestions.json",
+        ),
         ("release_simulation", "Release Simulation", root / "release_simulation.json"),
     ]
     if config_snapshot:
-        candidates.insert(1, ("config_snapshot", "Config Snapshot", Path(config_snapshot)))
+        candidates.insert(
+            1, ("config_snapshot", "Config Snapshot", Path(config_snapshot))
+        )
     seen: set[str] = set()
     for key, title, path in candidates:
         if not str(path):
@@ -181,7 +191,9 @@ def _consensus_summary(roles: list[dict[str, Any]]) -> dict[str, Any]:
             "title": items[0]["title"],
             "roles": roles_for_theme,
             "count": len(roles_for_theme),
-            "highest_severity": min(severities, key=_severity_rank) if severities else "LOW",
+            "highest_severity": min(severities, key=_severity_rank)
+            if severities
+            else "LOW",
             "severities": severities,
         }
         if len(roles_for_theme) >= 2:
@@ -201,9 +213,19 @@ def _consensus_summary(roles: list[dict[str, Any]]) -> dict[str, Any]:
                 },
             )
 
-    agreements.sort(key=lambda item: (-item["count"], _severity_rank(item["highest_severity"]), item["title"]))
-    disagreements.sort(key=lambda item: (_severity_rank(item["highest_severity"]), item["title"]))
-    solo_blockers.sort(key=lambda item: (_severity_rank(item["highest_severity"]), item["title"]))
+    agreements.sort(
+        key=lambda item: (
+            -item["count"],
+            _severity_rank(item["highest_severity"]),
+            item["title"],
+        )
+    )
+    disagreements.sort(
+        key=lambda item: (_severity_rank(item["highest_severity"]), item["title"])
+    )
+    solo_blockers.sort(
+        key=lambda item: (_severity_rank(item["highest_severity"]), item["title"])
+    )
     return {
         "agreements": agreements,
         "disagreements": disagreements,
@@ -223,7 +245,9 @@ def _candidate_run_dirs(path: Path) -> list[Path]:
         for child in root.iterdir():
             if child.is_dir() and _is_run_dir(child):
                 candidates.add(child)
-    return sorted(candidates, key=lambda item: _state_path(item).stat().st_mtime, reverse=True)
+    return sorted(
+        candidates, key=lambda item: _state_path(item).stat().st_mtime, reverse=True
+    )
 
 
 def _previous_run_dir(path: Path) -> Path | None:
@@ -279,7 +303,13 @@ def build_release_simulation(report: dict[str, Any]) -> dict[str, Any]:
         for role in report.get("roles", [])
         if isinstance(role, dict)
     }
-    relevant_roles = {"devops_sre", "release_manager", "documentation_writer", "test_generator", "security_auditor"}
+    relevant_roles = {
+        "devops_sre",
+        "release_manager",
+        "documentation_writer",
+        "test_generator",
+        "security_auditor",
+    }
     enabled = bool(relevant_roles & set(role_map))
     blockers = [
         f"{blocker['role']}: {blocker['title']}"
@@ -297,29 +327,61 @@ def build_release_simulation(report: dict[str, Any]) -> dict[str, Any]:
         return items
 
     rollout_stages = [
-        {"stage": "preflight", "tasks": _steps_for("architect", "security_auditor", "test_generator")},
+        {
+            "stage": "preflight",
+            "tasks": _steps_for("architect", "security_auditor", "test_generator"),
+        },
         {"stage": "rollout", "tasks": _steps_for("release_manager", "devops_sre")},
-        {"stage": "verification", "tasks": _steps_for("performance_analyst", "test_generator", "release_manager")},
+        {
+            "stage": "verification",
+            "tasks": _steps_for(
+                "performance_analyst", "test_generator", "release_manager"
+            ),
+        },
     ]
     rollback_criteria = [
         *blockers,
-        *[step for step in _steps_for("release_manager", "devops_sre") if "rollback" in step.lower()],
+        *[
+            step
+            for step in _steps_for("release_manager", "devops_sre")
+            if "rollback" in step.lower()
+        ],
     ]
     observability_checks = [
         step
         for step in _steps_for("devops_sre", "performance_analyst")
-        if any(token in step.lower() for token in ("metric", "observe", "telemetry", "monitor", "alert", "latency"))
+        if any(
+            token in step.lower()
+            for token in (
+                "metric",
+                "observe",
+                "telemetry",
+                "monitor",
+                "alert",
+                "latency",
+            )
+        )
     ]
-    required_sign_off = [role for role in ("release_manager", "devops_sre", "security_auditor") if role in role_map]
+    required_sign_off = [
+        role
+        for role in ("release_manager", "devops_sre", "security_auditor")
+        if role in role_map
+    ]
     assurance_level = str(report.get("assurance_level") or "standard").strip().lower()
     ready = (
         report.get("blocker_count", 0) == 0
         and report.get("status") == "completed"
         and assurance_level != "degraded"
     )
-    summary = "Release-ready" if ready else "Hold release until blockers and rollout checks are resolved."
+    summary = (
+        "Release-ready"
+        if ready
+        else "Hold release until blockers and rollout checks are resolved."
+    )
     if assurance_level == "degraded":
-        summary = "Hold release: degraded assurance runs are not sufficient release evidence."
+        summary = (
+            "Hold release: degraded assurance runs are not sufficient release evidence."
+        )
 
     return {
         "enabled": enabled,
@@ -390,7 +452,9 @@ def _code_suggestions(roles: list[dict[str, Any]]) -> list[dict[str, str]]:
             for item in explicit_code_suggestions:
                 if not isinstance(item, dict):
                     continue
-                summary = str(item.get("summary") or item.get("suggestion") or "").strip()
+                summary = str(
+                    item.get("summary") or item.get("suggestion") or ""
+                ).strip()
                 suggestion = str(item.get("suggestion") or "").strip()
                 if _is_placeholder_suggestion(suggestion):
                     continue
@@ -426,7 +490,13 @@ def _code_suggestions(roles: list[dict[str, Any]]) -> list[dict[str, str]]:
             severity = str(finding.get("severity") or "LOW").upper().strip() or "LOW"
             suggestion = str(finding.get("details") or title).strip()
             key = (role_name, _finding_theme(title), _finding_theme(suggestion))
-            if not role_name or not title or not suggestion or _is_placeholder_suggestion(suggestion) or key in seen:
+            if (
+                not role_name
+                or not title
+                or not suggestion
+                or _is_placeholder_suggestion(suggestion)
+                or key in seen
+            ):
                 continue
             seen.add(key)
             suggestions.append(
@@ -445,7 +515,12 @@ def _code_suggestions(roles: list[dict[str, Any]]) -> list[dict[str, str]]:
         for step in role.get("next_steps", []):
             suggestion = str(step or "").strip()
             key = (role_name, "next-step", _finding_theme(suggestion))
-            if not role_name or not suggestion or _is_placeholder_suggestion(suggestion) or key in seen:
+            if (
+                not role_name
+                or not suggestion
+                or _is_placeholder_suggestion(suggestion)
+                or key in seen
+            ):
                 continue
             seen.add(key)
             suggestions.append(
@@ -465,7 +540,9 @@ def _code_suggestions(roles: list[dict[str, Any]]) -> list[dict[str, str]]:
         key=lambda item: (
             0 if item.get("path") else 1,
             0 if item["source"] == "finding" else 1,
-            _severity_rank(item["severity"]) if item["severity"] in SEVERITY_ORDER else len(SEVERITY_ORDER),
+            _severity_rank(item["severity"])
+            if item["severity"] in SEVERITY_ORDER
+            else len(SEVERITY_ORDER),
             item["role"],
             item["title"],
         ),
@@ -485,10 +562,7 @@ def _group_code_suggestions(code_suggestions: list[dict[str, Any]]) -> dict[str,
         else:
             unscoped.append(item)
 
-    grouped_paths = [
-        {"path": path, "items": by_path[path]}
-        for path in sorted(by_path)
-    ]
+    grouped_paths = [{"path": path, "items": by_path[path]} for path in sorted(by_path)]
     return {
         "paths": [entry["path"] for entry in grouped_paths],
         "by_path": grouped_paths,
@@ -500,9 +574,7 @@ def _group_code_suggestions(code_suggestions: list[dict[str, Any]]) -> dict[str,
 
 def render_code_suggestions_markdown(report: dict[str, Any]) -> str:
     suggestions = [
-        item
-        for item in report.get("code_suggestions", [])
-        if isinstance(item, dict)
+        item for item in report.get("code_suggestions", []) if isinstance(item, dict)
     ]
     groups = _group_code_suggestions(suggestions)
     lines = [
@@ -541,9 +613,7 @@ def render_code_suggestions_markdown(report: dict[str, Any]) -> str:
 
 def render_code_suggestions_json(report: dict[str, Any]) -> str:
     suggestions = [
-        item
-        for item in report.get("code_suggestions", [])
-        if isinstance(item, dict)
+        item for item in report.get("code_suggestions", []) if isinstance(item, dict)
     ]
     groups = _group_code_suggestions(suggestions)
     payload = {
@@ -558,7 +628,9 @@ def render_code_suggestions_json(report: dict[str, Any]) -> str:
     return json.dumps(payload, indent=2) + "\n"
 
 
-def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -> dict[str, Any]:
+def collect_run_report(
+    artifacts_dir: str, *, include_comparison: bool = True
+) -> dict[str, Any]:
     root = Path(artifacts_dir)
     state = load_pipeline_state(str(root))
     roles: list[dict[str, Any]] = []
@@ -577,16 +649,10 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
             continue
 
         artifact_path = Path(artifact)
-        artifact_path = Path(artifact)
-        # Only join with root if the path is not already absolute and not already under root
         if not artifact_path.is_absolute():
-            # Check if the path is already relative to the root to avoid double prefixing
             try:
-                # If this succeeds, the path is already under root
                 artifact_path.resolve().relative_to(root.resolve())
-                # Keep the original path as it's already correct
             except ValueError:
-                # Path is not under root, so join with root
                 artifact_path = root / artifact_path
 
         entry: dict[str, Any] = {
@@ -612,13 +678,33 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
 
         entry["summary"] = str(report.get("summary") or "").strip()
         entry["confidence"] = str(report.get("confidence") or "").strip().upper()
-        entry["findings"] = report.get("findings") if isinstance(report.get("findings"), list) else []
-        entry["next_steps"] = [step for step in report.get("next_steps", []) if isinstance(step, str) and step.strip()]
-        entry["artifacts"] = [step for step in report.get("artifacts", []) if isinstance(step, str) and step.strip()]
-        entry["assumptions"] = [item for item in report.get("assumptions", []) if isinstance(item, str) and item.strip()]
-        entry["unknowns"] = [item for item in report.get("unknowns", []) if isinstance(item, str) and item.strip()]
+        entry["findings"] = (
+            report.get("findings") if isinstance(report.get("findings"), list) else []
+        )
+        entry["next_steps"] = [
+            step
+            for step in report.get("next_steps", [])
+            if isinstance(step, str) and step.strip()
+        ]
+        entry["artifacts"] = [
+            step
+            for step in report.get("artifacts", [])
+            if isinstance(step, str) and step.strip()
+        ]
+        entry["assumptions"] = [
+            item
+            for item in report.get("assumptions", [])
+            if isinstance(item, str) and item.strip()
+        ]
+        entry["unknowns"] = [
+            item
+            for item in report.get("unknowns", [])
+            if isinstance(item, str) and item.strip()
+        ]
         entry["evidence_basis"] = [
-            item for item in report.get("evidence_basis", []) if isinstance(item, str) and item.strip()
+            item
+            for item in report.get("evidence_basis", [])
+            if isinstance(item, str) and item.strip()
         ]
         entry["code_suggestions"] = [
             item
@@ -684,7 +770,9 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
         "next_steps": next_steps,
     }
     report["code_suggestions"] = _code_suggestions(roles)
-    report["code_suggestion_groups"] = _group_code_suggestions(report["code_suggestions"])
+    report["code_suggestion_groups"] = _group_code_suggestions(
+        report["code_suggestions"]
+    )
     report["consensus"] = _consensus_summary(roles)
     report["feedback"] = feedback_summary(root)
     if include_comparison:
@@ -705,11 +793,15 @@ def collect_run_report(artifacts_dir: str, *, include_comparison: bool = True) -
     )
     report["assurance_note"] = assurance_note
     report["top_blocker"] = blockers[0] if blockers else None
-    report["next_recommended_action"] = report["suggested_actions"][0] if report["suggested_actions"] else None
+    report["next_recommended_action"] = (
+        report["suggested_actions"][0] if report["suggested_actions"] else None
+    )
     return report
 
 
-def list_recent_runs(artifacts_dir: str, limit: int = DEFAULT_HISTORY_LIMIT) -> list[dict[str, Any]]:
+def list_recent_runs(
+    artifacts_dir: str, limit: int = DEFAULT_HISTORY_LIMIT
+) -> list[dict[str, Any]]:
     requested = Path(artifacts_dir)
     root = _history_root(requested)
     candidates: set[Path] = set()
@@ -764,7 +856,9 @@ def load_artifact_view(
 
     report = collect_run_report(artifacts_dir)
     if role:
-        match = next((item for item in report.get("roles", []) if item.get("role") == role), None)
+        match = next(
+            (item for item in report.get("roles", []) if item.get("role") == role), None
+        )
         if match is None:
             raise RunReportError(f"No artifact found for role '{role}'.")
         path = Path(str(match["artifact"]))
@@ -783,7 +877,10 @@ def load_artifact_view(
             "next_steps": match.get("next_steps", []),
         }
 
-    doc = next((item for item in report.get("documents", []) if item.get("key") == document), None)
+    doc = next(
+        (item for item in report.get("documents", []) if item.get("key") == document),
+        None,
+    )
     if doc is None:
         raise RunReportError(f"No document found for key '{document}'.")
     path = Path(str(doc["path"]))
@@ -804,8 +901,7 @@ def render_status_text(report: dict[str, Any]) -> str:
     executed = len(report.get("roles", []))
     counts = report.get("severity_counts", {})
     severity_line = ", ".join(
-        f"{severity.lower()}={counts.get(severity, 0)}"
-        for severity in SEVERITY_ORDER
+        f"{severity.lower()}={counts.get(severity, 0)}" for severity in SEVERITY_ORDER
     )
     run_id = _short_run_id(str(report.get("run_id") or ""))
     lines = [
@@ -826,7 +922,9 @@ def render_status_text(report: dict[str, Any]) -> str:
         lines.append(f"Assurance note: {assurance_note}")
     top_blocker = report.get("top_blocker") or {}
     if top_blocker:
-        lines.append(f"Top blocker: {top_blocker.get('role')}: {top_blocker.get('title')}")
+        lines.append(
+            f"Top blocker: {top_blocker.get('role')}: {top_blocker.get('title')}"
+        )
     next_action = report.get("next_recommended_action") or {}
     if next_action:
         lines.append(f"Next action: {next_action.get('text')}")
@@ -846,7 +944,11 @@ def render_report_text(report: dict[str, Any]) -> str:
         "",
     ]
     failure = str(report.get("failure") or "").strip()
-    failed_roles = [role for role in report.get("failed_roles", []) if isinstance(role, str) and role.strip()]
+    failed_roles = [
+        role
+        for role in report.get("failed_roles", [])
+        if isinstance(role, str) and role.strip()
+    ]
     if failure:
         lines.extend(["Failure:", failure, ""])
     if failed_roles:
@@ -887,7 +989,9 @@ def render_report_text(report: dict[str, Any]) -> str:
     if recurring_unknowns:
         lines.extend(["", "Recurring unknowns:"])
         for item in recurring_unknowns[:8]:
-            lines.append(f"- {item['text']} ({item['count']} roles: {', '.join(item['roles'])})")
+            lines.append(
+                f"- {item['text']} ({item['count']} roles: {', '.join(item['roles'])})"
+            )
 
     next_steps = report.get("next_steps", [])
     if next_steps:
@@ -962,7 +1066,9 @@ def render_sarif(report: dict[str, Any]) -> str:
                 continue
             title = str(finding.get("title") or "").strip() or "Untitled finding"
             severity = str(finding.get("severity") or "LOW").upper().strip()
-            rule_id = f"{role_name}:{_finding_theme(title).replace(' ', '-') or 'finding'}"
+            rule_id = (
+                f"{role_name}:{_finding_theme(title).replace(' ', '-') or 'finding'}"
+            )
             if rule_id not in seen_rules:
                 rules.append(
                     {
@@ -1020,15 +1126,21 @@ def render_junit(report: dict[str, Any]) -> str:
     )
     for role in report.get("roles", []):
         role_name = str(role.get("role") or "role")
-        findings = [finding for finding in role.get("findings", []) if isinstance(finding, dict)]
+        findings = [
+            finding for finding in role.get("findings", []) if isinstance(finding, dict)
+        ]
         if not findings:
             case = ET.SubElement(suite, "testcase", classname="ese", name=role_name)
-            ET.SubElement(case, "system-out").text = str(role.get("summary") or "No findings.")
+            ET.SubElement(case, "system-out").text = str(
+                role.get("summary") or "No findings."
+            )
             total_findings += 1
             continue
         for index, finding in enumerate(findings, start=1):
             total_findings += 1
-            case = ET.SubElement(suite, "testcase", classname=role_name, name=f"{role_name}-{index}")
+            case = ET.SubElement(
+                suite, "testcase", classname=role_name, name=f"{role_name}-{index}"
+            )
             severity = str(finding.get("severity") or "LOW").upper()
             title = str(finding.get("title") or "Untitled finding")
             details = str(finding.get("details") or "").strip()
@@ -1037,7 +1149,9 @@ def render_junit(report: dict[str, Any]) -> str:
                 failure = ET.SubElement(case, "failure", message=title, type=severity)
                 failure.text = details or title
             else:
-                ET.SubElement(case, "system-out").text = f"{severity}: {title}\n{details}".strip()
+                ET.SubElement(
+                    case, "system-out"
+                ).text = f"{severity}: {title}\n{details}".strip()
     suite.set("tests", str(total_findings))
     suite.set("failures", str(failures))
     xml = ET.tostring(suite, encoding="unicode")

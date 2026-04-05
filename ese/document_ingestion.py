@@ -508,14 +508,14 @@ def _parse_reflection_json(text: str) -> dict[str, Any] | None:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        pass
+        logger.debug("JSON parsing failed, attempting regex extraction")
 
     json_match = re.search(r"\{[\s\S]*\}", text)
     if json_match:
         try:
             return json.loads(json_match.group())
         except json.JSONDecodeError:
-            pass
+            logger.debug("Regex-extracted JSON also failed to parse")
 
     return None
 

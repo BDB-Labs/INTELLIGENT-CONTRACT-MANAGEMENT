@@ -2,15 +2,20 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 import base64
-import json
+import logging
 import os
 import secrets
+import threading
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.background import BackgroundTasks
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, ValidationError
+
+logger = logging.getLogger(__name__)
 
 from apps.contract_intelligence.domain.enums import AnalysisPerspective
 from apps.contract_intelligence.domain.models import AlertRecord, ReviewActionRecord
@@ -79,9 +84,31 @@ def _authenticated(request: Request) -> bool:
     )
 
 
+from ese.logging_config import configure_logging
+
+_logging_configured = False
+_logging_lock = threading.Lock()
+
+
+def _configure_logging_once() -> None:
+    global _logging_configured
+    if _logging_configured:
+        return
+    with _logging_lock:
+        if _logging_configured:
+            return
+        configure_logging(
+            level=os.getenv("LOG_LEVEL", "INFO"),
+            json_format=os.getenv("JSON_LOGGING", "").lower() in {"1", "true", "yes"},
+        )
+        _logging_configured = True
+
+
 @asynccontextmanager
 async def _lifespan(_: FastAPI):
+    _configure_logging_once()
     validate_allowed_roots_configured()
+
     yield
 
 
@@ -106,6 +133,7 @@ class AnalyzeProjectRequest(BaseModel):
     project_dir: str
     artifacts_dir: str | None = None
     analysis_perspective: AnalysisPerspective = AnalysisPerspective.VENDOR
+    async_mode: bool = False
 
 
 class CommitProjectRequest(BaseModel):
@@ -114,11 +142,13 @@ class CommitProjectRequest(BaseModel):
     finding_dispositions_file: str | None = None
     accepted_risks_file: str | None = None
     negotiated_changes_file: str | None = None
+    async_mode: bool = False
 
 
 class MonitorProjectRequest(BaseModel):
     project_dir: str
     status_inputs_file: str | None = None
+    async_mode: bool = False
 
 
 class ReviewActionUpsertRequest(BaseModel):
@@ -465,7 +495,7 @@ def readiness() -> dict[str, object]:
                 checks["storage"] = "warning: storage root does not exist"
             elif not os.access(root_path, os.W_OK):
                 checks["storage"] = "error: storage root not writable"
-        except Exception as e:
+        except (OSError, PermissionError) as e:
             checks["storage"] = f"error: {e}"
 
     all_ok = all(v == "ok" for v in checks.values())
@@ -498,14 +528,58 @@ def reference_case_dashboard(case_id: str) -> FileResponse:
     return FileResponse(target, media_type="text/html")
 
 
+def _background_analyze(
+    project_dir: str,
+    artifacts_dir: str | None,
+    analysis_perspective: str,
+    job_id: str,
+) -> None:
+    try:
+        result = run_bid_review(
+            project_dir=project_dir,
+            artifacts_dir=artifacts_dir,
+            analysis_perspective=AnalysisPerspective(analysis_perspective),
+        )
+        logger.info(
+            "Background analyze completed",
+            extra={
+                "job_id": job_id,
+                "project_id": result.project_id,
+                "recommendation": result.decision_summary.recommendation.value,
+            },
+        )
+    except Exception:
+        logger.exception("Background analyze failed", extra={"job_id": job_id})
+
+
 @app.post("/projects/analyze")
-def analyze_project(request: AnalyzeProjectRequest) -> dict[str, object]:
+def analyze_project(
+    request: AnalyzeProjectRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
     project_path = _validated_project_path(request.project_dir)
+    artifacts_dir = _validated_output_dir(
+        request.artifacts_dir, label="Artifacts directory"
+    )
+
+    if request.async_mode:
+        job_id = uuid.uuid4().hex[:12]
+        background_tasks.add_task(
+            _background_analyze,
+            project_dir=str(project_path),
+            artifacts_dir=str(artifacts_dir) if artifacts_dir else None,
+            analysis_perspective=request.analysis_perspective.value,
+            job_id=job_id,
+        )
+        return {
+            "job_id": job_id,
+            "status": "accepted",
+            "message": "Analysis started in background",
+        }
+
     result = run_bid_review(
         project_dir=project_path,
-        artifacts_dir=_validated_output_dir(
-            request.artifacts_dir, label="Artifacts directory"
-        ),
+        artifacts_dir=artifacts_dir,
         analysis_perspective=request.analysis_perspective,
     )
     return {
@@ -519,8 +593,64 @@ def analyze_project(request: AnalyzeProjectRequest) -> dict[str, object]:
     }
 
 
+def _background_commit(
+    project_dir: str,
+    committed_contract_dir: str | None,
+    finding_dispositions_file: str | None,
+    accepted_risks_file: str | None,
+    negotiated_changes_file: str | None,
+    job_id: str,
+) -> None:
+    try:
+        result = commit_contract(
+            project_dir=project_dir,
+            committed_contract_dir=committed_contract_dir,
+            finding_dispositions_file=finding_dispositions_file,
+            accepted_risks_file=accepted_risks_file,
+            negotiated_changes_file=negotiated_changes_file,
+        )
+        logger.info(
+            "Background commit completed",
+            extra={
+                "job_id": job_id,
+                "project_id": result.project_id,
+                "commit_id": result.commit_id,
+            },
+        )
+    except Exception:
+        logger.exception("Background commit failed", extra={"job_id": job_id})
+
+
 @app.post("/projects/commit")
-def commit_project(request: CommitProjectRequest) -> dict[str, object]:
+def commit_project(
+    request: CommitProjectRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
+    if request.async_mode:
+        job_id = uuid.uuid4().hex[:12]
+        background_tasks.add_task(
+            _background_commit,
+            project_dir=str(_validated_project_path(request.project_dir)),
+            committed_contract_dir=_validated_directory(
+                request.committed_contract_dir, label="Committed contract directory"
+            ),
+            finding_dispositions_file=_validated_input_file(
+                request.finding_dispositions_file, label="Finding dispositions file"
+            ),
+            accepted_risks_file=_validated_input_file(
+                request.accepted_risks_file, label="Accepted risks file"
+            ),
+            negotiated_changes_file=_validated_input_file(
+                request.negotiated_changes_file, label="Negotiated changes file"
+            ),
+            job_id=job_id,
+        )
+        return {
+            "job_id": job_id,
+            "status": "accepted",
+            "message": "Commit started in background",
+        }
+
     try:
         result = commit_contract(
             project_dir=_validated_project_path(request.project_dir),
@@ -552,8 +682,49 @@ def commit_project(request: CommitProjectRequest) -> dict[str, object]:
     }
 
 
+def _background_monitor(
+    project_dir: str,
+    status_inputs_file: str | None,
+    job_id: str,
+) -> None:
+    try:
+        result = monitor_contract(
+            project_dir=project_dir,
+            status_inputs_file=status_inputs_file,
+        )
+        logger.info(
+            "Background monitor completed",
+            extra={
+                "job_id": job_id,
+                "project_id": result.project_id,
+                "alerts_count": result.alerts_count,
+            },
+        )
+    except Exception:
+        logger.exception("Background monitor failed", extra={"job_id": job_id})
+
+
 @app.post("/projects/monitor")
-def monitor_project(request: MonitorProjectRequest) -> dict[str, object]:
+def monitor_project(
+    request: MonitorProjectRequest,
+    background_tasks: BackgroundTasks,
+) -> dict[str, object]:
+    if request.async_mode:
+        job_id = uuid.uuid4().hex[:12]
+        background_tasks.add_task(
+            _background_monitor,
+            project_dir=str(_validated_project_path(request.project_dir)),
+            status_inputs_file=_validated_input_file(
+                request.status_inputs_file, label="Status inputs file"
+            ),
+            job_id=job_id,
+        )
+        return {
+            "job_id": job_id,
+            "status": "accepted",
+            "message": "Monitor started in background",
+        }
+
     try:
         result = monitor_contract(
             project_dir=_validated_project_path(request.project_dir),

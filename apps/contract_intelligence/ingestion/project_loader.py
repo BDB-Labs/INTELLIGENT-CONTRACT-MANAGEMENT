@@ -155,14 +155,22 @@ def _extract_pdf_stream_text(path: Path) -> str:
 
 
 def _extract_pdf_spotlight_text(path: Path) -> str:
+    """Extract PDF text using macOS Spotlight metadata (macOS only)."""
+    import sys
+
+    if sys.platform != "darwin":
+        logger.debug("Spotlight extraction skipped: not running on macOS")
+        return ""
     try:
         result = subprocess.run(
             ["/usr/bin/mdls", "-raw", "-name", "kMDItemTextContent", str(path)],
             capture_output=True,
             text=True,
             check=False,
+            timeout=30,
         )
     except OSError:
+        logger.debug("Spotlight extraction failed: mdls command not found")
         return ""
     if result.returncode != 0:
         return ""
@@ -318,10 +326,10 @@ def _load_pdf_text(path: Path) -> tuple[str, str, str]:
             quality = _extract_text_quality(text)
             if quality != "none":
                 return text, "pypdf", quality
-    except (ImportError, OSError, IOError):
-        pass
-    except Exception:
-        pass
+    except (ImportError, OSError, IOError) as exc:
+        logger.debug("pypdf PDF extraction failed: %s", exc)
+    except (ValueError, RuntimeError) as exc:
+        logger.debug("pypdf PDF parsing error: %s", exc)
 
     # Fall back to existing methods
     candidates = [

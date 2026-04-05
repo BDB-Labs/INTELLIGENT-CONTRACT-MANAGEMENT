@@ -38,24 +38,38 @@ CERTAINTY_INDICATORS = {
     "high": 0.85,
 }
 
-PIPELINE_ORDER = [
-    "architect",
-    "implementer",
-    "adversarial_reviewer",
-    "security_auditor",
-    "test_generator",
-    "performance_analyst",
-    "documentation_writer",
-    "devops_sre",
-    "database_engineer",
-    "release_manager",
-]
+# Uncertainty scoring configuration
+UNCERTAINTY_PHRASE_PENALTY = 0.15  # Penalty for uncertain language
+HEDGE_COUNT_THRESHOLD = 3  # Number of hedge words to trigger penalty
+HEDGE_PENALTY = 0.2  # Penalty per excess hedge word
 
-JSON_REPORT_SEVERITIES = {"LOW", "MEDIUM", "HIGH", "CRITICAL"}
-JSON_REPORT_CONFIDENCE = {"LOW", "MEDIUM", "HIGH"}
+# Explicit certainty levels
+CERTAINTY_EXPLICIT_LOW = 0.3
+CERTAINTY_EXPLICIT_MEDIUM = 0.6
+CERTAINTY_EXPLICIT_HIGH = 0.85
+
+# Evidence gap penalties
+EVIDENCE_GAP_MAX_PENALTY = 0.4  # Maximum penalty for evidence gaps
+EVIDENCE_GAP_PENALTY_FACTOR = 0.1  # Penalty factor per gap
+
+# Uncertainty note penalties
+UNCERTAINTY_NOTE_MAX_PENALTY = 0.3
+UNCERTAINTY_NOTE_PENALTY_FACTOR = 0.1
+
+# Low confidence finding penalties
+LOW_CONFIDENCE_FINDING_PENALTY_MAX = 0.3
+LOW_CONFIDENCE_FINDING_PENALTY_FACTOR = 0.1
+
+# JSON report validation constants
+JSON_REPORT_SEVERITIES = frozenset({"LOW", "MEDIUM", "HIGH", "CRITICAL"})
+JSON_REPORT_CONFIDENCE = frozenset({"LOW", "MEDIUM", "HIGH"})
+
+# Config and state versioning
 CONFIG_SNAPSHOT_NAME = "ese_config.snapshot.yaml"
 STATE_CONTRACT_VERSION = 2
 REPORT_CONTRACT_VERSION = 2
+
+# Prompt truncation configuration
 PROMPT_TRUNCATION_MARKER = "[...truncated for size...]"
 PROMPT_LIMITS = {
     "scope": 4000,
@@ -111,6 +125,20 @@ SPECIALIST_ROLE_INSTRUCTIONS = {
 }
 PARALLEL_SPECIALIST_ROLES = set(SPECIALIST_ROLE_INSTRUCTIONS)
 
+# Default role execution order
+PIPELINE_ORDER = [
+    "architect",
+    "implementer",
+    "adversarial_reviewer",
+    "security_auditor",
+    "test_generator",
+    "performance_analyst",
+    "documentation_writer",
+    "devops_sre",
+    "database_engineer",
+    "release_manager",
+]
+
 
 class PipelineError(RuntimeError):
     """Raised when pipeline configuration or adapter execution fails."""
@@ -131,7 +159,10 @@ class RoleAdapter(Protocol):
         ...
 
 
-def _write(path: str, text: str) -> None:
+def _write(path: str, text: str, *, artifacts_dir: str | None = None) -> None:
+    """Write text to a file with optional path traversal protection."""
+    if artifacts_dir is not None:
+        path = _ensure_artifact_within_dir(artifacts_dir, path)
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -139,7 +170,12 @@ def _write(path: str, text: str) -> None:
         f.write(text)
 
 
-def _write_yaml(path: str, payload: Mapping[str, Any]) -> None:
+def _write_yaml(
+    path: str, payload: Mapping[str, Any], *, artifacts_dir: str | None = None
+) -> None:
+    """Write YAML payload to a file with optional path traversal protection."""
+    if artifacts_dir is not None:
+        path = _ensure_artifact_within_dir(artifacts_dir, path)
     parent = os.path.dirname(path)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -834,7 +870,6 @@ def _assess_response_certainty(
     certainty_score = 1.0  # Start with full certainty, deduct for issues
 
     if report is None:
-        # Non-JSON output, assess based on text patterns
         output_lower = output.lower()
         uncertainty_phrases = [
             "uncertain",
@@ -855,17 +890,16 @@ def _assess_response_certainty(
         ]
         for phrase in uncertainty_phrases:
             if phrase in output_lower:
-                certainty_score -= 0.15
+                certainty_score -= UNCERTAINTY_PHRASE_PENALTY
                 reasons.append(f"Uncertainty phrase detected: '{phrase}'")
 
-        # Check for hedging language
         hedge_count = sum(
             1
             for phrase in ["perhaps", "possibly", "maybe", "likely", "seems"]
             if phrase in output_lower
         )
-        if hedge_count >= 3:
-            certainty_score -= 0.2
+        if hedge_count >= HEDGE_COUNT_THRESHOLD:
+            certainty_score -= HEDGE_PENALTY
             reasons.append(f"Multiple hedging phrases detected ({hedge_count})")
     else:
         # Check confidence field if present
@@ -876,13 +910,13 @@ def _assess_response_certainty(
                 certainty_score = CERTAINTY_INDICATORS[confidence_lower]
                 reasons.append(f"Explicit confidence: {confidence}")
             elif "low" in confidence_lower:
-                certainty_score = 0.3
+                certainty_score = CERTAINTY_EXPLICIT_LOW
                 reasons.append(f"Low confidence stated: {confidence}")
             elif "medium" in confidence_lower:
-                certainty_score = 0.6
+                certainty_score = CERTAINTY_EXPLICIT_MEDIUM
                 reasons.append(f"Medium confidence stated: {confidence}")
             elif "high" in confidence_lower:
-                certainty_score = 0.85
+                certainty_score = CERTAINTY_EXPLICIT_HIGH
                 reasons.append(f"High confidence stated: {confidence}")
 
         # Check for evidence gaps
@@ -892,14 +926,19 @@ def _assess_response_certainty(
             or report.get("unknowns")
         )
         if isinstance(evidence_gaps, list) and len(evidence_gaps) > 0:
-            gap_penalty = min(0.4, len(evidence_gaps) * 0.1)
+            gap_penalty = min(
+                EVIDENCE_GAP_MAX_PENALTY,
+                len(evidence_gaps) * EVIDENCE_GAP_PENALTY_FACTOR,
+            )
             certainty_score -= gap_penalty
             reasons.append(f"Evidence gaps identified: {len(evidence_gaps)}")
 
-        # Check for uncertainty notes
         uncertainty_notes = report.get("uncertainty_notes", [])
         if isinstance(uncertainty_notes, list) and len(uncertainty_notes) > 0:
-            note_penalty = min(0.3, len(uncertainty_notes) * 0.1)
+            note_penalty = min(
+                UNCERTAINTY_NOTE_MAX_PENALTY,
+                len(uncertainty_notes) * UNCERTAINTY_NOTE_PENALTY_FACTOR,
+            )
             certainty_score -= note_penalty
             reasons.append(f"Uncertainty notes present: {len(uncertainty_notes)}")
 
@@ -915,7 +954,11 @@ def _assess_response_certainty(
                 and f["confidence"] < 0.5
             ]
             if low_confidence_findings:
-                certainty_score -= min(0.3, len(low_confidence_findings) * 0.1)
+                certainty_score -= min(
+                    LOW_CONFIDENCE_FINDING_PENALTY_MAX,
+                    len(low_confidence_findings)
+                    * LOW_CONFIDENCE_FINDING_PENALTY_FACTOR,
+                )
                 reasons.append(
                     f"Low-confidence findings: {len(low_confidence_findings)}"
                 )
