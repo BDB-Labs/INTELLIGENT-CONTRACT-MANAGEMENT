@@ -68,7 +68,7 @@ prefix CLI calls with `uv run`.
 
 ## One-Command Local Start
 
-There is now a local GUI: the ESE dashboard.
+There is now a local control surface: the ESE dashboard and native desktop shell.
 
 From the repo root, the simplest way to start everything is:
 
@@ -79,7 +79,8 @@ From the repo root, the simplest way to start everything is:
 That script will:
 - sync the project with `uv` using `uv.lock`,
 - create or refresh the local `.venv` managed by `uv`,
-- start the local dashboard GUI.
+- start the native desktop shell on macOS,
+- start the browser dashboard on other platforms.
 
 If you run a `local`/Ollama-backed workflow through the launcher, it now:
 - auto-starts Ollama when it is installed but not running,
@@ -89,6 +90,7 @@ Other common launcher modes:
 
 ```bash
 ./start_ese.sh task "Prepare a staged rollout plan for billing"
+./start_ese.sh desktop
 ./start_ese.sh pr --base origin/main --head HEAD
 ./start_ese.sh cli report --artifacts-dir artifacts
 ```
@@ -194,7 +196,40 @@ Launch the local dashboard:
 ese dashboard --artifacts-dir artifacts
 ```
 
+Launch the native desktop shell:
+
+```bash
+uv sync --group dev --group desktop
+ese desktop --artifacts-dir artifacts
+```
+
+Inspect the shared surface and delivery-target catalog:
+
+```bash
+ese surfaces
+ese platforms
+```
+
 The dashboard now supports both task-first runs and PR review runs.
+It also includes config doctor validation plus catalogs for commands, packs, roles, surfaces, and platform targets.
+
+## macOS Desktop Build
+
+Build the branded `.app` bundle and `.dmg`:
+
+```bash
+./scripts/build_macos_desktop.sh
+```
+
+Optional signing:
+
+- set `APPLE_DEVELOPER_IDENTITY`
+- optionally set `BUNDLE_ID`
+
+The build script outputs:
+
+- `dist/macos/ESE Control Center.app`
+- `dist/macos/ESE-Control-Center-macOS-<arch>.dmg`
 
 ## Contract Intelligence Application
 
@@ -336,6 +371,7 @@ runtime:
 - Pipeline state schema + deterministic role ordering: [`docs/PIPELINE_STATE.md`](docs/PIPELINE_STATE.md)
 - Contract-intelligence product overview: [`apps/contract_intelligence/README.md`](apps/contract_intelligence/README.md)
 - Case-intelligence platform design: [`docs/CASE_INTELLIGENCE_PLATFORM.md`](docs/CASE_INTELLIGENCE_PLATFORM.md)
+- Platform architecture and extension model: [`docs/PLATFORM_ARCHITECTURE.md`](docs/PLATFORM_ARCHITECTURE.md)
 - Contract-intelligence initiative and current extension targets: [`docs/CONTRACT_INTELLIGENCE_INITIATIVE.md`](docs/CONTRACT_INTELLIGENCE_INITIATIVE.md)
 - Contract-intelligence product direction and extension backlog: [`docs/CONTRACT_INTELLIGENCE_PRODUCT_DIRECTION.md`](docs/CONTRACT_INTELLIGENCE_PRODUCT_DIRECTION.md)
 - Security posture and current advisory notes: [`docs/SECURITY_NOTES.md`](docs/SECURITY_NOTES.md)

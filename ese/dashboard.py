@@ -8,6 +8,7 @@ import signal
 import threading
 import uuid
 import webbrowser
+from dataclasses import asdict
 from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -15,12 +16,13 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-logger = logging.getLogger(__name__)
-
 from ese.config import ConfigValidationError, load_config
+from ese.config_packs import list_config_packs
 from ese.feedback import record_feedback
-from ese.doctor import evaluate_doctor
+from ese.doctor import build_doctor_guidance, evaluate_doctor
+from ese.init_wizard import ROLE_DESCRIPTIONS
 from ese.pipeline import run_pipeline
+from ese.platform.catalog import list_platform_targets, list_surface_specs
 from ese.pr_review import PullRequestReviewError, run_pr_review
 from ese.reports import (
     RunReportError,
@@ -34,6 +36,96 @@ from ese.templates import (
     list_task_templates,
     recommend_template_for_scope,
     run_task_pipeline,
+)
+
+logger = logging.getLogger(__name__)
+
+
+_COMMAND_CATALOG = (
+    {
+        "command": "task",
+        "group": "execution",
+        "summary": "Task-first ensemble run from a natural-language scope.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "pr",
+        "group": "review",
+        "summary": "Pull-request or branch-diff review workflow.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "run-config",
+        "group": "execution",
+        "summary": "Run an existing config with dashboard control over scope and artifacts.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "rerun",
+        "group": "execution",
+        "summary": "Resume from a downstream role using saved artifacts.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "doctor",
+        "group": "validation",
+        "summary": "Validate config integrity and ensemble independence.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "report",
+        "group": "analysis",
+        "summary": "Aggregate run status, findings, blockers, and output artifacts.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "status",
+        "group": "analysis",
+        "summary": "Quick run posture summary through report telemetry.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "export",
+        "group": "analysis",
+        "summary": "SARIF and JUnit export from the current workspace.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "feedback",
+        "group": "learning",
+        "summary": "Operator feedback loop for findings and future signal quality.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "roles",
+        "group": "catalog",
+        "summary": "Starter framework role catalog.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "packs",
+        "group": "catalog",
+        "summary": "Shipped fixed-role config packs.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "surfaces",
+        "group": "catalog",
+        "summary": "Shared UI surfaces that can travel across desktop and SaaS targets.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "platforms",
+        "group": "catalog",
+        "summary": "Delivery-target roadmap for macOS, Windows, and SaaS.",
+        "ui_status": "supported",
+    },
+    {
+        "command": "init",
+        "group": "setup",
+        "summary": "Interactive config wizard. Still richer in CLI than in the dashboard.",
+        "ui_status": "planned",
+    },
 )
 
 
@@ -296,27 +388,109 @@ def _export_report_payload(
     raise ConfigValidationError("format must be 'sarif' or 'junit'.")
 
 
+def _doctor_payload(config_path: str) -> dict[str, Any]:
+    clean_path = str(config_path or "").strip()
+    if not clean_path:
+        raise ConfigValidationError("config_path is required.")
+
+    cfg = load_config(clean_path)
+    ok, violations, role_models = evaluate_doctor(cfg)
+    guidance = build_doctor_guidance(cfg, violations)
+    return {
+        "config_path": clean_path,
+        "ok": ok,
+        "violations": violations,
+        "guidance": guidance,
+        "role_models": role_models,
+    }
+
+
+def _catalog_payload() -> dict[str, Any]:
+    templates = [
+        {
+            "key": template.key,
+            "title": template.title,
+            "summary": template.summary,
+            "roles": list(template.roles),
+        }
+        for template in list_task_templates()
+    ]
+    packs = [
+        {
+            "key": pack.key,
+            "title": pack.title,
+            "summary": pack.summary,
+            "preset": pack.preset,
+            "goal_profile": pack.goal_profile,
+            "role_count": len(pack.roles),
+        }
+        for pack in list_config_packs()
+    ]
+    roles = [
+        {"key": key, "description": description}
+        for key, description in ROLE_DESCRIPTIONS.items()
+    ]
+    surfaces = [asdict(surface) for surface in list_surface_specs()]
+    platforms = [asdict(target) for target in list_platform_targets()]
+    return {
+        "commands": list(_COMMAND_CATALOG),
+        "roles": roles,
+        "packs": packs,
+        "templates": templates,
+        "surfaces": surfaces,
+        "platforms": platforms,
+    }
+
+
+def _empty_report_payload(artifacts_dir: str) -> dict[str, Any]:
+    return {
+        "artifacts_dir": artifacts_dir,
+        "status": "missing",
+        "roles": [],
+        "documents": [],
+        "blockers": [],
+        "next_steps": [],
+        "code_suggestions": [],
+        "consensus": {
+            "agreements": [],
+            "disagreements": [],
+            "solo_blockers": [],
+        },
+        "comparison": {},
+        "feedback": {"counts": {}, "guidance": []},
+        "severity_counts": {},
+        "finding_count": 0,
+        "blocker_count": 0,
+        "updated_at": None,
+    }
+
+
 def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     html = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ESE Dashboard</title>
+  <title>ESE Control Center</title>
   <style>
     :root {
-      --bg: #f5efe6;
-      --panel: rgba(255, 250, 244, 0.92);
-      --panel-strong: #fffaf3;
-      --ink: #16202a;
-      --muted: #5a6470;
-      --accent: #b85c38;
-      --accent-strong: #8d3c1d;
-      --good: #257a5a;
-      --warn: #c07d1a;
-      --bad: #9e2a2b;
-      --line: rgba(22, 32, 42, 0.12);
-      --shadow: 0 24px 60px rgba(68, 43, 26, 0.12);
+      color-scheme: dark;
+      --bg-0: #04101d;
+      --bg-1: #09192a;
+      --bg-2: #0f2234;
+      --panel: rgba(6, 16, 28, 0.82);
+      --panel-strong: rgba(9, 23, 39, 0.94);
+      --panel-elevated: rgba(13, 30, 47, 0.98);
+      --ink: #f3f7fc;
+      --muted: #9db1c4;
+      --accent: #78ffd6;
+      --accent-strong: #25c4ff;
+      --good: #55e6a5;
+      --warn: #ffbf69;
+      --bad: #ff7b72;
+      --line: rgba(255, 255, 255, 0.09);
+      --shadow: 0 28px 90px rgba(0, 0, 0, 0.34);
+      --font-display: "Avenir Next Condensed", "Avenir Next", "Segoe UI", sans-serif;
       --font: "Avenir Next", "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
@@ -325,47 +499,77 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       font-family: var(--font);
       color: var(--ink);
       background:
-        radial-gradient(circle at top left, rgba(184, 92, 56, 0.22), transparent 34%),
-        radial-gradient(circle at bottom right, rgba(37, 122, 90, 0.18), transparent 28%),
-        linear-gradient(180deg, #fdf8ef 0%, var(--bg) 55%, #efe4d2 100%);
+        radial-gradient(circle at 12% 18%, rgba(120, 255, 214, 0.16), transparent 24%),
+        radial-gradient(circle at 84% 16%, rgba(37, 196, 255, 0.22), transparent 28%),
+        radial-gradient(circle at 70% 84%, rgba(255, 191, 105, 0.10), transparent 18%),
+        linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, var(--bg-2) 100%);
       min-height: 100vh;
     }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.14;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 32px 32px;
+      mask-image: radial-gradient(circle at center, black 38%, transparent 88%);
+    }
     .shell {
-      max-width: 1480px;
+      position: relative;
+      max-width: 1600px;
       margin: 0 auto;
-      padding: 28px 20px 48px;
+      padding: 28px 20px 52px;
       display: grid;
       gap: 20px;
-      grid-template-columns: 360px minmax(0, 1fr);
+      grid-template-columns: 340px minmax(0, 1fr);
     }
     .panel {
-      background: var(--panel);
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
+        var(--panel);
       border: 1px solid var(--line);
-      border-radius: 22px;
+      border-radius: 24px;
       box-shadow: var(--shadow);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(18px);
     }
     .sidebar {
       padding: 24px;
       position: sticky;
       top: 20px;
       align-self: start;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)),
+        rgba(5, 13, 22, 0.84);
     }
     h1, h2, h3, p { margin-top: 0; }
     h1 {
-      font-size: 2rem;
-      letter-spacing: -0.04em;
-      margin-bottom: 8px;
+      font-family: var(--font-display);
+      font-size: 2.5rem;
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+      margin-bottom: 10px;
+    }
+    h2 {
+      font-size: 1.22rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 12px;
     }
     .lede {
       color: var(--muted);
-      line-height: 1.5;
+      line-height: 1.6;
       margin-bottom: 24px;
+      max-width: 32ch;
     }
     label {
       display: block;
-      font-size: 0.9rem;
+      font-size: 0.82rem;
       font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
       margin-bottom: 6px;
     }
     input, select, textarea, button {
@@ -373,12 +577,17 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       font: inherit;
     }
     input, select, textarea {
-      border: 1px solid rgba(22, 32, 42, 0.14);
-      border-radius: 14px;
-      padding: 12px 14px;
-      background: rgba(255,255,255,0.82);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 16px;
+      padding: 13px 14px;
+      background: rgba(5, 13, 22, 0.78);
       color: var(--ink);
       margin-bottom: 14px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid rgba(37, 196, 255, 0.18);
+      border-color: rgba(37, 196, 255, 0.42);
     }
     textarea {
       min-height: 128px;
@@ -389,21 +598,40 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       display: flex;
       gap: 10px;
     }
+    .action-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    .action-row input {
+      margin-bottom: 0;
+    }
+    .action-row button {
+      width: auto;
+      min-width: 148px;
+      white-space: nowrap;
+    }
     button {
-      border: 0;
-      border-radius: 14px;
+      border: 1px solid rgba(37, 196, 255, 0.18);
+      border-radius: 16px;
       padding: 12px 16px;
       cursor: pointer;
-      background: var(--accent);
-      color: white;
-      font-weight: 700;
-      transition: transform 120ms ease, background 120ms ease;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: #04101d;
+      font-weight: 800;
+      box-shadow: 0 12px 32px rgba(15, 99, 171, 0.18);
+      transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
     }
     button.secondary {
-      background: rgba(22, 32, 42, 0.08);
+      background: rgba(255, 255, 255, 0.05);
       color: var(--ink);
+      box-shadow: none;
+      border-color: var(--line);
     }
-    button:hover { transform: translateY(-1px); }
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 34px rgba(15, 99, 171, 0.24);
+    }
     button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
@@ -414,18 +642,87 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       gap: 20px;
     }
     .hero {
-      padding: 26px;
-      background: linear-gradient(135deg, rgba(255, 250, 244, 0.94), rgba(247, 236, 220, 0.92));
+      position: relative;
+      overflow: hidden;
+      padding: 28px;
+      background:
+        radial-gradient(circle at 12% 18%, rgba(120,255,214,0.16), transparent 24%),
+        radial-gradient(circle at 84% 22%, rgba(37,196,255,0.18), transparent 24%),
+        linear-gradient(135deg, rgba(9, 23, 39, 0.96), rgba(8, 18, 30, 0.90));
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -80px;
+      width: 280px;
+      height: 280px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(37,196,255,0.22), transparent 62%);
+      filter: blur(10px);
+      pointer-events: none;
+    }
+    .hero-grid {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(320px, 1fr);
+      gap: 24px;
+      align-items: end;
+    }
+    .hero-copy h2 {
+      font-family: var(--font-display);
+      font-size: clamp(2.1rem, 4vw, 3.45rem);
+      line-height: 0.94;
+      letter-spacing: -0.06em;
+      margin-bottom: 12px;
+    }
+    .hero-copy p {
+      max-width: 56ch;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 0;
+    }
+    .hero-runtime {
+      padding: 18px;
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      background: rgba(3, 9, 17, 0.42);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-weight: 800;
+      margin-bottom: 14px;
+    }
+    .eyebrow::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      box-shadow: 0 0 12px rgba(120,255,214,0.28);
     }
     .pill {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      padding: 7px 12px;
+      padding: 8px 12px;
       border-radius: 999px;
-      background: rgba(22, 32, 42, 0.06);
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       margin-right: 8px;
       margin-bottom: 8px;
     }
@@ -435,9 +732,11 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       gap: 14px;
     }
     .metric {
-      padding: 18px;
-      border-radius: 18px;
-      background: var(--panel-strong);
+      padding: 20px;
+      border-radius: 20px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+        var(--panel-strong);
       border: 1px solid var(--line);
     }
     .metric .kicker {
@@ -452,6 +751,11 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       letter-spacing: -0.04em;
       font-weight: 800;
     }
+    .surface-grid {
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 1.08fr 0.92fr;
+    }
     .sections {
       display: grid;
       gap: 20px;
@@ -460,15 +764,23 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     .section {
       padding: 22px;
     }
+    .section-kicker {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.74rem;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
     .list {
       display: grid;
       gap: 12px;
     }
     .card {
       border: 1px solid var(--line);
-      border-radius: 18px;
+      border-radius: 20px;
       padding: 18px;
-      background: rgba(255,255,255,0.72);
+      background: rgba(255,255,255,0.04);
     }
     .role-grid {
       display: grid;
@@ -491,8 +803,8 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     }
     .finding {
       border-left: 4px solid var(--warn);
-      padding-left: 10px;
-      margin-top: 10px;
+      padding-left: 12px;
+      margin-top: 12px;
     }
     .finding.bad { border-color: var(--bad); }
     .finding.good { border-color: var(--good); }
@@ -503,9 +815,9 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     .empty {
       padding: 18px;
       border-radius: 18px;
-      border: 1px dashed rgba(22, 32, 42, 0.2);
+      border: 1px dashed rgba(255, 255, 255, 0.16);
       color: var(--muted);
-      background: rgba(255,255,255,0.45);
+      background: rgba(255,255,255,0.03);
     }
     .mono {
       font-family: "SFMono-Regular", "Consolas", monospace;
@@ -527,15 +839,15 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       overflow: auto;
       padding: 16px;
       border-radius: 16px;
-      background: rgba(18, 24, 30, 0.94);
-      color: #f5efe6;
+      background: rgba(2, 7, 12, 0.88);
+      color: #edf3fb;
       line-height: 1.45;
       white-space: pre-wrap;
       word-break: break-word;
     }
     .history-card.active {
-      border-color: rgba(184, 92, 56, 0.45);
-      box-shadow: inset 0 0 0 1px rgba(184, 92, 56, 0.18);
+      border-color: rgba(37, 196, 255, 0.42);
+      box-shadow: inset 0 0 0 1px rgba(37, 196, 255, 0.16);
     }
     .history-card .meta-row {
       display: flex;
@@ -560,8 +872,8 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       margin-top: 12px;
       padding: 12px;
       border-radius: 14px;
-      background: rgba(18, 24, 30, 0.94);
-      color: #f5efe6;
+      background: rgba(2, 7, 12, 0.88);
+      color: #edf3fb;
       font-family: "SFMono-Regular", "Consolas", monospace;
       font-size: 0.84rem;
       line-height: 1.45;
@@ -569,22 +881,136 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       white-space: pre-wrap;
       word-break: break-word;
     }
+    .catalog-grid {
+      display: grid;
+      gap: 14px;
+    }
+    .catalog-cluster {
+      padding: 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.03);
+    }
+    .cluster-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .command-list, .list-compact {
+      display: grid;
+      gap: 10px;
+    }
+    .command-item {
+      display: grid;
+      gap: 6px;
+      padding: 12px 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.03);
+    }
+    .command-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+    }
+    .status-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border: 1px solid transparent;
+    }
+    .status-tag.supported {
+      color: var(--good);
+      background: rgba(85, 230, 165, 0.09);
+      border-color: rgba(85, 230, 165, 0.18);
+    }
+    .status-tag.partial {
+      color: var(--warn);
+      background: rgba(255, 191, 105, 0.10);
+      border-color: rgba(255, 191, 105, 0.18);
+    }
+    .status-tag.planned {
+      color: var(--muted);
+      background: rgba(255,255,255,0.05);
+      border-color: rgba(255,255,255,0.08);
+    }
+    .chip-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+    .doctor-panel {
+      display: grid;
+      gap: 12px;
+    }
+    .doctor-summary {
+      padding: 14px 16px;
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+    }
+    .doctor-summary.good {
+      border-color: rgba(85, 230, 165, 0.18);
+      background: rgba(85, 230, 165, 0.08);
+    }
+    .doctor-summary.warn {
+      border-color: rgba(255, 191, 105, 0.18);
+      background: rgba(255, 191, 105, 0.08);
+    }
+    .doctor-summary.bad {
+      border-color: rgba(255, 123, 114, 0.18);
+      background: rgba(255, 123, 114, 0.08);
+    }
+    .panel, .metric {
+      animation: rise 240ms ease-out both;
+    }
+    @keyframes rise {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
     @media (max-width: 1100px) {
-      .shell, .sections { grid-template-columns: 1fr; }
+      .shell, .surface-grid, .sections, .hero-grid { grid-template-columns: 1fr; }
       .sidebar { position: static; }
       .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
     @media (max-width: 680px) {
       .metrics { grid-template-columns: 1fr; }
-      .btn-row { flex-direction: column; }
+      .btn-row, .action-row { flex-direction: column; }
+      .action-row button { width: 100%; }
     }
   </style>
 </head>
 <body>
   <div class="shell">
     <aside class="panel sidebar">
-      <h1>ESE Dashboard</h1>
-      <p class="lede">Start task-first runs, compare independent specialist voices, and carry pluralistic review signal through to release decisions.</p>
+      <h1>ESE Control Center</h1>
+      <p class="lede">Run ensemble workflows, validate configs, inspect catalogs, and stage the same surface for native desktop and future hosted control planes.</p>
       <form id="run-form">
         <label for="interface_mode">Experience</label>
         <select id="interface_mode" name="interface_mode">
@@ -700,10 +1126,35 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     </aside>
     <main class="main">
       <section class="panel hero">
-        <div id="hero-meta"></div>
-        <div id="job-status" class="muted">No active job.</div>
+        <div class="hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">Run Studio Surface</div>
+            <h2>One control surface for execution, validation, and platform expansion.</h2>
+            <p>The dashboard is no longer treated as a visual wrapper alone. It is the control plane for task runs, PR review, config health, artifact inspection, and the shared surface model that can extend to macOS, Windows, and SaaS.</p>
+          </div>
+          <div class="hero-runtime">
+            <div id="hero-meta"></div>
+            <div id="job-status" class="muted">No active job.</div>
+          </div>
+        </div>
       </section>
       <section class="metrics" id="metrics"></section>
+      <section class="surface-grid">
+        <section class="panel section doctor-panel">
+          <div class="section-kicker">Validation</div>
+          <h2>Config Doctor</h2>
+          <div class="action-row">
+            <input id="doctor_config_path" placeholder="Path to ese.config.yaml">
+            <button id="doctor-button" type="button">Run Doctor</button>
+          </div>
+          <div id="doctor-results"></div>
+        </section>
+        <section class="panel section">
+          <div class="section-kicker">Control Plane</div>
+          <h2>Catalog and Platform Map</h2>
+          <div id="catalog" class="catalog-grid"></div>
+        </section>
+      </section>
       <section class="panel section">
         <h2>Recent Runs</h2>
         <div id="history" class="list"></div>
@@ -773,6 +1224,10 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     const learningEl = document.getElementById('learning');
     const rolesEl = document.getElementById('roles');
     const viewerEl = document.getElementById('viewer');
+    const catalogEl = document.getElementById('catalog');
+    const doctorConfigInput = document.getElementById('doctor_config_path');
+    const doctorResultsEl = document.getElementById('doctor-results');
+    const doctorButton = document.getElementById('doctor-button');
     const refreshButton = document.getElementById('refresh-button');
     const runButton = document.getElementById('run-button');
     const prButton = document.getElementById('pr-button');
@@ -789,6 +1244,7 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     if (bootstrap.config_path) {
       configInput.value = bootstrap.config_path;
     }
+    doctorConfigInput.value = bootstrap.config_path || '';
 
     async function request(url, options = {}) {
       const response = await fetch(url, options);
@@ -829,6 +1285,131 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
 
     function statusClass(status) {
       return `status-${String(status || 'unknown').toLowerCase()}`;
+    }
+
+    function renderCatalog(catalog) {
+      if (!catalog) {
+        catalogEl.innerHTML = `<div class="empty">Catalog data is unavailable.</div>`;
+        return;
+      }
+
+      const commandItems = (catalog.commands || []).map((item) => `
+        <article class="command-item">
+          <div class="command-top">
+            <strong>${escapeHtml(item.command)}</strong>
+            <span class="status-tag ${escapeHtml(item.ui_status)}">${escapeHtml(item.ui_status)}</span>
+          </div>
+          <div class="tiny">${escapeHtml(item.group)}</div>
+          <div>${escapeHtml(item.summary)}</div>
+        </article>
+      `).join('');
+
+      const packItems = (catalog.packs || []).map((item) => `
+        <article class="command-item">
+          <div class="command-top">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span class="pill">${escapeHtml(item.role_count)} roles</span>
+          </div>
+          <div class="tiny">${escapeHtml(item.key)} · ${escapeHtml(item.goal_profile)}</div>
+          <div>${escapeHtml(item.summary)}</div>
+        </article>
+      `).join('');
+
+      const templateChips = (catalog.templates || []).map((item) => `
+        <span class="chip">${escapeHtml(item.key)}</span>
+      `).join('');
+      const roleChips = (catalog.roles || []).map((item) => `
+        <span class="chip">${escapeHtml(item.key)}</span>
+      `).join('');
+      const surfaceItems = (catalog.surfaces || []).map((item) => `
+        <article class="command-item">
+          <div class="command-top">
+            <strong>${escapeHtml(item.headline)}</strong>
+            <span class="pill">${escapeHtml(item.key)}</span>
+          </div>
+          <div>${escapeHtml(item.supporting_copy)}</div>
+        </article>
+      `).join('');
+      const platformItems = (catalog.platforms || []).map((item) => `
+        <article class="command-item">
+          <div class="command-top">
+            <strong>${escapeHtml(item.label)}</strong>
+            <span class="status-tag ${item.status === 'active' ? 'supported' : 'planned'}">${escapeHtml(item.status)}</span>
+          </div>
+          <div class="tiny">${escapeHtml(item.delivery_model)}</div>
+          <div>${escapeHtml(item.summary)}</div>
+        </article>
+      `).join('');
+
+      catalogEl.innerHTML = `
+        <section class="catalog-cluster">
+          <div class="cluster-header">
+            <strong>Command Coverage</strong>
+            <span class="tiny">${escapeHtml(String((catalog.commands || []).length))} command families</span>
+          </div>
+          <div class="command-list">${commandItems}</div>
+        </section>
+        <section class="catalog-cluster">
+          <div class="cluster-header">
+            <strong>Packs and Templates</strong>
+            <span class="tiny">${escapeHtml(String((catalog.packs || []).length))} packs</span>
+          </div>
+          <div class="command-list">${packItems}</div>
+          <div class="chip-grid" style="margin-top:12px;">${templateChips}</div>
+        </section>
+        <section class="catalog-cluster">
+          <div class="cluster-header">
+            <strong>Framework Roles</strong>
+            <span class="tiny">${escapeHtml(String((catalog.roles || []).length))} starters</span>
+          </div>
+          <div class="chip-grid">${roleChips}</div>
+        </section>
+        <section class="catalog-cluster">
+          <div class="cluster-header">
+            <strong>Surfaces and Targets</strong>
+            <span class="tiny">shared runtime contract</span>
+          </div>
+          <div class="list-compact">${surfaceItems}${platformItems}</div>
+        </section>
+      `;
+    }
+
+    function renderDoctorResult(payload) {
+      if (!payload) {
+        doctorResultsEl.innerHTML = `<div class="empty">Choose a config path and run Doctor to validate the ensemble contract.</div>`;
+        return;
+      }
+
+      const tone = payload.ok ? (payload.violations?.length ? 'warn' : 'good') : 'bad';
+      const headline = payload.ok
+        ? (payload.violations?.length ? 'Config is usable with notes.' : 'Config passed Doctor.')
+        : 'Config failed Doctor.';
+      const violations = (payload.violations || []).length
+        ? (payload.violations || []).map((item) => `<div class="card">${escapeHtml(item)}</div>`).join('')
+        : '<div class="card">No violations.</div>';
+      const guidance = (payload.guidance || []).map((item) => `<div class="card">${escapeHtml(item)}</div>`).join('');
+      const roleModels = Object.entries(payload.role_models || {}).map(([role, model]) => `
+        <span class="chip"><strong>${escapeHtml(role)}</strong> ${escapeHtml(model)}</span>
+      `).join('');
+
+      doctorResultsEl.innerHTML = `
+        <div class="doctor-summary ${tone}">
+          <strong>${headline}</strong>
+          <div class="tiny" style="margin-top:6px;">${escapeHtml(payload.config_path || '')}</div>
+        </div>
+        <div class="list-compact">
+          <div class="section-kicker" style="margin-top:4px;">Violations and Notes</div>
+          ${violations}
+        </div>
+        <div class="list-compact">
+          <div class="section-kicker" style="margin-top:4px;">Guidance</div>
+          ${guidance}
+        </div>
+        <div class="list-compact">
+          <div class="section-kicker" style="margin-top:4px;">Role Models</div>
+          <div class="chip-grid">${roleModels || '<span class="chip">No role assignments loaded</span>'}</div>
+        </div>
+      `;
     }
 
     function renderMetrics(report) {
@@ -1154,6 +1735,31 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       return response.runs || [];
     }
 
+    async function loadCatalog() {
+      const response = await request('/api/catalog');
+      renderCatalog(response);
+    }
+
+    async function runDoctor() {
+      const configPath = doctorConfigInput.value.trim() || configInput.value.trim();
+      if (!configPath) {
+        renderDoctorResult({
+          ok: false,
+          config_path: '',
+          violations: ['Provide a config path before running Doctor.'],
+          guidance: ['Point Doctor at an existing ese.config.yaml or run a config-backed workflow first.'],
+          role_models: {},
+        });
+        return;
+      }
+      const response = await request('/api/doctor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config_path: configPath }),
+      });
+      renderDoctorResult(response);
+    }
+
     async function loadArtifactView() {
       if (!state.selectedArtifact) {
         renderArtifactView(null);
@@ -1187,6 +1793,9 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
         const report = await request(`/api/report?artifacts_dir=${encodeURIComponent(state.artifactsDir)}`);
         if (report.config_snapshot && !configInput.value) {
           configInput.value = report.config_snapshot;
+        }
+        if (!doctorConfigInput.value && report.config_snapshot) {
+          doctorConfigInput.value = report.config_snapshot;
         }
         if (!state.selectedArtifact) {
           if ((report.documents || []).length) {
@@ -1339,6 +1948,16 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       await loadReport();
     });
 
+    doctorButton.addEventListener('click', async () => {
+      await runDoctor();
+    });
+
+    configInput.addEventListener('change', () => {
+      if (!doctorConfigInput.value.trim()) {
+        doctorConfigInput.value = configInput.value.trim();
+      }
+    });
+
     interfaceMode.addEventListener('change', applyInterfaceMode);
     recommendTemplateButton.addEventListener('click', async () => {
       const scope = form.scope.value.trim();
@@ -1350,6 +1969,12 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       const templates = await request('/api/templates');
       renderTemplates(templates.templates);
       applyInterfaceMode();
+      await loadCatalog();
+      if (doctorConfigInput.value || configInput.value) {
+        await runDoctor();
+      } else {
+        renderDoctorResult(null);
+      }
       await loadReport({ preferLatest: true });
     }
 
@@ -1433,6 +2058,14 @@ def serve_dashboard(
                 self._send_text(_dashboard_html(bootstrap))
                 return
 
+            if parsed.path == "/favicon.ico":
+                self._send_text(
+                    "",
+                    content_type="image/x-icon",
+                    status=HTTPStatus.NO_CONTENT,
+                )
+                return
+
             if parsed.path == "/api/templates":
                 payload = {
                     "templates": [
@@ -1448,11 +2081,17 @@ def serve_dashboard(
                 self._send_json(payload)
                 return
 
+            if parsed.path == "/api/catalog":
+                self._send_json(_catalog_payload())
+                return
+
             if parsed.path == "/api/report":
+                artifacts_dir = self._artifacts_dir_from_query()
                 try:
-                    report = collect_run_report(self._artifacts_dir_from_query())
+                    report = collect_run_report(artifacts_dir)
                 except RunReportError as err:
-                    self._send_json({"error": str(err)}, status=HTTPStatus.NOT_FOUND)
+                    logger.debug("No report available for %s: %s", artifacts_dir, err)
+                    self._send_json(_empty_report_payload(artifacts_dir))
                     return
                 self._send_json(report)
                 return
@@ -1563,6 +2202,12 @@ def serve_dashboard(
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
 
+                if parsed.path == "/api/doctor":
+                    self._send_json(
+                        _doctor_payload(str(payload.get("config_path") or ""))
+                    )
+                    return
+
                 if parsed.path == "/api/run-config":
                     config_path_value = str(payload.get("config_path") or "").strip()
                     if not config_path_value:
@@ -1655,8 +2300,6 @@ def serve_dashboard(
                 return
 
             self._send_json({"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
-
-    import signal
 
     _shutdown_requested = False
 

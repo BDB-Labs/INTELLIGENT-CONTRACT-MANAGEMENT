@@ -12,6 +12,7 @@ usage() {
   cat <<'EOF'
 Usage:
   ./start_ese.sh
+  ./start_ese.sh desktop [extra ese desktop args...]
   ./start_ese.sh dashboard [extra ese dashboard args...]
   ./start_ese.sh task "Your task scope" [extra ese task args...]
   ./start_ese.sh pr [ese pr args...]
@@ -20,10 +21,11 @@ Usage:
   ./start_ese.sh help
 
 Default behavior:
-  No arguments starts the local dashboard GUI.
+  No arguments starts the native desktop shell on macOS and the browser dashboard elsewhere.
 
 Examples:
   ./start_ese.sh
+  ./start_ese.sh desktop
   ./start_ese.sh task "Prepare a staged rollout plan for billing"
   ./start_ese.sh pr --repo-path . --base origin/main --head HEAD
   ./start_ese.sh cli report --artifacts-dir artifacts
@@ -40,12 +42,21 @@ ensure_uv() {
 
 ensure_install() {
   ensure_uv
-  echo "Syncing ESE with uv..."
-  "${UV_BIN}" sync --locked
+  local mode="${1:-dashboard}"
+  local groups=(--group dev)
+  if [[ "${mode}" == "desktop" ]]; then
+    groups+=(--group desktop)
+  fi
+  echo "Syncing ESE with uv for ${mode}..."
+  "${UV_BIN}" sync --locked "${groups[@]}"
 }
 
 run_dashboard() {
   exec "${UV_BIN}" run ese dashboard --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
+}
+
+run_desktop() {
+  exec "${UV_BIN}" run ese desktop --artifacts-dir "${DEFAULT_ARTIFACTS_DIR}" "$@"
 }
 
 run_task() {
@@ -270,18 +281,29 @@ ensure_local_runtime_for_invocation() {
 }
 
 main() {
-  ensure_install
+  local mode="${1:-}"
+  if [[ -z "${mode}" ]]; then
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+      mode="desktop"
+    else
+      mode="dashboard"
+    fi
+  fi
 
-  local mode="${1:-dashboard}"
+  ensure_install "${mode}"
   case "${mode}" in
-    dashboard|task|pr|cli)
-      ensure_local_runtime_for_invocation "$@"
+    desktop|dashboard|task|pr|cli)
+      ensure_local_runtime_for_invocation "${mode}" "${@:2}"
       ;;
     *)
       ensure_local_runtime_for_invocation cli "$@"
       ;;
   esac
   case "${mode}" in
+    desktop)
+      shift || true
+      run_desktop "$@"
+      ;;
     dashboard)
       shift || true
       run_dashboard "$@"

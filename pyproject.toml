@@ -25,11 +25,21 @@ dependencies = [
 [project.scripts]
 ese = "ese.cli:app"
 
+[project.gui-scripts]
+ese-desktop = "ese.desktop.app:main"
+
 [dependency-groups]
 dev = [
   "httpx>=0.27",
   "pytest>=8.0",
   "ruff>=0.4",
+]
+desktop = [
+  "pywebview>=5.3",
+]
+packaging = [
+  "Pillow>=10.4",
+  "pyinstaller>=6.8",
 ]
 
 [tool.uv]

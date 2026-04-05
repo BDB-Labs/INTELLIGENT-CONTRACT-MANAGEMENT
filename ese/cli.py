@@ -11,10 +11,13 @@ import yaml
 from ese.config import ConfigValidationError, load_config, write_config
 from ese.config_packs import list_config_packs
 from ese.dashboard import serve_dashboard
+from ese.desktop.app import launch_desktop_app
+from ese.desktop.config import DesktopLaunchConfig
 from ese.doctor import build_doctor_guidance, evaluate_doctor, run_doctor
 from ese.feedback import record_feedback as persist_feedback
 from ese.init_wizard import ROLE_DESCRIPTIONS, run_wizard
 from ese.pipeline import CONFIG_SNAPSHOT_NAME, PipelineError, run_pipeline
+from ese.platform import list_platform_targets, list_surface_specs
 from ese.pr_review import (
     DEFAULT_MAX_DIFF_CHARS,
     PullRequestReviewError,
@@ -271,6 +274,59 @@ def list_packs():
     typer.echo("Shipped config packs:")
     for pack in list_config_packs():
         typer.echo(f"  - {pack.key}: {pack.title} - {pack.summary}")
+
+
+@app.command("surfaces")
+def list_surfaces(
+    json_output: bool = typer.Option(False, "--json", help="Emit surfaces as JSON"),
+):
+    """List shared UI surfaces available to desktop and future hosted targets."""
+    payload = [
+        {
+            "key": surface.key,
+            "title": surface.title,
+            "headline": surface.headline,
+            "subtitle": surface.subtitle,
+            "route_path": surface.route_path,
+        }
+        for surface in list_surface_specs()
+    ]
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo("Shared UI surfaces:")
+    for item in payload:
+        typer.echo(f"  - {item['key']}: {item['headline']} ({item['title']})")
+        typer.echo(f"    {item['subtitle']} -> {item['route_path']}")
+
+
+@app.command("platforms")
+def list_platforms(
+    json_output: bool = typer.Option(False, "--json", help="Emit targets as JSON"),
+):
+    """List delivery targets for the shared control-surface contract."""
+    payload = [
+        {
+            "key": target.key,
+            "label": target.label,
+            "category": target.category,
+            "status": target.status,
+            "summary": target.summary,
+            "delivery_model": target.delivery_model,
+        }
+        for target in list_platform_targets()
+    ]
+    if json_output:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+
+    typer.echo("Delivery targets:")
+    for item in payload:
+        typer.echo(
+            f"  - {item['key']}: {item['label']} [{item['status']}]"
+        )
+        typer.echo(f"    {item['summary']}")
 
 
 @app.command()
@@ -767,6 +823,42 @@ def dashboard(
         port=port,
         config=config,
         open_browser=open_browser,
+    )
+
+
+@app.command("desktop")
+def desktop(
+    artifacts_dir: str = typer.Option(
+        "artifacts", help="Artifacts directory to inspect by default"
+    ),
+    host: str = typer.Option("127.0.0.1", help="Host for the local desktop runtime"),
+    port: int = typer.Option(
+        0, help="Port for the local desktop runtime (0 selects a free port)"
+    ),
+    config: str | None = typer.Option(
+        None, help="Optional config path to prefill the dashboard"
+    ),
+    surface: str = typer.Option(
+        "ese-dashboard", help="Desktop surface key to launch"
+    ),
+    debug: bool = typer.Option(False, help="Enable desktop shell debug mode"),
+    browser_fallback: bool = typer.Option(
+        True,
+        "--browser-fallback/--no-browser-fallback",
+        help="Open the system browser if the native webview runtime is unavailable",
+    ),
+):
+    """Launch the native desktop shell for ESE surfaces."""
+    launch_desktop_app(
+        DesktopLaunchConfig(
+            artifacts_dir=artifacts_dir,
+            host=host,
+            port=port,
+            config_path=config,
+            surface=surface,
+            debug=debug,
+            browser_fallback=browser_fallback,
+        )
     )
 
 
