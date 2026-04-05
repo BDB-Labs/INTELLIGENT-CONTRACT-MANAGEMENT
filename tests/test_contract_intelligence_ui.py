@@ -102,6 +102,8 @@ def test_render_project_dashboard_outputs_html_snapshot(tmp_path: Path) -> None:
     assert "Selected Obligation" in html
     assert "Findings Workspace" in html
     assert "Lifecycle Timeline" in html
+    assert "Relationship Advice" in html
+    assert "Negotiation Playbook" in html
     assert "go_with_conditions" in html
     assert '"analysis_perspective": "vendor"' in html
 

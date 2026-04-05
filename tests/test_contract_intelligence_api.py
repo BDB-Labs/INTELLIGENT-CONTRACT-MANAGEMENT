@@ -116,15 +116,19 @@ def test_contract_intelligence_api_wraps_full_local_lifecycle(tmp_path: Path) ->
     state_response = client.get("/projects/state", params={"project_dir": str(project_dir)})
     latest_commit_response = client.get("/projects/commits/latest", params={"project_dir": str(project_dir)})
     latest_monitoring_response = client.get("/projects/monitoring/latest", params={"project_dir": str(project_dir)})
+    latest_run_response = client.get("/projects/runs/latest", params={"project_dir": str(project_dir)})
     alerts_response = client.get("/projects/alerts", params={"project_dir": str(project_dir)})
 
     assert state_response.status_code == 200
     assert latest_commit_response.status_code == 200
     assert latest_monitoring_response.status_code == 200
+    assert latest_run_response.status_code == 200
     assert alerts_response.status_code == 200
     assert state_response.json()["latest_analysis_perspective"] == "agency"
     assert state_response.json()["latest_commit_id"] == latest_commit_response.json()["commit_id"]
     assert state_response.json()["latest_monitoring_run_id"] == latest_monitoring_response.json()["run_id"]
+    assert latest_run_response.json()["relationship_advice"]["analysis_perspective"] == "agency"
+    assert latest_run_response.json()["negotiation_strategy"]["analysis_perspective"] == "agency"
     assert any(item["alert_type"] == "late" for item in alerts_response.json())
 
 

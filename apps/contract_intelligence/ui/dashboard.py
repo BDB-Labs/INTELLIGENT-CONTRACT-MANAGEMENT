@@ -109,6 +109,20 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
         )
         or []
     )
+    relationship_advice = _load_json_artifact(
+        artifact_paths.get("relationship_advice.json"),
+        label="relationship advice",
+        diagnostics=diagnostics,
+    )
+    if relationship_advice is None:
+        relationship_advice = latest_run.get("relationship_advice", {})
+    negotiation_strategy = _load_json_artifact(
+        artifact_paths.get("negotiation_strategy.json"),
+        label="negotiation strategy",
+        diagnostics=diagnostics,
+    )
+    if negotiation_strategy is None:
+        negotiation_strategy = latest_run.get("negotiation_strategy", {})
 
     findings: list[dict[str, Any]] = []
     for source_name, payload in (
@@ -178,6 +192,8 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
         "latest_run": latest_run,
         "latest_commit": latest_commit,
         "latest_monitoring": latest_monitoring,
+        "relationship_advice": relationship_advice,
+        "negotiation_strategy": negotiation_strategy,
         "documents": documents,
         "findings": findings,
         "obligations": obligations,
@@ -201,6 +217,12 @@ def _load_dashboard_data(project_path: Path) -> dict[str, Any]:
             "alerts_count": len(alerts),
             "documents_count": len(documents),
             "obligations_count": len(obligations),
+            "relationship_impact_score": relationship_advice.get(
+                "relationship_impact_score", 0
+            ),
+            "overall_approach": negotiation_strategy.get(
+                "overall_approach", "unknown"
+            ),
         },
     }
 
@@ -276,6 +298,8 @@ def _external_dashboard_data(data: dict[str, Any]) -> dict[str, Any]:
         "obligations": data.get("obligations", []),
         "monitored_obligations": data.get("monitored_obligations", []),
         "alerts": data.get("alerts", []),
+        "relationship_advice": {},
+        "negotiation_strategy": {},
         "review_actions": [],
         "diagnostics": data.get("diagnostics", []),
         "severity_counts": data.get("severity_counts", {}),
@@ -1172,6 +1196,16 @@ def render_project_dashboard(
               <div class="stack" id="artifact-diagnostics"></div>
             </div>
           </div>
+          <div class="grid-2" style="margin-top:16px;" data-internal-only="true">
+            <div class="subpanel" style="padding:18px;">
+              <div class="eyebrow">Relationship Advice</div>
+              <div class="stack" id="relationship-advice"></div>
+            </div>
+            <div class="subpanel" style="padding:18px;">
+              <div class="eyebrow">Negotiation Playbook</div>
+              <div class="stack" id="negotiation-playbook"></div>
+            </div>
+          </div>
         </div>
 
         <div class="view" data-view="decision">
@@ -1692,6 +1726,8 @@ def render_project_dashboard(
 
     function renderOverview() {
       const decision = dashboardData.latest_run.decision_summary || {};
+      const relationshipAdvice = dashboardData.relationship_advice || {};
+      const negotiationStrategy = dashboardData.negotiation_strategy || {};
       const review = reviewSummary();
       const stats = [
         ["Review runs", dashboardData.case_record.total_runs],
@@ -1727,6 +1763,52 @@ def render_project_dashboard(
           <h3>${safe(item)}</h3>
         </div>
       `).join("") : emptyState("No artifact integrity issues are currently recorded.");
+
+      const considerations = relationshipAdvice.key_considerations || [];
+      el("relationship-advice").innerHTML = Object.keys(relationshipAdvice).length ? `
+        <div class="detail-card">
+          <div class="meta">
+            <span>${safeTitle(relationshipAdvice.negotiation_strategy)}</span>
+            <span>${safe(relationshipAdvice.relationship_impact_score)}</span>
+            <span>${safeTitle(relationshipAdvice.confidence)}</span>
+          </div>
+          <h3>${safe(relationshipAdvice.long_term_risk_assessment || "Relationship trajectory captured.")}</h3>
+          ${considerations.length ? `
+            <ul class="detail-list">
+              ${considerations.slice(0, 3).map((item) => `
+                <li>
+                  <strong>${safe(item.clause_reference)}</strong>
+                  <div class="note">${safe(item.recommended_action)}</div>
+                </li>
+              `).join("")}
+            </ul>
+          ` : '<p class="note">No clause-level relationship considerations were recorded.</p>'}
+        </div>
+      ` : emptyState("No relationship advice artifact is available for the latest run.");
+
+      const nextSteps = negotiationStrategy.next_steps || [];
+      const roadmap = negotiationStrategy.phase_roadmap || [];
+      el("negotiation-playbook").innerHTML = Object.keys(negotiationStrategy).length ? `
+        <div class="detail-card">
+          <div class="meta">
+            <span>${safeTitle(negotiationStrategy.overall_approach)}</span>
+            <span>${safeTitle(negotiationStrategy.confidence)}</span>
+            <span>${safe(negotiationStrategy.relationship_alignment_score)}</span>
+          </div>
+          <h3>${safe(negotiationStrategy.executive_summary || "Negotiation roadmap captured.")}</h3>
+          ${roadmap.length ? `<p class="note"><strong>Current phase emphasis:</strong> ${safe(roadmap[0].phase)} / ${safe((roadmap[0].focus_areas || []).join(", "))}</p>` : ""}
+          ${nextSteps.length ? `
+            <ul class="detail-list">
+              ${nextSteps.slice(0, 3).map((item) => `
+                <li>
+                  <strong>${safe(item.owner)}</strong>: ${safe(item.action)}
+                  <div class="note">${safe(item.timeline)}</div>
+                </li>
+              `).join("")}
+            </ul>
+          ` : '<p class="note">No immediate negotiation steps were recorded.</p>'}
+        </div>
+      ` : emptyState("No negotiation strategy artifact is available for the latest run.");
     }
 
     function renderDecision() {

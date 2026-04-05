@@ -315,6 +315,8 @@ class FileSystemCaseStore:
         procurement_profile: ProcurementProfile,
         outcome_evidence: OutcomeEvidenceBundle,
         relationship_strategy: dict[str, object],
+        relationship_advice: dict[str, object],
+        negotiation_strategy: dict[str, object],
         review_challenges: dict[str, object],
         obligations_count: int,
     ) -> PersistedCaseState:
@@ -346,6 +348,8 @@ class FileSystemCaseStore:
             procurement_profile=procurement_profile,
             outcome_evidence=outcome_evidence,
             relationship_strategy=relationship_strategy,
+            relationship_advice=relationship_advice,
+            negotiation_strategy=negotiation_strategy,
             review_challenges=review_challenges,
             obligations_count=obligations_count,
         )

@@ -202,6 +202,8 @@ class BidReviewRunRecord(BaseModel):
     procurement_profile: ProcurementProfile
     outcome_evidence: OutcomeEvidenceBundle
     relationship_strategy: dict[str, object]
+    relationship_advice: dict[str, object] = Field(default_factory=dict)
+    negotiation_strategy: dict[str, object] = Field(default_factory=dict)
     review_challenges: dict[str, object]
     obligations_count: int
 

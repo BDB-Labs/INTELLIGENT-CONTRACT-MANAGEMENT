@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -1279,7 +1279,7 @@ class RelationshipAdvice:
     project_id: str
     relationship_impact_score: float
     negotiation_strategy: str
-    key_considerations: list[dict[str, str]]
+    key_considerations: list[dict[str, Any]]
     monitoring_recommendations: list[str]
     confidence: str = "medium"
     relationship_factors: dict[str, Any] | None = None
@@ -1296,10 +1296,94 @@ class NegotiationStrategy:
     priority_matrix: list[dict[str, Any]]
     phase_roadmap: list[dict[str, Any]]
     trade_off_analysis: list[dict[str, Any]]
-    next_steps: list[dict[str, str]]
+    next_steps: list[dict[str, Any]]
     executive_summary: str = ""
     confidence: str = "medium"
     relationship_alignment_score: float | None = None
+
+
+def _relationship_cost_for_severity(severity: Severity) -> int:
+    return {
+        Severity.CRITICAL: -4,
+        Severity.HIGH: -3,
+        Severity.MEDIUM: -2,
+        Severity.LOW: -1,
+    }.get(severity, -1)
+
+
+def _timing_recommendation_for_severity(severity: Severity) -> str:
+    if severity in {Severity.CRITICAL, Severity.HIGH}:
+        return "early"
+    if severity is Severity.MEDIUM:
+        return "mid"
+    return "late"
+
+
+def _relationship_impact_label(score: float) -> str:
+    if score <= -5:
+        return "very_negative"
+    if score < -1:
+        return "negative"
+    if score <= 1:
+        return "neutral"
+    if score < 5:
+        return "positive"
+    return "very_positive"
+
+
+def _overall_negotiation_approach(
+    relationship_advice: RelationshipAdvice, risk_findings: list[Finding]
+) -> str:
+    critical_count = sum(1 for item in risk_findings if item.severity is Severity.CRITICAL)
+    high_count = sum(1 for item in risk_findings if item.severity is Severity.HIGH)
+    score = relationship_advice.relationship_impact_score
+
+    if score >= 3 and critical_count == 0:
+        return "collaborative"
+    if score <= -5 and critical_count + high_count >= 2:
+        return "competitive"
+    if critical_count == 0 and high_count <= 1 and score < 0:
+        return "avoiding"
+    return "compromising"
+
+
+def _trading_value_for(finding: Finding) -> str:
+    if finding.category in {"payment_terms", "delay_exposure", "indemnity"}:
+        return "Trade only for concrete cash-flow or liability protection."
+    if finding.category in {"additional_insured", "primary_noncontributory", "completed_operations"}:
+        return "High value when exchanged for broker-confirmed wording or narrower endorsements."
+    if finding.category in {"davis_bacon", "certified_payroll", "buy_america", "dbe_participation"}:
+        return "Low trading value; preserve compliance but seek process clarity instead."
+    return "Use as concession currency only if it unlocks a higher-priority commercial fix."
+
+
+def _net_value_for(*, relationship_cost: int, risk_reduction: int) -> str:
+    score = risk_reduction + relationship_cost
+    if score >= 8:
+        return "strongly_positive"
+    if score >= 5:
+        return "positive"
+    if score >= 2:
+        return "neutral"
+    if score >= 0:
+        return "negative"
+    return "strongly_negative"
+
+
+def _relationship_advice_payload(
+    advice: RelationshipAdvice, *, analysis_perspective: AnalysisPerspective
+) -> dict[str, Any]:
+    payload = asdict(advice)
+    payload["analysis_perspective"] = analysis_perspective.value
+    return payload
+
+
+def _negotiation_strategy_payload(
+    strategy: NegotiationStrategy, *, analysis_perspective: AnalysisPerspective
+) -> dict[str, Any]:
+    payload = asdict(strategy)
+    payload["analysis_perspective"] = analysis_perspective.value
+    return payload
 
 
 def _relationship_advisor(
@@ -1312,16 +1396,13 @@ def _relationship_advisor(
     perspective: AnalysisPerspective,
 ) -> RelationshipAdvice:
     """Assess long-term relationship impact and provide negotiation strategy guidance."""
-    # Analyze relationship factors from context profile
     funding_flexibility = context_profile.funding_flexibility
     schedule_pressure = context_profile.schedule_pressure
     oversight_intensity = context_profile.oversight_intensity
     public_visibility = context_profile.public_visibility
 
-    # Calculate relationship impact score based on multiple factors
     impact_score = 0.0
 
-    # Factor in risk findings severity
     high_severity_count = sum(
         1 for f in risk_findings if f.severity in {Severity.HIGH, Severity.CRITICAL}
     )
@@ -1331,27 +1412,23 @@ def _relationship_advisor(
     impact_score -= high_severity_count * 1.5
     impact_score -= medium_severity_count * 0.5
 
-    # Factor in context signals
     if funding_flexibility == "low":
-        impact_score -= 1.0  # Tight funding = more adversarial negotiations
+        impact_score -= 1.0
     if schedule_pressure == "high":
-        impact_score -= 0.5  # High schedule pressure = more contentious
+        impact_score -= 0.5
     if oversight_intensity == "high":
-        impact_score -= 0.5  # High oversight = more cautious relationship
+        impact_score -= 0.5
 
-    # Factor in outcome evidence
     if outcome_evidence.outcome_status in {
         "termination_takeover",
         "bankruptcy_restructuring",
     }:
-        impact_score -= 2.0  # Very negative history
+        impact_score -= 2.0
     elif outcome_evidence.outcome_status == "completion_documented":
-        impact_score += 1.0  # Positive history
+        impact_score += 1.0
 
-    # Normalize to -10 to +10 scale
     impact_score = max(-10.0, min(10.0, impact_score))
 
-    # Determine negotiation strategy
     if impact_score >= 5:
         strategy = "collaborative"
     elif impact_score >= 2:
@@ -1363,14 +1440,22 @@ def _relationship_advisor(
     else:
         strategy = "walk_away"
 
-    # Generate key considerations
-    considerations = []
-    if high_severity_count > 0:
+    considerations: list[dict[str, Any]] = []
+    if risk_findings:
+        lead_finding = max(
+            risk_findings,
+            key=lambda item: SEVERITY_ORDER[item.severity],
+        )
         considerations.append(
             {
-                "clause_reference": "Multiple high-severity risk findings",
-                "impact_description": f"Found {high_severity_count} high-severity issues that could strain the relationship if not addressed proactively.",
-                "recommended_action": "Address these issues early in negotiations with collaborative framing.",
+                "clause_reference": lead_finding.category,
+                "impact_description": (
+                    f"{lead_finding.title} is likely to drive the tone of the negotiation because "
+                    f"it carries {lead_finding.severity.value} technical risk and immediate commercial consequences."
+                ),
+                "recommended_action": lead_finding.recommended_action,
+                "relationship_cost": _relationship_cost_for_severity(lead_finding.severity),
+                "timing_recommendation": _timing_recommendation_for_severity(lead_finding.severity),
             }
         )
 
@@ -1380,6 +1465,8 @@ def _relationship_advisor(
                 "clause_reference": "Budget constraints detected",
                 "impact_description": "Entity appears to have limited funding flexibility, which may lead to rigid negotiation positions.",
                 "recommended_action": "Focus on value-engineering and alternative funding approaches rather than direct concessions.",
+                "relationship_cost": -2,
+                "timing_recommendation": "mid",
             }
         )
 
@@ -1389,6 +1476,8 @@ def _relationship_advisor(
                 "clause_reference": "Schedule pressure identified",
                 "impact_description": "Entity is under significant schedule pressure, which may create adversarial dynamics around timeline commitments.",
                 "recommended_action": "Use schedule flexibility as a negotiation lever while protecting critical path requirements.",
+                "relationship_cost": -2,
+                "timing_recommendation": "early",
             }
         )
 
@@ -1398,13 +1487,15 @@ def _relationship_advisor(
                 "clause_reference": "General contract terms",
                 "impact_description": "No significant relationship-impacting issues identified in the current analysis.",
                 "recommended_action": "Maintain collaborative approach and monitor for emerging relationship risks.",
+                "relationship_cost": 0,
+                "timing_recommendation": "late",
             }
         )
 
-    # Generate monitoring recommendations
     monitoring_recs = [
         "Track relationship health through regular check-ins during contract execution.",
         "Monitor for changes in entity leadership or budget priorities that may affect relationship dynamics.",
+        "Maintain a dated log of major clarifications, field directives, and response times so early relationship drift is visible.",
     ]
 
     if oversight_intensity == "high":
@@ -1419,7 +1510,23 @@ def _relationship_advisor(
             "Given negative historical outcomes, implement enhanced relationship monitoring protocols."
         )
 
-    # Build relationship factors
+    trust_indicators: list[str] = []
+    if procurement_profile.governance_artifacts_present:
+        trust_indicators.append("Governance artifacts create a visible paper trail for commitments and changes.")
+    if any(item.document_type is DocumentType.ADDENDUM for item in documents):
+        trust_indicators.append("Addenda activity suggests the entity is willing to clarify documents before award.")
+    if outcome_evidence.events:
+        trust_indicators.append("Outcome evidence provides a factual baseline for prior collaboration stress or success.")
+
+    relationship_value = "transactional"
+    if procurement_profile.agreement_type in {
+        "cmgc_preconstruction_services",
+        "design_build",
+    } or impact_score >= 5:
+        relationship_value = "partnership"
+    elif impact_score >= 0:
+        relationship_value = "strategic"
+
     relationship_factors = {
         "historical_pattern": outcome_evidence.outcome_status,
         "entity_priorities": [
@@ -1428,11 +1535,16 @@ def _relationship_advisor(
             f"Oversight intensity: {oversight_intensity}",
             f"Public visibility: {public_visibility}",
         ],
-        "relationship_value": "strategic" if impact_score >= 0 else "transactional",
+        "relationship_value": relationship_value,
+        "trust_indicators": trust_indicators,
+        "communication_quality": (
+            "structured"
+            if procurement_profile.governance_artifacts_present or len(documents) >= 4
+            else "limited"
+        ),
     }
 
-    # Entity interaction history from outcome evidence
-    entity_history = []
+    entity_history: list[str] = []
     if outcome_evidence.events:
         for event in outcome_evidence.events[:3]:
             entity_history.append(f"{event.event_type}: {event.summary}")
@@ -1475,13 +1587,10 @@ def _negotiation_strategist(
     obligations: list[Obligation],
 ) -> NegotiationStrategy:
     """Synthesize all inputs into a comprehensive negotiation strategy."""
-    # Determine overall approach based on relationship advice
-    overall_approach = relationship_advice.negotiation_strategy
+    overall_approach = _overall_negotiation_approach(relationship_advice, risk_findings)
 
-    # Build priority matrix combining technical risk and relationship impact
-    priority_matrix = []
+    priority_matrix: list[dict[str, Any]] = []
     for finding in risk_findings:
-        # Calculate priority score based on severity and relationship impact
         severity_score = {
             Severity.CRITICAL: _PRIORITY_SCORE_CRITICAL,
             Severity.HIGH: _PRIORITY_SCORE_HIGH,
@@ -1489,11 +1598,9 @@ def _negotiation_strategist(
             Severity.LOW: _PRIORITY_SCORE_LOW,
         }.get(finding.severity, _PRIORITY_SCORE_DEFAULT)
 
-        # Adjust based on relationship impact
         relationship_adjustment = relationship_advice.relationship_impact_score / 10.0
         priority_score = max(1, min(10, severity_score + relationship_adjustment))
 
-        # Determine recommended action
         if priority_score >= _PRIORITY_THRESHOLD_HOLD_FIRM:
             action = "hold_firm"
         elif priority_score >= _PRIORITY_THRESHOLD_SEEK_CONCESSION:
@@ -1505,29 +1612,31 @@ def _negotiation_strategist(
 
         priority_matrix.append(
             {
-                "issue": finding.category,
+                "issue": finding.title,
                 "technical_risk": finding.severity.value,
-                "relationship_impact": "negative"
-                if relationship_advice.relationship_impact_score < 0
-                else "positive",
+                "relationship_impact": _relationship_impact_label(
+                    relationship_advice.relationship_impact_score
+                ),
                 "priority_score": round(priority_score, 1),
                 "recommended_action": action,
+                "negotiation_effort": (
+                    "high"
+                    if priority_score >= 8
+                    else "medium"
+                    if priority_score >= 5
+                    else "low"
+                ),
+                "trading_value": _trading_value_for(finding),
             }
         )
 
-    # Sort by priority score descending
     priority_matrix.sort(key=lambda x: x["priority_score"], reverse=True)
 
-    # Build phase roadmap
     phase_roadmap = [
         {
             "phase": "pre_bid",
             "timing": "2-4 weeks before bid deadline",
-            "focus_areas": [
-                "Document completeness",
-                "Risk identification",
-                "Entity research",
-            ],
+            "focus_areas": ["Document completeness", "Risk identification", "Entity research"],
             "objectives": [
                 "Complete document inventory",
                 "Identify all high-severity risks",
@@ -1538,15 +1647,16 @@ def _negotiation_strategist(
                 "Risk findings documented",
                 "Entity context profile complete",
             ],
+            "key_stakeholders": ["Contract Manager", "Estimator", "Legal Counsel"],
+            "preparation_requirements": [
+                "Resolve document gaps and unreadable source material.",
+                "Confirm which high-risk findings are negotiable versus must-price items.",
+            ],
         },
         {
             "phase": "bid_submission",
             "timing": "1-2 weeks before bid deadline",
-            "focus_areas": [
-                "Pricing strategy",
-                "Risk allocation",
-                "Relationship positioning",
-            ],
+            "focus_areas": ["Pricing strategy", "Risk allocation", "Relationship positioning"],
             "objectives": [
                 "Price risks appropriately",
                 "Frame proposal collaboratively",
@@ -1557,15 +1667,16 @@ def _negotiation_strategist(
                 "Collaborative language used",
                 "Value propositions clear",
             ],
+            "key_stakeholders": ["Business Development", "Estimator", "Executive Sponsor"],
+            "preparation_requirements": [
+                "Convert top-priority issues into pricing assumptions or clarification requests.",
+                "Align proposal language with the selected negotiation approach.",
+            ],
         },
         {
             "phase": "negotiation",
             "timing": "Post-bid selection",
-            "focus_areas": [
-                "Priority issues",
-                "Trade-off analysis",
-                "Relationship preservation",
-            ],
+            "focus_areas": ["Priority issues", "Trade-off analysis", "Relationship preservation"],
             "objectives": [
                 "Address high-priority risks",
                 "Find creative solutions",
@@ -1576,24 +1687,52 @@ def _negotiation_strategist(
                 "Mutually acceptable terms",
                 "Relationship intact or improved",
             ],
+            "key_stakeholders": ["Contract Manager", "Legal Counsel", "Project Executive"],
+            "preparation_requirements": [
+                "Prepare fallback wording for the top three issues.",
+                "Define the escalation path for stalled commercial discussions.",
+            ],
+        },
+        {
+            "phase": "post_award",
+            "timing": "Immediately after execution",
+            "focus_areas": ["Kickoff controls", "Notice compliance", "Relationship monitoring"],
+            "objectives": [
+                "Carry negotiated terms into execution checklists",
+                "Assign ownership for early notice and reporting obligations",
+                "Keep issue escalation disciplined and factual",
+            ],
+            "success_criteria": [
+                "Kickoff meeting aligns contract, operations, and finance teams",
+                "First notice/reporting deadlines are owned",
+                "Relationship monitoring cadence is established",
+            ],
+            "key_stakeholders": ["Project Manager", "Project Controls Manager", "Operations Lead"],
+            "preparation_requirements": [
+                "Translate negotiated outcomes into operational playbooks.",
+                "Confirm the initial obligation queue and monitoring cadence.",
+            ],
         },
     ]
 
-    # Build trade-off analysis
-    trade_off_analysis = []
+    trade_off_analysis: list[dict[str, Any]] = []
     if relationship_advice.key_considerations:
         for consideration in relationship_advice.key_considerations[:3]:
+            relationship_cost = int(consideration.get("relationship_cost", -1))
+            risk_reduction = 8 if overall_approach in {"collaborative", "compromising"} else 6
             trade_off_analysis.append(
                 {
                     "what_you_gain": "Risk mitigation and contract protection",
                     "what_you_give_up": "Potential relationship friction if handled adversarially",
-                    "relationship_cost": -1
-                    if relationship_advice.relationship_impact_score < 0
-                    else 1,
-                    "risk_reduction": 7,
-                    "net_value": "positive"
-                    if relationship_advice.relationship_impact_score >= 0
-                    else "neutral",
+                    "relationship_cost": relationship_cost,
+                    "risk_reduction": risk_reduction,
+                    "net_value": _net_value_for(
+                        relationship_cost=relationship_cost,
+                        risk_reduction=risk_reduction,
+                    ),
+                    "alternative_if_rejected": (
+                        "Price the issue explicitly and tighten execution controls instead of relying on oral assurances."
+                    ),
                 }
             )
 
@@ -1605,10 +1744,10 @@ def _negotiation_strategist(
                 "relationship_cost": 0,
                 "risk_reduction": 8,
                 "net_value": "positive",
+                "alternative_if_rejected": "Accept the baseline form and manage the exposure operationally.",
             }
         )
 
-    # Generate next steps
     next_steps = [
         {
             "action": "Review and prioritize risk findings with legal team",
@@ -1616,6 +1755,7 @@ def _negotiation_strategist(
             "timeline": "Within 1 week",
             "dependencies": ["Complete risk analysis"],
             "success_metric": "Prioritized list of issues to address in negotiation",
+            "escalation_path": "Escalate to Project Executive if legal review slips beyond the bid clarification window.",
         },
         {
             "action": "Research entity's historical negotiation patterns",
@@ -1623,6 +1763,7 @@ def _negotiation_strategist(
             "timeline": "Within 2 weeks",
             "dependencies": ["Access to historical contract data"],
             "success_metric": "Entity negotiation profile document",
+            "escalation_path": "Escalate to Executive Sponsor if historical data is unavailable.",
         },
         {
             "action": "Develop creative alternatives for high-priority issues",
@@ -1630,18 +1771,42 @@ def _negotiation_strategist(
             "timeline": "Before negotiation phase",
             "dependencies": ["Prioritized risk list", "Entity research complete"],
             "success_metric": "At least 3 creative alternatives documented",
+            "escalation_path": "Escalate to Legal Counsel if fallback wording cannot preserve core protections.",
+        },
+        {
+            "action": "Map early notice and reporting obligations into the execution kickoff plan",
+            "owner": "Project Controls Manager",
+            "timeline": "Before contract execution",
+            "dependencies": ["Committed obligation register", "Negotiated term set"],
+            "success_metric": f"{len(obligations)} obligations mapped to an owner or kickoff checklist item",
+            "escalation_path": "Escalate to Operations Lead if obligation ownership is unclear.",
         },
     ]
 
-    # Generate executive summary
-    executive_summary = (
-        f"Negotiation strategy for project {project_id} recommends a {overall_approach} approach. "
-        f"Relationship impact score is {relationship_advice.relationship_impact_score:.1f}/10. "
-        f"Priority focus areas: {', '.join([m['issue'] for m in priority_matrix[:3]])}. "
-        f"Key recommendation: {relationship_advice.key_considerations[0]['recommended_action'] if relationship_advice.key_considerations else 'Proceed with standard negotiation protocols'}."
+    top_issues = ", ".join(item["issue"] for item in priority_matrix[:3]) or "No major issues identified"
+    executive_summary = "\n\n".join(
+        [
+            (
+                f"Project {project_id} should be approached with a {overall_approach} negotiation posture. "
+                f"The relationship impact score is {relationship_advice.relationship_impact_score:.1f}/10 and the current "
+                f"context profile indicates funding flexibility={context_profile.funding_flexibility}, "
+                f"schedule pressure={context_profile.schedule_pressure}, and oversight intensity={context_profile.oversight_intensity}."
+            ),
+            (
+                f"The immediate focus should stay on {top_issues}. These are the issues most likely to affect "
+                "cash flow, claims posture, or long-term working dynamics if they remain unresolved."
+            ),
+            (
+                "Success depends on bringing the contract manager, legal counsel, and pricing stakeholders into the same "
+                "decision loop before negotiation starts so concessions are traded deliberately instead of reactively."
+            ),
+            (
+                f"If the team does not negotiate this package effectively, the likely result is a {procurement_profile.agreement_type} "
+                "execution baseline with preventable commercial friction and a weaker operational hand during early performance."
+            ),
+        ]
     )
 
-    # Calculate relationship alignment score
     relationship_alignment = max(
         0, min(10, 5 + relationship_advice.relationship_impact_score / 2)
     )
@@ -2143,7 +2308,6 @@ def run_bid_review(
                 try:
                     run_data = json.loads(run_path.read_text(encoding="utf-8"))
                     if run_data.get("idempotency_key") == idempotency_key:
-                        run_id = run_path.stem
                         return BidReviewRunResult(
                             project_id=project_id,
                             artifacts_dir=output_dir,
@@ -2227,6 +2391,15 @@ def run_bid_review(
         procurement_profile,
         analysis_perspective=perspective,
     )
+    relationship_advice = _relationship_advisor(
+        project_id,
+        documents,
+        procurement_profile,
+        context_profile,
+        outcome_evidence,
+        all_findings,
+        perspective,
+    )
     review_challenges = _review_challenges(
         missing_docs=missing_docs,
         unreadable_documents=unreadable_documents,
@@ -2234,6 +2407,14 @@ def run_bid_review(
         outcome_evidence=outcome_evidence,
     )
     obligations = _extract_obligations(documents)
+    negotiation_strategy = _negotiation_strategist(
+        project_id,
+        relationship_advice,
+        all_findings,
+        context_profile,
+        procurement_profile,
+        obligations,
+    )
     decision_summary = _decision_summary(
         project_id=project_id,
         analysis_perspective=perspective,
@@ -2253,11 +2434,19 @@ def run_bid_review(
             finding.model_dump() for finding in compliance_findings
         ],
         "relationship_strategy.json": relationship_strategy,
+        "relationship_advice.json": _relationship_advice_payload(
+            relationship_advice,
+            analysis_perspective=perspective,
+        ),
         "context_profile.json": context_profile.model_dump(),
         "procurement_profile.json": procurement_profile.model_dump(),
         "outcome_evidence.json": outcome_evidence.model_dump(),
         "review_challenges.json": review_challenges,
         "decision_summary.json": decision_summary.model_dump(),
+        "negotiation_strategy.json": _negotiation_strategy_payload(
+            negotiation_strategy,
+            analysis_perspective=perspective,
+        ),
         "obligations_register.json": [
             obligation.model_dump() for obligation in obligations
         ],
@@ -2283,6 +2472,14 @@ def run_bid_review(
         procurement_profile=procurement_profile,
         outcome_evidence=outcome_evidence,
         relationship_strategy=relationship_strategy,
+        relationship_advice=_relationship_advice_payload(
+            relationship_advice,
+            analysis_perspective=perspective,
+        ),
+        negotiation_strategy=_negotiation_strategy_payload(
+            negotiation_strategy,
+            analysis_perspective=perspective,
+        ),
         review_challenges=review_challenges,
         obligations_count=len(obligations),
     )

@@ -1,37 +1,45 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Relationship Advice Schema",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RelationshipAdvice",
   "type": "object",
-  "required": ["relationship_impact_score", "negotiation_strategy", "key_considerations", "monitoring_recommendations"],
+  "required": [
+    "project_id",
+    "analysis_perspective",
+    "relationship_impact_score",
+    "negotiation_strategy",
+    "key_considerations",
+    "monitoring_recommendations",
+    "confidence"
+  ],
   "properties": {
+    "project_id": { "type": "string" },
+    "analysis_perspective": { "type": "string", "enum": ["vendor", "agency"] },
     "relationship_impact_score": {
       "type": "number",
       "minimum": -10,
-      "maximum": 10,
-      "description": "Estimated impact on long-term relationship (-10 = severely damaging, +10 = strongly positive)"
+      "maximum": 10
     },
     "negotiation_strategy": {
       "type": "string",
-      "enum": ["collaborative", "seek_concession", "creative_alternative", "hold_firm", "walk_away"],
-      "description": "Recommended overall negotiation approach for relationship preservation"
+      "enum": ["collaborative", "seek_concession", "creative_alternative", "hold_firm", "walk_away"]
     },
     "key_considerations": {
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["clause_reference", "impact_description", "recommended_action"],
+        "required": ["clause_reference", "impact_description", "recommended_action", "relationship_cost", "timing_recommendation"],
         "properties": {
-          "clause_reference": {"type": "string"},
-          "impact_description": {"type": "string"},
-          "recommended_action": {"type": "string"},
-          "relationship_cost": {"type": "number", "minimum": -5, "maximum": 5},
-          "timing_recommendation": {"type": "string", "enum": ["early", "mid", "late"]}
+          "clause_reference": { "type": "string" },
+          "impact_description": { "type": "string" },
+          "recommended_action": { "type": "string" },
+          "relationship_cost": { "type": "integer", "minimum": -5, "maximum": 5 },
+          "timing_recommendation": { "type": "string", "enum": ["early", "mid", "late"] }
         }
       }
     },
     "monitoring_recommendations": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": { "type": "string" }
     },
     "confidence": {
       "type": "string",
@@ -40,14 +48,26 @@
     "relationship_factors": {
       "type": "object",
       "properties": {
-        "historical_pattern": {"type": "string"},
-        "entity_priorities": {"type": "array", "items": {"type": "string"}},
-        "relationship_value": {"type": "string", "enum": ["transactional", "strategic", "partnership"]},
-        "trust_indicators": {"type": "array", "items": {"type": "string"}},
-        "communication_quality": {"type": "string"}
+        "historical_pattern": { "type": "string" },
+        "entity_priorities": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "relationship_value": {
+          "type": "string",
+          "enum": ["transactional", "strategic", "partnership"]
+        },
+        "trust_indicators": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "communication_quality": { "type": "string" }
       }
     },
-    "long_term_risk_assessment": {"type": "string"},
-    "entity_interaction_history": {"type": "array", "items": {"type": "string"}}
+    "entity_interaction_history": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "long_term_risk_assessment": { "type": "string" }
   }
 }

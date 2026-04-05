@@ -86,6 +86,32 @@ def test_bid_review_runner_emits_core_artifacts(tmp_path: Path) -> None:
     assert context_profile["project_id"] == "riverside-bridge"
     assert context_profile["internal_only"] is True
 
+    relationship_advice = json.loads(
+        (result.artifacts_dir / "relationship_advice.json").read_text()
+    )
+    assert relationship_advice["project_id"] == "riverside-bridge"
+    assert relationship_advice["analysis_perspective"] == "vendor"
+    assert relationship_advice["negotiation_strategy"] in {
+        "collaborative",
+        "seek_concession",
+        "creative_alternative",
+        "hold_firm",
+        "walk_away",
+    }
+
+    negotiation_strategy = json.loads(
+        (result.artifacts_dir / "negotiation_strategy.json").read_text()
+    )
+    assert negotiation_strategy["project_id"] == "riverside-bridge"
+    assert negotiation_strategy["analysis_perspective"] == "vendor"
+    assert negotiation_strategy["overall_approach"] in {
+        "collaborative",
+        "competitive",
+        "compromising",
+        "avoiding",
+    }
+    assert negotiation_strategy["next_steps"]
+
     outcome_evidence = json.loads((result.artifacts_dir / "outcome_evidence.json").read_text())
     assert outcome_evidence["outcome_status"] == "unknown_publicly_documented"
 
@@ -413,6 +439,14 @@ def test_bid_review_runner_persists_case_and_run_records(tmp_path: Path) -> None
     assert run_record["procurement_profile"]["project_id"] == "persisted-case"
     assert run_record["outcome_evidence"]["outcome_status"] == "dispute_or_change_documented"
     assert run_record["artifact_paths"]["decision_summary.json"].endswith("decision_summary.json")
+    assert run_record["artifact_paths"]["relationship_advice.json"].endswith(
+        "relationship_advice.json"
+    )
+    assert run_record["artifact_paths"]["negotiation_strategy.json"].endswith(
+        "negotiation_strategy.json"
+    )
+    assert run_record["relationship_advice"]["project_id"] == "persisted-case"
+    assert run_record["negotiation_strategy"]["project_id"] == "persisted-case"
 
     second = run_bid_review(project_dir)
     case_record_after_second_run = json.loads(second.case_record_path.read_text())

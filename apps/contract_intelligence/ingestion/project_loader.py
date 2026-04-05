@@ -328,7 +328,7 @@ def _load_pdf_text(path: Path) -> tuple[str, str, str]:
                 return text, "pypdf", quality
     except (ImportError, OSError, IOError) as exc:
         logger.debug("pypdf PDF extraction failed: %s", exc)
-    except (ValueError, RuntimeError) as exc:
+    except Exception as exc:
         logger.debug("pypdf PDF parsing error: %s", exc)
 
     # Fall back to existing methods
