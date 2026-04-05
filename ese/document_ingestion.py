@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from ese.adapters import AdapterExecutionError
+
 logger = logging.getLogger(__name__)
 
 SUPPORTED_EXTENSIONS = {
@@ -84,14 +86,14 @@ def extract_text_from_pdf(path: Path) -> tuple[str, list[str]]:
                     warnings.append(
                         f"Page {i + 1}: No extractable text (may be scanned/image-based)"
                     )
-            except Exception as e:
+            except (OSError, IOError, ValueError) as e:
                 warnings.append(f"Page {i + 1}: Extraction error - {e}")
 
         if not text_parts:
             warnings.append(
                 "PDF contains no extractable text content. Consider OCR preprocessing."
             )
-    except Exception as e:
+    except (OSError, IOError) as e:
         warnings.append(f"PDF read error: {e}")
 
     return "\n\n".join(text_parts), warnings
@@ -122,7 +124,7 @@ def extract_text_from_docx(path: Path) -> tuple[str, list[str]]:
 
         if not text_parts:
             warnings.append("Document appears empty or contains only images")
-    except Exception as e:
+    except (OSError, IOError, ImportError) as e:
         warnings.append(f"DOCX read error: {e}")
 
     return "\n".join(text_parts), warnings
@@ -166,7 +168,7 @@ def extract_text_from_spreadsheet(path: Path) -> tuple[str, list[str]]:
 
         if not text_parts:
             warnings.append("Spreadsheet appears empty")
-    except Exception as e:
+    except (OSError, IOError, ImportError) as e:
         warnings.append(f"Spreadsheet read error: {e}")
 
     return "\n".join(text_parts), warnings
@@ -191,7 +193,7 @@ def extract_text_from_presentation(path: Path) -> tuple[str, list[str]]:
 
         if not text_parts:
             warnings.append("Presentation appears empty or contains only images")
-    except Exception as e:
+    except (OSError, IOError, ImportError) as e:
         warnings.append(f"Presentation read error: {e}")
 
     return "\n".join(text_parts), warnings
@@ -222,7 +224,7 @@ def extract_text_from_markup(path: Path) -> tuple[str, list[str]]:
             warnings.append("File appears empty after extraction")
 
         return content, warnings
-    except Exception as e:
+    except (OSError, IOError) as e:
         warnings.append(f"Markup read error: {e}")
         return "", warnings
 
@@ -232,7 +234,7 @@ def extract_text_from_plain(path: Path) -> tuple[str, list[str]]:
     try:
         content = path.read_text(encoding="utf-8", errors="replace")
         return content, []
-    except Exception as e:
+    except (OSError, IOError) as e:
         return "", [f"Plain text read error: {e}"]
 
 
@@ -475,7 +477,7 @@ def reflect_on_output(
                 cfg=cfg,
             )
 
-        except Exception as e:
+        except (AdapterExecutionError, json.JSONDecodeError, TimeoutError) as e:
             logger.warning("Reflection failed for role=%s: %s", role, e)
             return ReflectionResult(
                 role=role,

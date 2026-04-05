@@ -445,6 +445,36 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/health/ready")
+def readiness() -> dict[str, object]:
+    """Enhanced readiness check that verifies dependencies."""
+    checks = {
+        "allowed_roots": "ok",
+        "storage": "ok",
+    }
+    try:
+        validate_allowed_roots_configured()
+    except ValueError as e:
+        checks["allowed_roots"] = f"error: {e}"
+
+    storage_root = os.getenv("CONTRACT_INTELLIGENCE_STORAGE_ROOT", "").strip()
+    if storage_root:
+        try:
+            root_path = Path(storage_root).expanduser().resolve()
+            if not root_path.exists():
+                checks["storage"] = "warning: storage root does not exist"
+            elif not os.access(root_path, os.W_OK):
+                checks["storage"] = "error: storage root not writable"
+        except Exception as e:
+            checks["storage"] = f"error: {e}"
+
+    all_ok = all(v == "ok" for v in checks.values())
+    return {
+        "status": "ready" if all_ok else "not_ready",
+        "checks": checks,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def root() -> str:
     return _reference_landing_html()

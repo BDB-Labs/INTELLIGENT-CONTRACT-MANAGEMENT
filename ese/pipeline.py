@@ -571,7 +571,12 @@ def _run_adapter_healthcheck(
 
     try:
         result = healthcheck(*args, **kwargs)
-    except Exception as err:  # noqa: BLE001
+    except AdapterExecutionError as err:
+        raise PipelineError(
+            f"Adapter healthcheck failed for '{reference}': {err}"
+        ) from err
+    except Exception as err:
+        logger.exception("Unexpected error in adapter healthcheck")
         raise PipelineError(
             f"Adapter healthcheck failed for '{reference}': {err}"
         ) from err
@@ -615,7 +620,8 @@ def _invoke_adapter(
         raise PipelineError(
             f"Adapter execution failed for role '{role}': {err}"
         ) from err
-    except Exception as err:  # noqa: BLE001 - preserve adapter stack info in message.
+    except Exception as err:
+        logger.exception("Unexpected error in adapter execution for role '%s'", role)
         raise PipelineError(
             f"Adapter execution failed for role '{role}': {err}"
         ) from err
@@ -1207,7 +1213,7 @@ def _self_reflect_role_output(
             "suggestions": suggestions,
             "refined_output": refined_output,
         }
-    except Exception as e:
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
         logger.debug("Self-reflection failed for role=%s: %s", role, e)
         return None
 
@@ -1620,7 +1626,10 @@ def run_pipeline(
                     run_index, run_role = future_map[future]
                     try:
                         results.append(future.result())
-                    except Exception as err:  # noqa: BLE001
+                    except (PipelineError, AdapterExecutionError) as err:
+                        failures.append((run_index, run_role, str(err)))
+                    except Exception as err:
+                        logger.exception("Unexpected error in parallel role execution")
                         failures.append((run_index, run_role, str(err)))
 
             results.sort(key=lambda item: int(item["index"]))
@@ -1702,7 +1711,12 @@ def run_pipeline(
                 artifacts_dir=artifacts_dir,
                 strategy="serial",
             )
-        except Exception as err:  # noqa: BLE001
+        except (
+            PipelineError,
+            AdapterExecutionError,
+            json.JSONDecodeError,
+            ValueError,
+        ) as err:
             logger.error("Role execution failed role=%s error=%s", role, err)
             failure = f"Role '{role}' failed: {err}"
             summary_path = _persist_run_outputs(

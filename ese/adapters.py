@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import random
 import re
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
 from typing import Any, Mapping
+from dataclasses import dataclass, field
+from enum import Enum
 
 from ese.local_runtime import (
     ensure_local_runtime_ready,
@@ -18,9 +22,101 @@ from ese.local_runtime import (
     LocalRuntimeError,
 )
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_CUSTOM_API_KEY_ENV = "CUSTOM_API_KEY"
 DEFAULT_RETRYABLE_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
+
+
+class CircuitState(Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
+
+
+@dataclass
+class CircuitBreaker:
+    """Circuit breaker for external API resilience."""
+
+    failure_threshold: int = 5
+    recovery_timeout: float = 30.0
+    half_open_max_calls: int = 3
+
+    _state: CircuitState = field(default=CircuitState.CLOSED, init=False)
+    _failure_count: int = field(default=0, init=False)
+    _last_failure_time: float = field(default=0.0, init=False)
+    _half_open_calls: int = field(default=0, init=False)
+    _lock: threading.Lock = field(default_factory=threading.Lock, init=False)
+
+    def record_success(self) -> None:
+        with self._lock:
+            if self._state == CircuitState.HALF_OPEN:
+                self._half_open_calls += 1
+                if self._half_open_calls >= self.half_open_max_calls:
+                    self._state = CircuitState.CLOSED
+                    self._failure_count = 0
+                    self._half_open_calls = 0
+                    logger.info("Circuit breaker closed")
+            elif self._state == CircuitState.CLOSED:
+                self._failure_count = 0
+
+    def record_failure(self) -> None:
+        with self._lock:
+            self._failure_count += 1
+            self._last_failure_time = time.monotonic()
+            if self._state == CircuitState.HALF_OPEN:
+                self._state = CircuitState.OPEN
+                logger.warning("Circuit breaker opened after half-open failure")
+            elif self._failure_count >= self.failure_threshold:
+                self._state = CircuitState.OPEN
+                logger.warning(
+                    f"Circuit breaker opened after {self._failure_count} failures"
+                )
+
+    def can_execute(self) -> bool:
+        with self._lock:
+            if self._state == CircuitState.CLOSED:
+                return True
+            if self._state == CircuitState.OPEN:
+                if time.monotonic() - self._last_failure_time >= self.recovery_timeout:
+                    self._state = CircuitState.HALF_OPEN
+                    self._half_open_calls = 0
+                    logger.info("Circuit breaker entering half-open state")
+                    return True
+                return False
+            return True
+
+    @property
+    def state(self) -> CircuitState:
+        with self._lock:
+            return self._state
+
+
+# Global circuit breakers per adapter
+_circuit_breakers: dict[str, CircuitBreaker] = {}
+_circuit_breakers_lock = threading.Lock()
+
+
+def _get_circuit_breaker(adapter_name: str) -> CircuitBreaker:
+    with _circuit_breakers_lock:
+        if adapter_name not in _circuit_breakers:
+            _circuit_breakers[adapter_name] = CircuitBreaker()
+        return _circuit_breakers[adapter_name]
+
+
+# Connection pooling with thread-safe HTTP opener
+_http_opener_lock = threading.Lock()
+_http_opener: urllib.request.OpenerDirector | None = None
+
+
+def _get_http_opener() -> urllib.request.OpenerDirector:
+    global _http_opener
+    with _http_opener_lock:
+        if _http_opener is None:
+            _http_opener = urllib.request.build_opener()
+            _http_opener.addheaders = [("User-Agent", "ese-cli/1.0")]
+        return _http_opener
 
 
 class AdapterExecutionError(RuntimeError):
@@ -339,6 +435,7 @@ def _execute_responses_request(
     provider_name: str,
     role: str,
     cfg: Mapping[str, Any] | None = None,
+    circuit_breaker: CircuitBreaker | None = None,
 ) -> str:
     body = json.dumps(payload).encode("utf-8")
     headers = {
@@ -356,18 +453,32 @@ def _execute_responses_request(
     last_error: str | None = None
     attempts = max_retries + 1
     for attempt in range(1, attempts + 1):
+        # Check circuit breaker before attempting
+        if circuit_breaker is not None and not circuit_breaker.can_execute():
+            raise AdapterExecutionError(
+                f"{provider_name} circuit breaker is open, request skipped"
+            )
+
         try:
-            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:  # noqa: S310
+            # Use connection pool
+            opener = _get_http_opener()
+            with opener.open(request, timeout=timeout_seconds) as response:  # noqa: S310
                 response_text = response.read().decode("utf-8")
                 parsed = json.loads(response_text)
                 if not isinstance(parsed, Mapping):
                     raise AdapterExecutionError(
                         f"{provider_name} response JSON must be an object"
                     )
+                # Record success in circuit breaker
+                if circuit_breaker is not None:
+                    circuit_breaker.record_success()
                 return _extract_openai_text(parsed)
         except urllib.error.HTTPError as err:
             response_body = err.read().decode("utf-8", errors="replace")
             status = err.code
+            # Record failure in circuit breaker
+            if circuit_breaker is not None:
+                circuit_breaker.record_failure()
             if status in {401, 403}:
                 raise AdapterExecutionError(
                     f"{auth_error_message} Role: {role}."
@@ -385,6 +496,9 @@ def _execute_responses_request(
                 f"{provider_name} request failed ({last_error})"
             ) from err
         except (urllib.error.URLError, TimeoutError, socket.timeout) as err:
+            # Record failure in circuit breaker
+            if circuit_breaker is not None:
+                circuit_breaker.record_failure()
             last_error = (
                 f"provider={provider_name} role={role} attempt={attempt}/{attempts} "
                 f"error={_truncate_for_error(_redact_error_text(str(err)))}"
@@ -438,6 +552,8 @@ def openai_adapter(
     api_key = _openai_api_key(cfg)
     url = f"{base_url}/responses"
 
+    circuit_breaker = _get_circuit_breaker("openai")
+
     return _execute_responses_request(
         url=url,
         api_key=api_key,
@@ -449,6 +565,7 @@ def openai_adapter(
         provider_name="OpenAI",
         role=role,
         cfg=cfg,
+        circuit_breaker=circuit_breaker,
     )
 
 
@@ -509,6 +626,7 @@ def custom_api_adapter(
         provider_name=f"Custom API ({configured_provider})",
         role=role,
         cfg=cfg,
+        circuit_breaker=_get_circuit_breaker(f"custom_api_{configured_provider}"),
     )
 
 
@@ -564,6 +682,7 @@ def local_adapter(
         provider_name="Local adapter",
         role=role,
         cfg=cfg,
+        circuit_breaker=_get_circuit_breaker("local"),
     )
 
 
@@ -583,11 +702,19 @@ def check_adapter_health(
             request = urllib.request.Request(
                 url, headers={"Authorization": f"Bearer {api_key}"}
             )
-            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+            opener = _get_http_opener()
+            with opener.open(request, timeout=10) as response:  # noqa: S310
                 if response.status == 200:
-                    return True, f"OpenAI endpoint reachable at {base_url}"
-        except Exception as e:
+                    cb = _get_circuit_breaker("openai")
+                    return (
+                        True,
+                        f"OpenAI endpoint reachable at {base_url} (circuit: {cb.state.value})",
+                    )
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as e:
             return False, f"OpenAI endpoint unreachable: {e}"
+        except Exception as e:
+            logger.exception("Unexpected error checking OpenAI health")
+            return False, f"OpenAI endpoint error: {e}"
 
     if adapter_name == "local":
         try:
@@ -597,11 +724,19 @@ def check_adapter_health(
             local_cfg = _runtime_local_cfg(cfg)
             if bool(local_cfg.get("use_openai_compat_auth", True)):
                 request.add_header("Authorization", "Bearer ollama")
-            with urllib.request.urlopen(request, timeout=10) as response:  # noqa: S310
+            opener = _get_http_opener()
+            with opener.open(request, timeout=10) as response:  # noqa: S310
                 if response.status == 200:
-                    return True, f"Local endpoint reachable at {base_url}"
-        except Exception as e:
+                    cb = _get_circuit_breaker("local")
+                    return (
+                        True,
+                        f"Local endpoint reachable at {base_url} (circuit: {cb.state.value})",
+                    )
+        except (urllib.error.URLError, TimeoutError, socket.timeout) as e:
             return False, f"Local endpoint unreachable: {e}"
+        except Exception as e:
+            logger.exception("Unexpected error checking local health")
+            return False, f"Local endpoint error: {e}"
 
     if adapter_name == "custom_api":
         try:

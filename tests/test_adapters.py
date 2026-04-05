@@ -4,7 +4,12 @@ import json
 
 import pytest
 
-from ese.adapters import AdapterExecutionError, custom_api_adapter, local_adapter, openai_adapter
+from ese.adapters import (
+    AdapterExecutionError,
+    custom_api_adapter,
+    local_adapter,
+    openai_adapter,
+)
 from ese.local_runtime import LocalRuntimeError
 
 
@@ -20,6 +25,14 @@ class _FakeResponse:
 
     def read(self) -> bytes:
         return self._body.encode("utf-8")
+
+
+class _FakeOpener:
+    def __init__(self, urlopen_fn):
+        self._urlopen_fn = urlopen_fn
+
+    def open(self, request, timeout=None):
+        return self._urlopen_fn(request, timeout)
 
 
 def _openai_cfg() -> dict:
@@ -111,7 +124,9 @@ def test_custom_api_adapter_success(monkeypatch: pytest.MonkeyPatch) -> None:
         assert payload["model"] == "my-model"
         return _FakeResponse(json.dumps({"output_text": "ok"}))
 
-    monkeypatch.setattr("ese.adapters.urllib.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr(
+        "ese.adapters._get_http_opener", lambda: _FakeOpener(_fake_urlopen)
+    )
 
     output = custom_api_adapter(
         role="architect",
@@ -143,7 +158,10 @@ def test_local_adapter_success(monkeypatch: pytest.MonkeyPatch) -> None:
         },
     }
 
-    monkeypatch.setattr("ese.adapters.ensure_local_runtime_ready", lambda cfg, auto_start=True, require_models=True: None)
+    monkeypatch.setattr(
+        "ese.adapters.ensure_local_runtime_ready",
+        lambda cfg, auto_start=True, require_models=True: None,
+    )
 
     def _fake_urlopen(request, timeout):  # noqa: ANN001
         assert timeout == 30
@@ -153,7 +171,9 @@ def test_local_adapter_success(monkeypatch: pytest.MonkeyPatch) -> None:
         assert request.headers["Authorization"] == "Bearer ollama"
         return _FakeResponse(json.dumps({"output_text": "local ok"}))
 
-    monkeypatch.setattr("ese.adapters.urllib.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr(
+        "ese.adapters._get_http_opener", lambda: _FakeOpener(_fake_urlopen)
+    )
 
     output = local_adapter(
         role="architect",
@@ -166,7 +186,9 @@ def test_local_adapter_success(monkeypatch: pytest.MonkeyPatch) -> None:
     assert output == "local ok"
 
 
-def test_local_adapter_wraps_local_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_local_adapter_wraps_local_runtime_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cfg = {
         "provider": {
             "name": "local",
@@ -202,7 +224,9 @@ def test_local_adapter_wraps_local_runtime_errors(monkeypatch: pytest.MonkeyPatc
     assert "Ollama is unavailable" in str(exc.value)
 
 
-def test_local_adapter_can_disable_openai_compat_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_local_adapter_can_disable_openai_compat_auth(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cfg = {
         "provider": {
             "name": "local",
@@ -224,7 +248,10 @@ def test_local_adapter_can_disable_openai_compat_auth(monkeypatch: pytest.Monkey
         },
     }
 
-    monkeypatch.setattr("ese.adapters.ensure_local_runtime_ready", lambda cfg, auto_start=True, require_models=True: None)
+    monkeypatch.setattr(
+        "ese.adapters.ensure_local_runtime_ready",
+        lambda cfg, auto_start=True, require_models=True: None,
+    )
 
     def _fake_urlopen(request, timeout):  # noqa: ANN001
         assert timeout == 30
@@ -232,7 +259,9 @@ def test_local_adapter_can_disable_openai_compat_auth(monkeypatch: pytest.Monkey
         assert request.headers.get("Authorization") is None
         return _FakeResponse(json.dumps({"output_text": "local ok"}))
 
-    monkeypatch.setattr("ese.adapters.urllib.request.urlopen", _fake_urlopen)
+    monkeypatch.setattr(
+        "ese.adapters._get_http_opener", lambda: _FakeOpener(_fake_urlopen)
+    )
 
     output = local_adapter(
         role="architect",

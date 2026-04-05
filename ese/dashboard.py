@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import signal
 import threading
 import uuid
 import webbrowser
@@ -12,6 +14,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
+
+logger = logging.getLogger(__name__)
 
 from ese.config import ConfigValidationError, load_config
 from ese.feedback import record_feedback
@@ -26,7 +30,11 @@ from ese.reports import (
     render_junit,
     render_sarif,
 )
-from ese.templates import list_task_templates, recommend_template_for_scope, run_task_pipeline
+from ese.templates import (
+    list_task_templates,
+    recommend_template_for_scope,
+    run_task_pipeline,
+)
 
 
 class DashboardStateError(RuntimeError):
@@ -51,14 +59,22 @@ class DashboardJobStore:
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except OSError as err:
-                raise DashboardStateError(f"Could not read persisted dashboard job state: {path}") from err
+                raise DashboardStateError(
+                    f"Could not read persisted dashboard job state: {path}"
+                ) from err
             except json.JSONDecodeError as err:
-                raise DashboardStateError(f"Persisted dashboard job state is not valid JSON: {path}") from err
+                raise DashboardStateError(
+                    f"Persisted dashboard job state is not valid JSON: {path}"
+                ) from err
             if not isinstance(payload, dict):
-                raise DashboardStateError(f"Persisted dashboard job state must be a JSON object: {path}")
+                raise DashboardStateError(
+                    f"Persisted dashboard job state must be a JSON object: {path}"
+                )
             job_id = str(payload.get("id") or "").strip()
             if not job_id:
-                raise DashboardStateError(f"Persisted dashboard job state is missing an id: {path}")
+                raise DashboardStateError(
+                    f"Persisted dashboard job state is missing an id: {path}"
+                )
             self._jobs[job_id] = payload
 
     def _job_path(self, job_id: str) -> Path | None:
@@ -106,7 +122,9 @@ class DashboardJobStore:
     def _update(self, job_id: str, **updates: Any) -> None:
         with self._lock:
             if job_id in self._jobs:
-                updates["updated_at"] = datetime.now().astimezone().isoformat(timespec="seconds")
+                updates["updated_at"] = (
+                    datetime.now().astimezone().isoformat(timespec="seconds")
+                )
                 self._jobs[job_id].update(updates)
                 self._persist_job(job_id)
 
@@ -116,7 +134,9 @@ class DashboardJobStore:
             return dict(job) if job else None
 
 
-def _load_effective_config(config_path: str, scope: str | None = None) -> dict[str, Any]:
+def _load_effective_config(
+    config_path: str, scope: str | None = None
+) -> dict[str, Any]:
     cfg = load_config(config_path)
     effective = dict(cfg or {})
     if scope and scope.strip():
@@ -137,7 +157,9 @@ def _run_config_job(
 ) -> dict[str, str]:
     effective = _load_effective_config(config_path, scope=scope)
     summary_path = run_pipeline(cfg=effective, artifacts_dir=artifacts_dir)
-    final_artifacts_dir = artifacts_dir or str((effective.get("output") or {}).get("artifacts_dir") or "artifacts")
+    final_artifacts_dir = artifacts_dir or str(
+        (effective.get("output") or {}).get("artifacts_dir") or "artifacts"
+    )
     return {
         "summary_path": summary_path,
         "artifacts_dir": final_artifacts_dir,
@@ -146,7 +168,9 @@ def _run_config_job(
 
 def _run_task_job(**kwargs: Any) -> dict[str, str]:
     cfg, summary_path = run_task_pipeline(**kwargs)
-    final_artifacts_dir = str((cfg.get("output") or {}).get("artifacts_dir") or "artifacts")
+    final_artifacts_dir = str(
+        (cfg.get("output") or {}).get("artifacts_dir") or "artifacts"
+    )
     return {
         "summary_path": summary_path,
         "artifacts_dir": final_artifacts_dir,
@@ -155,7 +179,9 @@ def _run_task_job(**kwargs: Any) -> dict[str, str]:
 
 def _run_pr_job(**kwargs: Any) -> dict[str, str]:
     context, cfg, summary_path, review_path = run_pr_review(**kwargs)
-    final_artifacts_dir = str((cfg.get("output") or {}).get("artifacts_dir") or "artifacts")
+    final_artifacts_dir = str(
+        (cfg.get("output") or {}).get("artifacts_dir") or "artifacts"
+    )
     return {
         "summary_path": summary_path,
         "artifacts_dir": final_artifacts_dir,
@@ -193,7 +219,9 @@ def _rerun_job(
 
 def _allocate_run_artifacts_dir(base_dir: str, *, kind: str) -> str:
     requested = Path(base_dir)
-    root = requested.parent if (requested / "pipeline_state.json").exists() else requested
+    root = (
+        requested.parent if (requested / "pipeline_state.json").exists() else requested
+    )
     root.mkdir(parents=True, exist_ok=True)
 
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -214,7 +242,9 @@ def _coerce_bool(value: Any, *, default: bool = True) -> bool:
     return str(value).strip().lower() not in {"", "0", "false", "no", "off"}
 
 
-def _task_run_kwargs(payload: dict[str, Any], *, root_artifacts_dir: str) -> dict[str, Any]:
+def _task_run_kwargs(
+    payload: dict[str, Any], *, root_artifacts_dir: str
+) -> dict[str, Any]:
     run_artifacts_dir = _allocate_run_artifacts_dir(
         str(payload.get("artifacts_dir") or root_artifacts_dir),
         kind="task-run",
@@ -226,17 +256,29 @@ def _task_run_kwargs(payload: dict[str, Any], *, root_artifacts_dir: str) -> dic
         "execution_mode": str(payload.get("execution_mode") or "auto"),
         "artifacts_dir": run_artifacts_dir,
         "model": str(payload.get("model")) if payload.get("model") else None,
-        "runtime_adapter": str(payload.get("runtime_adapter")) if payload.get("runtime_adapter") else None,
+        "runtime_adapter": str(payload.get("runtime_adapter"))
+        if payload.get("runtime_adapter")
+        else None,
         "base_url": str(payload.get("base_url")) if payload.get("base_url") else None,
-        "config_path": str(payload.get("config_path")) if payload.get("config_path") else None,
-        "repo_path": str(payload.get("repo_path")) if payload.get("repo_path") else None,
-        "include_repo_status": _coerce_bool(payload.get("include_repo_status"), default=True),
-        "include_repo_diff": _coerce_bool(payload.get("include_repo_diff"), default=True),
+        "config_path": str(payload.get("config_path"))
+        if payload.get("config_path")
+        else None,
+        "repo_path": str(payload.get("repo_path"))
+        if payload.get("repo_path")
+        else None,
+        "include_repo_status": _coerce_bool(
+            payload.get("include_repo_status"), default=True
+        ),
+        "include_repo_diff": _coerce_bool(
+            payload.get("include_repo_diff"), default=True
+        ),
         "max_repo_diff_chars": int(payload.get("max_repo_diff_chars") or 8000),
     }
 
 
-def _export_report_payload(artifacts_dir: str, export_format: str) -> tuple[str, str, str]:
+def _export_report_payload(
+    artifacts_dir: str, export_format: str
+) -> tuple[str, str, str]:
     report = collect_run_report(artifacts_dir)
     clean_format = export_format.strip().lower()
     if clean_format == "sarif":
@@ -1330,7 +1372,9 @@ def serve_dashboard(
     config_path: str | None = None,
 ) -> str:
     root_artifacts_dir = str(Path(artifacts_dir))
-    jobs = DashboardJobStore(storage_dir=Path(root_artifacts_dir) / ".ese-dashboard-jobs")
+    jobs = DashboardJobStore(
+        storage_dir=Path(root_artifacts_dir) / ".ese-dashboard-jobs"
+    )
     bootstrap = {
         "artifacts_dir": root_artifacts_dir,
         "config_path": config_path,
@@ -1340,7 +1384,9 @@ def serve_dashboard(
     class DashboardHandler(BaseHTTPRequestHandler):
         server_version = "ESEDashboard/1.0"
 
-        def _send_json(self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> None:
+        def _send_json(
+            self, payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK
+        ) -> None:
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -1412,7 +1458,9 @@ def serve_dashboard(
                 return
 
             if parsed.path == "/api/history":
-                self._send_json({"runs": list_recent_runs(self._artifacts_dir_from_query())})
+                self._send_json(
+                    {"runs": list_recent_runs(self._artifacts_dir_from_query())}
+                )
                 return
 
             if parsed.path == "/api/recommend-template":
@@ -1435,7 +1483,9 @@ def serve_dashboard(
                 self._send_text(
                     body,
                     content_type=content_type,
-                    headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{filename}"'
+                    },
                 )
                 return
 
@@ -1459,7 +1509,10 @@ def serve_dashboard(
                 job_id = parsed.path.rsplit("/", 1)[-1]
                 job = jobs.get(job_id)
                 if job is None:
-                    self._send_json({"error": f"Unknown job '{job_id}'."}, status=HTTPStatus.NOT_FOUND)
+                    self._send_json(
+                        {"error": f"Unknown job '{job_id}'."},
+                        status=HTTPStatus.NOT_FOUND,
+                    )
                     return
                 self._send_json(job)
                 return
@@ -1475,10 +1528,17 @@ def serve_dashboard(
                     return
                 for item in report.get("roles", []):
                     if item.get("role") == role:
-                        content = Path(str(item["artifact"])).read_text(encoding="utf-8")
-                        self._send_text(content, content_type="text/plain; charset=utf-8")
+                        content = Path(str(item["artifact"])).read_text(
+                            encoding="utf-8"
+                        )
+                        self._send_text(
+                            content, content_type="text/plain; charset=utf-8"
+                        )
                         return
-                self._send_json({"error": f"No artifact found for role '{role}'."}, status=HTTPStatus.NOT_FOUND)
+                self._send_json(
+                    {"error": f"No artifact found for role '{role}'."},
+                    status=HTTPStatus.NOT_FOUND,
+                )
                 return
 
             self._send_json({"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
@@ -1496,7 +1556,9 @@ def serve_dashboard(
                     job_id = jobs.start(
                         "task-run",
                         _run_task_job,
-                        **_task_run_kwargs(payload, root_artifacts_dir=root_artifacts_dir),
+                        **_task_run_kwargs(
+                            payload, root_artifacts_dir=root_artifacts_dir
+                        ),
                     )
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
@@ -1504,14 +1566,22 @@ def serve_dashboard(
                 if parsed.path == "/api/run-config":
                     config_path_value = str(payload.get("config_path") or "").strip()
                     if not config_path_value:
-                        raise ConfigValidationError("config_path is required for /api/run-config.")
-                    requested_dir = str(payload.get("artifacts_dir") or root_artifacts_dir)
+                        raise ConfigValidationError(
+                            "config_path is required for /api/run-config."
+                        )
+                    requested_dir = str(
+                        payload.get("artifacts_dir") or root_artifacts_dir
+                    )
                     job_id = jobs.start(
                         "config-run",
                         _run_config_job,
                         config_path=config_path_value,
-                        artifacts_dir=_allocate_run_artifacts_dir(requested_dir, kind="config-run"),
-                        scope=str(payload.get("scope")) if payload.get("scope") else None,
+                        artifacts_dir=_allocate_run_artifacts_dir(
+                            requested_dir, kind="config-run"
+                        ),
+                        scope=str(payload.get("scope"))
+                        if payload.get("scope")
+                        else None,
                     )
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
@@ -1528,13 +1598,21 @@ def serve_dashboard(
                         pr=str(payload.get("pr")) if payload.get("pr") else None,
                         base=str(payload.get("base")) if payload.get("base") else None,
                         head=str(payload.get("head")) if payload.get("head") else None,
-                        focus=str(payload.get("focus")) if payload.get("focus") else None,
+                        focus=str(payload.get("focus"))
+                        if payload.get("focus")
+                        else None,
                         provider=str(payload.get("provider") or "openai"),
                         execution_mode=str(payload.get("execution_mode") or "auto"),
                         artifacts_dir=run_artifacts_dir,
-                        model=str(payload.get("model")) if payload.get("model") else None,
-                        runtime_adapter=str(payload.get("runtime_adapter")) if payload.get("runtime_adapter") else None,
-                        base_url=str(payload.get("base_url")) if payload.get("base_url") else None,
+                        model=str(payload.get("model"))
+                        if payload.get("model")
+                        else None,
+                        runtime_adapter=str(payload.get("runtime_adapter"))
+                        if payload.get("runtime_adapter")
+                        else None,
+                        base_url=str(payload.get("base_url"))
+                        if payload.get("base_url")
+                        else None,
                     )
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
@@ -1543,10 +1621,16 @@ def serve_dashboard(
                     job_id = jobs.start(
                         "rerun",
                         _rerun_job,
-                        artifacts_dir=str(payload.get("artifacts_dir") or root_artifacts_dir),
+                        artifacts_dir=str(
+                            payload.get("artifacts_dir") or root_artifacts_dir
+                        ),
                         from_role=str(payload.get("from_role") or ""),
-                        config_path=str(payload.get("config_path")) if payload.get("config_path") else None,
-                        scope=str(payload.get("scope")) if payload.get("scope") else None,
+                        config_path=str(payload.get("config_path"))
+                        if payload.get("config_path")
+                        else None,
+                        scope=str(payload.get("scope"))
+                        if payload.get("scope")
+                        else None,
                     )
                     self._send_json({"job_id": job_id}, status=HTTPStatus.ACCEPTED)
                     return
@@ -1557,8 +1641,12 @@ def serve_dashboard(
                         role=str(payload.get("role") or ""),
                         title=str(payload.get("title") or ""),
                         feedback=str(payload.get("feedback") or ""),
-                        artifacts_dir=str(payload.get("artifacts_dir") or root_artifacts_dir),
-                        details=str(payload.get("details")) if payload.get("details") else None,
+                        artifacts_dir=str(
+                            payload.get("artifacts_dir") or root_artifacts_dir
+                        ),
+                        details=str(payload.get("details"))
+                        if payload.get("details")
+                        else None,
                     )
                     self._send_json({"entry": entry}, status=HTTPStatus.CREATED)
                     return
@@ -1568,14 +1656,28 @@ def serve_dashboard(
 
             self._send_json({"error": "Not found."}, status=HTTPStatus.NOT_FOUND)
 
+    import signal
+
+    _shutdown_requested = False
+
+    def _signal_handler(signum, frame):
+        nonlocal _shutdown_requested
+        _shutdown_requested = True
+        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+
+    signal.signal(signal.SIGTERM, _signal_handler)
+    signal.signal(signal.SIGINT, _signal_handler)
+
     server = ThreadingHTTPServer((host, port), DashboardHandler)
     url = f"http://{host}:{port}"
     if open_browser:
         webbrowser.open(url)
     try:
-        server.serve_forever()
+        while not _shutdown_requested:
+            server.handle_request()
     except KeyboardInterrupt:
         pass
     finally:
+        logger.info("Shutting down dashboard server...")
         server.server_close()
     return url

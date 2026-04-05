@@ -103,7 +103,7 @@ def _extract_xlsx_text(path: Path) -> str:
                     text_parts.append("[...truncated at 1000 rows...]")
                     break
         wb.close()
-    except Exception as e:
+    except (OSError, IOError, ImportError) as e:
         logger.warning("XLSX extraction failed for %s: %s", path.name, e)
     return "\n".join(text_parts).strip()
 
@@ -122,7 +122,7 @@ def _extract_pptx_text(path: Path) -> str:
                     for para in shape.text_frame.paragraphs:  # type: ignore[attr-defined]
                         if para.text.strip():
                             text_parts.append(para.text)
-    except Exception as e:
+    except (OSError, IOError, ImportError) as e:
         logger.warning("PPTX extraction failed for %s: %s", path.name, e)
     return "\n".join(text_parts).strip()
 
@@ -318,6 +318,8 @@ def _load_pdf_text(path: Path) -> tuple[str, str, str]:
             quality = _extract_text_quality(text)
             if quality != "none":
                 return text, "pypdf", quality
+    except (ImportError, OSError, IOError):
+        pass
     except Exception:
         pass
 

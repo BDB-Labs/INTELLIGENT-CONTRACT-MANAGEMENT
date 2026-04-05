@@ -1,0 +1,5080 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "INTELLIGENT-CONTRACT-MANAGEMENT",
+    "languages": [
+      "Python"
+    ],
+    "frameworks": [
+      "FastAPI",
+      "Typer",
+      "Pydantic"
+    ],
+    "description": "ESE CLI framework for orchestrated AI ensembles + Contract Intelligence Application for construction contract compliance",
+    "analyzedAt": "2026-04-04T23:08:32.584906Z",
+    "gitCommitHash": "75e92e7aa50c5c4fa2a58734723fe9fccc408969"
+  },
+  "nodes": [
+    {
+      "id": "file:main.py",
+      "name": "main.py",
+      "type": "file",
+      "filePath": "main.py",
+      "summary": "Entry point that imports and exports the FastAPI app from contract_intelligence",
+      "tags": [
+        "entrypoint",
+        "fastapi"
+      ]
+    },
+    {
+      "id": "file:ese/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "ese/__init__.py",
+      "summary": "ESE package initialization with version from metadata",
+      "tags": [
+        "package-init",
+        "version"
+      ]
+    },
+    {
+      "id": "file:ese/adapters.py",
+      "name": "adapters.py",
+      "type": "file",
+      "filePath": "ese/adapters.py",
+      "summary": "Built-in runtime adapters for ESE role execution including dry-run, openai, local, and custom_api",
+      "tags": [
+        "adapters",
+        "runtime",
+        "llm"
+      ]
+    },
+    {
+      "id": "file:ese/admin.py",
+      "name": "admin.py",
+      "type": "file",
+      "filePath": "ese/admin.py",
+      "summary": "FastAPI admin web application for system management with dashboard, pipeline, contracts, knowledge base, CRM pages",
+      "tags": [
+        "admin",
+        "fastapi",
+        "ui",
+        "web"
+      ]
+    },
+    {
+      "id": "file:ese/cli.py",
+      "name": "cli.py",
+      "type": "file",
+      "filePath": "ese/cli.py",
+      "summary": "Typer CLI with commands for init, start, task, pr, status, report, suggestions, export, feedback, dashboard",
+      "tags": [
+        "cli",
+        "typer",
+        "commands"
+      ]
+    },
+    {
+      "id": "file:ese/config.py",
+      "name": "config.py",
+      "type": "file",
+      "filePath": "ese/config.py",
+      "summary": "ESE configuration loading, validation, and helper utilities using Pydantic models",
+      "tags": [
+        "config",
+        "validation",
+        "pydantic"
+      ]
+    },
+    {
+      "id": "file:ese/config_packs.py",
+      "name": "config_packs.py",
+      "type": "file",
+      "filePath": "ese/config_packs.py",
+      "summary": "Shipped config-pack registry for opinionated ESE installations including construction-contract-intelligence pack",
+      "tags": [
+        "config",
+        "packs",
+        "registry"
+      ]
+    },
+    {
+      "id": "file:ese/constants.py",
+      "name": "constants.py",
+      "type": "file",
+      "filePath": "ese/constants.py",
+      "summary": "System-wide constants including execution modes, pipeline defaults, adapter defaults, certainty thresholds",
+      "tags": [
+        "constants",
+        "defaults"
+      ]
+    },
+    {
+      "id": "file:ese/crm.py",
+      "name": "crm.py",
+      "type": "file",
+      "filePath": "ese/crm.py",
+      "summary": "Lightweight CRM for contract intelligence tracking entities, contacts, interactions, relationship health",
+      "tags": [
+        "crm",
+        "entities",
+        "relationships"
+      ]
+    },
+    {
+      "id": "file:ese/dashboard.py",
+      "name": "dashboard.py",
+      "type": "file",
+      "filePath": "ese/dashboard.py",
+      "summary": "Local dashboard for creating and reviewing ESE runs with job store and background execution",
+      "tags": [
+        "dashboard",
+        "web",
+        "ui"
+      ]
+    },
+    {
+      "id": "file:ese/diff_context.py",
+      "name": "diff_context.py",
+      "type": "file",
+      "filePath": "ese/diff_context.py",
+      "summary": "Helpers for building file-aware diff excerpts with truncation support",
+      "tags": [
+        "diff",
+        "git",
+        "context"
+      ]
+    },
+    {
+      "id": "file:ese/doctor.py",
+      "name": "doctor.py",
+      "type": "file",
+      "filePath": "ese/doctor.py",
+      "summary": "ESE doctor checks for validating config and enforcing ensemble role separation constraints",
+      "tags": [
+        "validation",
+        "config",
+        "constraints"
+      ]
+    },
+    {
+      "id": "file:ese/document_ingestion.py",
+      "name": "document_ingestion.py",
+      "type": "file",
+      "filePath": "ese/document_ingestion.py",
+      "summary": "Document ingestion pipeline with multi-format support (PDF, DOCX, XLSX, etc) and self-correction",
+      "tags": [
+        "documents",
+        "ingestion",
+        "extraction"
+      ]
+    },
+    {
+      "id": "file:ese/feedback.py",
+      "name": "feedback.py",
+      "type": "file",
+      "filePath": "ese/feedback.py",
+      "summary": "Local feedback capture and lightweight learning helpers for ESE",
+      "tags": [
+        "feedback",
+        "learning",
+        "tracking"
+      ]
+    },
+    {
+      "id": "file:ese/init_wizard.py",
+      "name": "init_wizard.py",
+      "type": "file",
+      "filePath": "ese/init_wizard.py",
+      "summary": "Interactive wizard for creating ese.config.yaml with provider, model, role selection",
+      "tags": [
+        "wizard",
+        "init",
+        "interactive"
+      ]
+    },
+    {
+      "id": "file:ese/knowledge_base.py",
+      "name": "knowledge_base.py",
+      "type": "file",
+      "filePath": "ese/knowledge_base.py",
+      "summary": "RAG knowledge base for contract intelligence using BM25 + cosine similarity stored on disk",
+      "tags": [
+        "knowledge-base",
+        "rag",
+        "bm25"
+      ]
+    },
+    {
+      "id": "file:ese/local_runtime.py",
+      "name": "local_runtime.py",
+      "type": "file",
+      "filePath": "ese/local_runtime.py",
+      "summary": "Helpers for local Ollama-backed runtime including model checking and server management",
+      "tags": [
+        "local",
+        "ollama",
+        "runtime"
+      ]
+    },
+    {
+      "id": "file:ese/pipeline.py",
+      "name": "pipeline.py",
+      "type": "file",
+      "filePath": "ese/pipeline.py",
+      "summary": "ESE pipeline runner with pluggable role adapters and artifact chaining",
+      "tags": [
+        "pipeline",
+        "runner",
+        "orchestration"
+      ]
+    },
+    {
+      "id": "file:ese/pr_review.py",
+      "name": "pr_review.py",
+      "type": "file",
+      "filePath": "ese/pr_review.py",
+      "summary": "Pull request review helpers for ESE with git/gh integration",
+      "tags": [
+        "pr",
+        "review",
+        "git"
+      ]
+    },
+    {
+      "id": "file:ese/provider_runtime.py",
+      "name": "provider_runtime.py",
+      "type": "file",
+      "filePath": "ese/provider_runtime.py",
+      "summary": "Shared provider/runtime capability metadata and helpers for OpenAI, Anthropic, Google, etc",
+      "tags": [
+        "provider",
+        "runtime",
+        "capabilities"
+      ]
+    },
+    {
+      "id": "class:ese/adapters.py:AdapterExecutionError",
+      "name": "AdapterExecutionError",
+      "type": "class",
+      "filePath": "ese/adapters.py",
+      "summary": "Exception raised when a runtime adapter cannot execute successfully",
+      "tags": [
+        "exception",
+        "adapter"
+      ]
+    },
+    {
+      "id": "func:ese/adapters.py:dry_run_adapter",
+      "name": "dry_run_adapter",
+      "type": "function",
+      "filePath": "ese/adapters.py",
+      "summary": "Return deterministic placeholder output without external model calls",
+      "tags": [
+        "adapter",
+        "dry-run"
+      ]
+    },
+    {
+      "id": "func:ese/adapters.py:openai_adapter",
+      "name": "openai_adapter",
+      "type": "function",
+      "filePath": "ese/adapters.py",
+      "summary": "Execute role prompt using the OpenAI Responses API",
+      "tags": [
+        "adapter",
+        "openai",
+        "api"
+      ]
+    },
+    {
+      "id": "func:ese/adapters.py:custom_api_adapter",
+      "name": "custom_api_adapter",
+      "type": "function",
+      "filePath": "ese/adapters.py",
+      "summary": "Execute role prompt against a custom Responses-compatible API gateway",
+      "tags": [
+        "adapter",
+        "custom-api"
+      ]
+    },
+    {
+      "id": "func:ese/adapters.py:local_adapter",
+      "name": "local_adapter",
+      "type": "function",
+      "filePath": "ese/adapters.py",
+      "summary": "Execute role prompt against a local Ollama runtime",
+      "tags": [
+        "adapter",
+        "local",
+        "ollama"
+      ]
+    },
+    {
+      "id": "func:ese/adapters.py:check_adapter_health",
+      "name": "check_adapter_health",
+      "type": "function",
+      "filePath": "ese/adapters.py",
+      "summary": "Check if an adapter's endpoint is reachable and responsive",
+      "tags": [
+        "health",
+        "adapter"
+      ]
+    },
+    {
+      "id": "func:ese/admin.py:create_admin_app",
+      "name": "create_admin_app",
+      "type": "function",
+      "filePath": "ese/admin.py",
+      "summary": "Create the ESE Admin FastAPI application with all endpoints",
+      "tags": [
+        "fastapi",
+        "admin",
+        "app"
+      ]
+    },
+    {
+      "id": "class:ese/cli.py:app",
+      "name": "app",
+      "type": "class",
+      "filePath": "ese/cli.py",
+      "summary": "Typer CLI application instance",
+      "tags": [
+        "typer",
+        "cli"
+      ]
+    },
+    {
+      "id": "func:ese/cli.py:main",
+      "name": "main",
+      "type": "function",
+      "filePath": "ese/cli.py",
+      "summary": "Main CLI entry point that launches dashboard interactively",
+      "tags": [
+        "cli",
+        "entrypoint"
+      ]
+    },
+    {
+      "id": "func:ese/cli.py:init",
+      "name": "init",
+      "type": "function",
+      "filePath": "ese/cli.py",
+      "summary": "CLI command to create ESE configuration via interactive wizard",
+      "tags": [
+        "cli",
+        "init",
+        "wizard"
+      ]
+    },
+    {
+      "id": "func:ese/cli.py:start",
+      "name": "start",
+      "type": "function",
+      "filePath": "ese/cli.py",
+      "summary": "CLI command to start the full ESE pipeline",
+      "tags": [
+        "cli",
+        "pipeline",
+        "start"
+      ]
+    },
+    {
+      "id": "func:ese/cli.py:task",
+      "name": "task",
+      "type": "function",
+      "filePath": "ese/cli.py",
+      "summary": "CLI command to run ESE from a task description",
+      "tags": [
+        "cli",
+        "task",
+        "run"
+      ]
+    },
+    {
+      "id": "func:ese/cli.py:pr",
+      "name": "pr",
+      "type": "function",
+      "filePath": "ese/cli.py",
+      "summary": "CLI command to review a pull request or branch diff",
+      "tags": [
+        "cli",
+        "pr",
+        "review"
+      ]
+    },
+    {
+      "id": "class:ese/config.py:ConfigValidationError",
+      "name": "ConfigValidationError",
+      "type": "class",
+      "filePath": "ese/config.py",
+      "summary": "Exception raised when ESE configuration is malformed or unsupported",
+      "tags": [
+        "exception",
+        "config"
+      ]
+    },
+    {
+      "id": "class:ese/config.py:ProviderConfig",
+      "name": "ProviderConfig",
+      "type": "class",
+      "filePath": "ese/config.py",
+      "summary": "Pydantic model for provider configuration",
+      "tags": [
+        "pydantic",
+        "config"
+      ]
+    },
+    {
+      "id": "class:ese/config.py:RoleConfig",
+      "name": "RoleConfig",
+      "type": "class",
+      "filePath": "ese/config.py",
+      "summary": "Pydantic model for role configuration",
+      "tags": [
+        "pydantic",
+        "config",
+        "roles"
+      ]
+    },
+    {
+      "id": "class:ese/config.py:RuntimeConfig",
+      "name": "RuntimeConfig",
+      "type": "class",
+      "filePath": "ese/config.py",
+      "summary": "Pydantic model for runtime configuration",
+      "tags": [
+        "pydantic",
+        "config",
+        "runtime"
+      ]
+    },
+    {
+      "id": "class:ese/config.py:ESEConfig",
+      "name": "ESEConfig",
+      "type": "class",
+      "filePath": "ese/config.py",
+      "summary": "Main Pydantic model for complete ESE configuration",
+      "tags": [
+        "pydantic",
+        "config"
+      ]
+    },
+    {
+      "id": "func:ese/config.py:validate_config",
+      "name": "validate_config",
+      "type": "function",
+      "filePath": "ese/config.py",
+      "summary": "Validate and normalize an ESE config dictionary",
+      "tags": [
+        "validation",
+        "config"
+      ]
+    },
+    {
+      "id": "func:ese/config.py:load_config",
+      "name": "load_config",
+      "type": "function",
+      "filePath": "ese/config.py",
+      "summary": "Load YAML config into a dict, optionally schema-validating it",
+      "tags": [
+        "config",
+        "yaml",
+        "load"
+      ]
+    },
+    {
+      "id": "func:ese/config.py:write_config",
+      "name": "write_config",
+      "type": "function",
+      "filePath": "ese/config.py",
+      "summary": "Write configuration to YAML file",
+      "tags": [
+        "config",
+        "yaml",
+        "write"
+      ]
+    },
+    {
+      "id": "class:ese/config_packs.py:PackRoleDefinition",
+      "name": "PackRoleDefinition",
+      "type": "class",
+      "filePath": "ese/config_packs.py",
+      "summary": "Dataclass for pack role definition with key, responsibility, prompt, temperature",
+      "tags": [
+        "config-pack",
+        "roles"
+      ]
+    },
+    {
+      "id": "class:ese/config_packs.py:ConfigPackDefinition",
+      "name": "ConfigPackDefinition",
+      "type": "class",
+      "filePath": "ese/config_packs.py",
+      "summary": "Dataclass for config pack definition with key, title, summary, preset, roles",
+      "tags": [
+        "config-pack"
+      ]
+    },
+    {
+      "id": "func:ese/config_packs.py:list_config_packs",
+      "name": "list_config_packs",
+      "type": "function",
+      "filePath": "ese/config_packs.py",
+      "summary": "List all shipped config packs",
+      "tags": [
+        "config-pack",
+        "registry"
+      ]
+    },
+    {
+      "id": "func:ese/config_packs.py:get_config_pack",
+      "name": "get_config_pack",
+      "type": "function",
+      "filePath": "ese/config_packs.py",
+      "summary": "Get a config pack by key",
+      "tags": [
+        "config-pack",
+        "lookup"
+      ]
+    },
+    {
+      "id": "class:ese/crm.py:Contact",
+      "name": "Contact",
+      "type": "class",
+      "filePath": "ese/crm.py",
+      "summary": "Dataclass for a person associated with an entity",
+      "tags": [
+        "crm",
+        "contact"
+      ]
+    },
+    {
+      "id": "class:ese/crm.py:Interaction",
+      "name": "Interaction",
+      "type": "class",
+      "filePath": "ese/crm.py",
+      "summary": "Dataclass for a recorded interaction with an entity",
+      "tags": [
+        "crm",
+        "interaction"
+      ]
+    },
+    {
+      "id": "class:ese/crm.py:Entity",
+      "name": "Entity",
+      "type": "class",
+      "filePath": "ese/crm.py",
+      "summary": "Dataclass for an organization entity (agency, vendor, contractor)",
+      "tags": [
+        "crm",
+        "entity"
+      ]
+    },
+    {
+      "id": "class:ese/crm.py:ContractCRM",
+      "name": "ContractCRM",
+      "type": "class",
+      "filePath": "ese/crm.py",
+      "summary": "Lightweight CRM for contract intelligence stored on disk",
+      "tags": [
+        "crm",
+        "storage"
+      ]
+    },
+    {
+      "id": "func:ese/crm.py:create_entity",
+      "name": "create_entity",
+      "type": "function",
+      "filePath": "ese/crm.py",
+      "summary": "Factory function to create a new entity",
+      "tags": [
+        "crm",
+        "factory"
+      ]
+    },
+    {
+      "id": "func:ese/crm.py:create_contact",
+      "name": "create_contact",
+      "type": "function",
+      "filePath": "ese/crm.py",
+      "summary": "Factory function to create a new contact",
+      "tags": [
+        "crm",
+        "factory"
+      ]
+    },
+    {
+      "id": "func:ese/crm.py:create_interaction",
+      "name": "create_interaction",
+      "type": "function",
+      "filePath": "ese/crm.py",
+      "summary": "Factory function to create a new interaction",
+      "tags": [
+        "crm",
+        "factory"
+      ]
+    },
+    {
+      "id": "class:ese/dashboard.py:DashboardStateError",
+      "name": "DashboardStateError",
+      "type": "class",
+      "filePath": "ese/dashboard.py",
+      "summary": "Exception raised when persisted dashboard state cannot be trusted",
+      "tags": [
+        "exception",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "class:ese/dashboard.py:DashboardJobStore",
+      "name": "DashboardJobStore",
+      "type": "class",
+      "filePath": "ese/dashboard.py",
+      "summary": "Thread-safe registry for background dashboard jobs",
+      "tags": [
+        "dashboard",
+        "jobs",
+        "threading"
+      ]
+    },
+    {
+      "id": "func:ese/dashboard.py:serve_dashboard",
+      "name": "serve_dashboard",
+      "type": "function",
+      "filePath": "ese/dashboard.py",
+      "summary": "Serve the local ESE dashboard",
+      "tags": [
+        "dashboard",
+        "server"
+      ]
+    },
+    {
+      "id": "class:ese/diff_context.py:DiffExcerpt",
+      "name": "DiffExcerpt",
+      "type": "class",
+      "filePath": "ese/diff_context.py",
+      "summary": "Dataclass for diff excerpt with text, truncation info, file counts",
+      "tags": [
+        "diff",
+        "dataclass"
+      ]
+    },
+    {
+      "id": "func:ese/diff_context.py:build_file_aware_diff_excerpt",
+      "name": "build_file_aware_diff_excerpt",
+      "type": "function",
+      "filePath": "ese/diff_context.py",
+      "summary": "Build file-aware diff excerpt with truncation",
+      "tags": [
+        "diff",
+        "git"
+      ]
+    },
+    {
+      "id": "func:ese/doctor.py:evaluate_doctor",
+      "name": "evaluate_doctor",
+      "type": "function",
+      "filePath": "ese/doctor.py",
+      "summary": "Evaluate config against doctor constraints",
+      "tags": [
+        "validation",
+        "doctor"
+      ]
+    },
+    {
+      "id": "func:ese/doctor.py:run_doctor",
+      "name": "run_doctor",
+      "type": "function",
+      "filePath": "ese/doctor.py",
+      "summary": "Run full doctor validation on config file",
+      "tags": [
+        "validation",
+        "doctor"
+      ]
+    },
+    {
+      "id": "class:ese/document_ingestion.py:ExtractedDocument",
+      "name": "ExtractedDocument",
+      "type": "class",
+      "filePath": "ese/document_ingestion.py",
+      "summary": "Dataclass for document extraction result",
+      "tags": [
+        "documents",
+        "extraction"
+      ]
+    },
+    {
+      "id": "class:ese/document_ingestion.py:ReflectionResult",
+      "name": "ReflectionResult",
+      "type": "class",
+      "filePath": "ese/document_ingestion.py",
+      "summary": "Dataclass for self-reflection on model output",
+      "tags": [
+        "reflection",
+        "self-correction"
+      ]
+    },
+    {
+      "id": "func:ese/document_ingestion.py:extract_text_from_pdf",
+      "name": "extract_text_from_pdf",
+      "type": "function",
+      "filePath": "ese/document_ingestion.py",
+      "summary": "Extract text from PDF with fallback strategies",
+      "tags": [
+        "pdf",
+        "extraction"
+      ]
+    },
+    {
+      "id": "func:ese/document_ingestion.py:extract_text_from_docx",
+      "name": "extract_text_from_docx",
+      "type": "function",
+      "filePath": "ese/document_ingestion.py",
+      "summary": "Extract text from Word document preserving structure",
+      "tags": [
+        "docx",
+        "extraction"
+      ]
+    },
+    {
+      "id": "class:ese/feedback.py:FeedbackStoreError",
+      "name": "FeedbackStoreError",
+      "type": "class",
+      "filePath": "ese/feedback.py",
+      "summary": "Exception raised when local feedback store cannot be trusted",
+      "tags": [
+        "exception",
+        "feedback"
+      ]
+    },
+    {
+      "id": "func:ese/feedback.py:record_feedback",
+      "name": "record_feedback",
+      "type": "function",
+      "filePath": "ese/feedback.py",
+      "summary": "Persist one feedback event for a finding title and role",
+      "tags": [
+        "feedback",
+        "recording"
+      ]
+    },
+    {
+      "id": "func:ese/feedback.py:feedback_summary",
+      "name": "feedback_summary",
+      "type": "function",
+      "filePath": "ese/feedback.py",
+      "summary": "Aggregate feedback history into counts, role trends, prompt guidance",
+      "tags": [
+        "feedback",
+        "analytics"
+      ]
+    },
+    {
+      "id": "class:ese/init_wizard.py:DEMO_EXECUTION_MODE",
+      "name": "DEMO_EXECUTION_MODE",
+      "type": "class",
+      "filePath": "ese/init_wizard.py",
+      "summary": "Demo execution mode constant",
+      "tags": [
+        "constants",
+        "execution-mode"
+      ]
+    },
+    {
+      "id": "func:ese/init_wizard.py:run_wizard",
+      "name": "run_wizard",
+      "type": "function",
+      "filePath": "ese/init_wizard.py",
+      "summary": "Run interactive wizard to create ESE config",
+      "tags": [
+        "wizard",
+        "interactive"
+      ]
+    },
+    {
+      "id": "class:ese/knowledge_base.py:ContractKnowledgeBase",
+      "name": "ContractKnowledgeBase",
+      "type": "class",
+      "filePath": "ese/knowledge_base.py",
+      "summary": "RAG knowledge base for contract intelligence with BM25 + cosine similarity",
+      "tags": [
+        "knowledge-base",
+        "rag",
+        "bm25"
+      ]
+    },
+    {
+      "id": "func:ese/knowledge_base.py:create_entry_from_bid_review",
+      "name": "create_entry_from_bid_review",
+      "type": "function",
+      "filePath": "ese/knowledge_base.py",
+      "summary": "Create knowledge base entry from bid review data",
+      "tags": [
+        "knowledge-base",
+        "entry"
+      ]
+    },
+    {
+      "id": "class:ese/local_runtime.py:LocalRuntimeError",
+      "name": "LocalRuntimeError",
+      "type": "class",
+      "filePath": "ese/local_runtime.py",
+      "summary": "Exception raised when local Ollama runtime is unavailable or misconfigured",
+      "tags": [
+        "exception",
+        "local",
+        "ollama"
+      ]
+    },
+    {
+      "id": "func:ese/local_runtime.py:local_runtime_selected",
+      "name": "local_runtime_selected",
+      "type": "function",
+      "filePath": "ese/local_runtime.py",
+      "summary": "Check if local runtime is selected in config",
+      "tags": [
+        "local",
+        "config"
+      ]
+    },
+    {
+      "id": "func:ese/local_runtime.py:local_base_url",
+      "name": "local_base_url",
+      "type": "function",
+      "filePath": "ese/local_runtime.py",
+      "summary": "Get local runtime base URL from config",
+      "tags": [
+        "local",
+        "url"
+      ]
+    },
+    {
+      "id": "func:ese/local_runtime.py:ensure_local_runtime_ready",
+      "name": "ensure_local_runtime_ready",
+      "type": "function",
+      "filePath": "ese/local_runtime.py",
+      "summary": "Ensure local Ollama runtime is ready with auto-start support",
+      "tags": [
+        "local",
+        "ollama",
+        " readiness"
+      ]
+    },
+    {
+      "id": "class:ese/pipeline.py:PipelineError",
+      "name": "PipelineError",
+      "type": "class",
+      "filePath": "ese/pipeline.py",
+      "summary": "Exception raised when pipeline configuration or adapter execution fails",
+      "tags": [
+        "exception",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "class:ese/pipeline.py:RoleAdapter",
+      "name": "RoleAdapter",
+      "type": "class",
+      "filePath": "ese/pipeline.py",
+      "summary": "Protocol for callable signature used by external role adapters",
+      "tags": [
+        "adapter",
+        "protocol"
+      ]
+    },
+    {
+      "id": "func:ese/pipeline.py:run_pipeline",
+      "name": "run_pipeline",
+      "type": "function",
+      "filePath": "ese/pipeline.py",
+      "summary": "Run the ESE pipeline with configured roles and adapters",
+      "tags": [
+        "pipeline",
+        "execution"
+      ]
+    },
+    {
+      "id": "class:ese/pr_review.py:PullRequestReviewError",
+      "name": "PullRequestReviewError",
+      "type": "class",
+      "filePath": "ese/pr_review.py",
+      "summary": "Exception raised when pull request review context cannot be assembled",
+      "tags": [
+        "exception",
+        "pr",
+        "review"
+      ]
+    },
+    {
+      "id": "class:ese/pr_review.py:PullRequestReviewContext",
+      "name": "PullRequestReviewContext",
+      "type": "class",
+      "filePath": "ese/pr_review.py",
+      "summary": "Dataclass for PR review context including repo, refs, diff",
+      "tags": [
+        "pr",
+        "review",
+        "context"
+      ]
+    },
+    {
+      "id": "func:ese/pr_review.py:build_pr_review_config",
+      "name": "build_pr_review_config",
+      "type": "function",
+      "filePath": "ese/pr_review.py",
+      "summary": "Build ESE config for PR review from repo and PR details",
+      "tags": [
+        "pr",
+        "config"
+      ]
+    },
+    {
+      "id": "func:ese/pr_review.py:run_pr_review",
+      "name": "run_pr_review",
+      "type": "function",
+      "filePath": "ese/pr_review.py",
+      "summary": "Run full PR review pipeline",
+      "tags": [
+        "pr",
+        "review",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "class:ese/provider_runtime.py:ProviderRuntimeCapability",
+      "name": "ProviderRuntimeCapability",
+      "type": "class",
+      "filePath": "ese/provider_runtime.py",
+      "summary": "Dataclass for provider runtime capability metadata",
+      "tags": [
+        "provider",
+        "runtime",
+        "capability"
+      ]
+    },
+    {
+      "id": "func:ese/provider_runtime.py:provider_runtime_capability",
+      "name": "provider_runtime_capability",
+      "type": "function",
+      "filePath": "ese/provider_runtime.py",
+      "summary": "Get capability metadata for a provider",
+      "tags": [
+        "provider",
+        "capability"
+      ]
+    },
+    {
+      "id": "func:ese/provider_runtime.py:supports_builtin_live",
+      "name": "supports_builtin_live",
+      "type": "function",
+      "filePath": "ese/provider_runtime.py",
+      "summary": "Check if provider supports built-in live adapter",
+      "tags": [
+        "provider",
+        "live"
+      ]
+    },
+    {
+      "id": "func:ese/provider_runtime.py:default_provider_from_env",
+      "name": "default_provider_from_env",
+      "type": "function",
+      "filePath": "ese/provider_runtime.py",
+      "summary": "Detect default provider from environment variables",
+      "tags": [
+        "provider",
+        "env",
+        "detection"
+      ]
+    },
+    {
+      "id": "file:ese/repo_context.py",
+      "name": "repo_context.py",
+      "type": "file",
+      "filePath": "ese/repo_context.py",
+      "summary": "Repository-grounded context helpers for task-first ESE runs. Provides functions to collect git status, diffs, and build repository context for task execution.",
+      "tags": [
+        "ese",
+        "context",
+        "git",
+        "repository"
+      ]
+    },
+    {
+      "id": "class:ese/repo_context.py:RepoContextError",
+      "name": "RepoContextError",
+      "type": "class",
+      "filePath": "ese/repo_context.py",
+      "summary": "Custom exception raised when repository context cannot be assembled.",
+      "tags": [
+        "exception",
+        "error"
+      ]
+    },
+    {
+      "id": "func:ese/repo_context.py:build_repo_context",
+      "name": "build_repo_context",
+      "type": "function",
+      "filePath": "ese/repo_context.py",
+      "summary": "Collect lightweight repo context for a task-oriented run including branch, status, diff, and patch information.",
+      "tags": [
+        "function",
+        "repository",
+        "context"
+      ]
+    },
+    {
+      "id": "func:ese/repo_context.py:render_repo_context",
+      "name": "render_repo_context",
+      "type": "function",
+      "filePath": "ese/repo_context.py",
+      "summary": "Render repo context into additional prompt text for task execution.",
+      "tags": [
+        "function",
+        "rendering",
+        "context"
+      ]
+    },
+    {
+      "id": "file:ese/reports.py",
+      "name": "reports.py",
+      "type": "file",
+      "filePath": "ese/reports.py",
+      "summary": "Helpers for loading and summarizing ESE run artifacts. Provides functions to collect run reports, render various formats (markdown, SARIF, JUnit), and manage run history.",
+      "tags": [
+        "ese",
+        "reports",
+        "artifacts",
+        "rendering"
+      ]
+    },
+    {
+      "id": "class:ese/reports.py:RunReportError",
+      "name": "RunReportError",
+      "type": "class",
+      "filePath": "ese/reports.py",
+      "summary": "Custom exception raised when a run report cannot be loaded from artifacts.",
+      "tags": [
+        "exception",
+        "error"
+      ]
+    },
+    {
+      "id": "func:ese/reports.py:load_pipeline_state",
+      "name": "load_pipeline_state",
+      "type": "function",
+      "filePath": "ese/reports.py",
+      "summary": "Load pipeline state from artifacts directory.",
+      "tags": [
+        "function",
+        "loading",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "func:ese/reports.py:load_role_report",
+      "name": "load_role_report",
+      "type": "function",
+      "filePath": "ese/reports.py",
+      "summary": "Load role report from artifact path.",
+      "tags": [
+        "function",
+        "loading",
+        "role"
+      ]
+    },
+    {
+      "id": "func:ese/reports.py:collect_run_report",
+      "name": "collect_run_report",
+      "type": "function",
+      "filePath": "ese/reports.py",
+      "summary": "Collect comprehensive run report from artifacts including roles, findings, blockers, and consensus summaries.",
+      "tags": [
+        "function",
+        "report",
+        "collection"
+      ]
+    },
+    {
+      "id": "func:ese/reports.py:list_recent_runs",
+      "name": "list_recent_runs",
+      "type": "function",
+      "filePath": "ese/reports.py",
+      "summary": "List recent ESE runs from artifacts directory.",
+      "tags": [
+        "function",
+        "history",
+        "runs"
+      ]
+    },
+    {
+      "id": "func:ese/reports.py:render_sarif",
+      "name": "render_sarif",
+      "type": "function",
+      "filePath": "ese/reports.py",
+      "summary": "Render findings as SARIF format for CI and code scanning ingestion.",
+      "tags": [
+        "function",
+        "rendering",
+        "sarif"
+      ]
+    },
+    {
+      "id": "func:ese/reports.py:render_junit",
+      "name": "render_junit",
+      "type": "function",
+      "filePath": "ese/reports.py",
+      "summary": "Render findings as a JUnit-style XML test report.",
+      "tags": [
+        "function",
+        "rendering",
+        "junit"
+      ]
+    },
+    {
+      "id": "file:ese/role_drafting.py",
+      "name": "role_drafting.py",
+      "type": "file",
+      "filePath": "ese/role_drafting.py",
+      "summary": "Helpers for drafting framework-mode role prompts and detecting overlap. Provides utilities for creating role prompts with keywords, warnings, and overlap detection.",
+      "tags": [
+        "ese",
+        "roles",
+        "drafting",
+        "framework"
+      ]
+    },
+    {
+      "id": "class:ese/role_drafting.py:FrameworkRoleInput",
+      "name": "FrameworkRoleInput",
+      "type": "class",
+      "filePath": "ese/role_drafting.py",
+      "summary": "Dataclass for input to framework role drafting with name and responsibility.",
+      "tags": [
+        "dataclass",
+        "role",
+        "input"
+      ]
+    },
+    {
+      "id": "class:ese/role_drafting.py:FrameworkRoleDraft",
+      "name": "FrameworkRoleDraft",
+      "type": "class",
+      "filePath": "ese/role_drafting.py",
+      "summary": "Dataclass representing a drafted framework role with name, key, responsibility, prompt, suggestions, warnings, and keywords.",
+      "tags": [
+        "dataclass",
+        "role",
+        "draft"
+      ]
+    },
+    {
+      "id": "class:ese/role_drafting.py:FrameworkRoleDraftReview",
+      "name": "FrameworkRoleDraftReview",
+      "type": "class",
+      "filePath": "ese/role_drafting.py",
+      "summary": "Dataclass containing a review of drafted framework roles with overlap warnings.",
+      "tags": [
+        "dataclass",
+        "role",
+        "review"
+      ]
+    },
+    {
+      "id": "func:ese/role_drafting.py:normalize_role_key",
+      "name": "normalize_role_key",
+      "type": "function",
+      "filePath": "ese/role_drafting.py",
+      "summary": "Normalize role name to a consistent key format.",
+      "tags": [
+        "function",
+        "normalization",
+        "role"
+      ]
+    },
+    {
+      "id": "func:ese/role_drafting.py:draft_framework_roles",
+      "name": "draft_framework_roles",
+      "type": "function",
+      "filePath": "ese/role_drafting.py",
+      "summary": "Draft framework roles from role inputs with validation and overlap detection.",
+      "tags": [
+        "function",
+        "drafting",
+        "roles"
+      ]
+    },
+    {
+      "id": "file:ese/templates.py",
+      "name": "templates.py",
+      "type": "file",
+      "filePath": "ese/templates.py",
+      "summary": "Opinionated task templates and config builders for ESE. Provides task templates (feature-delivery, release-readiness, security-hardening, etc.) and functions to build task configurations.",
+      "tags": [
+        "ese",
+        "templates",
+        "config",
+        "tasks"
+      ]
+    },
+    {
+      "id": "class:ese/templates.py:TaskTemplate",
+      "name": "TaskTemplate",
+      "type": "class",
+      "filePath": "ese/templates.py",
+      "summary": "Dataclass representing a task template with key, title, summary, preset, goal_profile, and roles.",
+      "tags": [
+        "dataclass",
+        "template",
+        "task"
+      ]
+    },
+    {
+      "id": "func:ese/templates.py:list_task_templates",
+      "name": "list_task_templates",
+      "type": "function",
+      "filePath": "ese/templates.py",
+      "summary": "List all available task templates.",
+      "tags": [
+        "function",
+        "templates"
+      ]
+    },
+    {
+      "id": "func:ese/templates.py:recommend_template_for_scope",
+      "name": "recommend_template_for_scope",
+      "type": "function",
+      "filePath": "ese/templates.py",
+      "summary": "Choose a pragmatic default template from natural-language task scope.",
+      "tags": [
+        "function",
+        "recommendation",
+        "templates"
+      ]
+    },
+    {
+      "id": "func:ese/templates.py:resolve_task_template",
+      "name": "resolve_task_template",
+      "type": "function",
+      "filePath": "ese/templates.py",
+      "summary": "Resolve a task template by key.",
+      "tags": [
+        "function",
+        "resolution",
+        "template"
+      ]
+    },
+    {
+      "id": "func:ese/templates.py:build_task_config",
+      "name": "build_task_config",
+      "type": "function",
+      "filePath": "ese/templates.py",
+      "summary": "Build a complete task configuration from scope and template key.",
+      "tags": [
+        "function",
+        "config",
+        "build"
+      ]
+    },
+    {
+      "id": "func:ese/templates.py:run_task_pipeline",
+      "name": "run_task_pipeline",
+      "type": "function",
+      "filePath": "ese/templates.py",
+      "summary": "Run the task pipeline with built configuration.",
+      "tags": [
+        "function",
+        "pipeline",
+        "execution"
+      ]
+    },
+    {
+      "id": "file:apps/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/__init__.py",
+      "summary": "Application-layer experiments and domain packs built on top of ESE.",
+      "tags": [
+        "apps",
+        "root"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/__init__.py",
+      "summary": "Construction contract intelligence pilot built on top of ESE. Defines APP_KEY.",
+      "tags": [
+        "contract_intelligence",
+        "app",
+        "root"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/__main__.py",
+      "name": "__main__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/__main__.py",
+      "summary": "CLI entry point for contract intelligence application.",
+      "tags": [
+        "contract_intelligence",
+        "cli",
+        "entry"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/api/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/api/__init__.py",
+      "summary": "API module initialization, exports FastAPI app.",
+      "tags": [
+        "api",
+        "fastapi",
+        "init"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/api/app.py",
+      "name": "app.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/api/app.py",
+      "summary": "FastAPI application for Contract Intelligence API. Provides endpoints for project analysis, commit, monitoring, and case state management.",
+      "tags": [
+        "fastapi",
+        "api",
+        "contract_intelligence"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/api/app.py:analyze_project",
+      "name": "analyze_project",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/api/app.py",
+      "summary": "POST endpoint to analyze a construction project bid review.",
+      "tags": [
+        "endpoint",
+        "analysis",
+        "bid_review"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/api/app.py:commit_project",
+      "name": "commit_project",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/api/app.py",
+      "summary": "POST endpoint to commit a contract and create obligation snapshot.",
+      "tags": [
+        "endpoint",
+        "commit",
+        "contract"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/api/app.py:monitor_project",
+      "name": "monitor_project",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/api/app.py",
+      "summary": "POST endpoint to monitor contract obligations and emit alerts.",
+      "tags": [
+        "endpoint",
+        "monitoring",
+        "obligations"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/cli.py",
+      "name": "cli.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "Typer CLI for Contract Intelligence pilot. Provides commands for bid-review, evaluate-corpus, build-demo, ensemble-bid-review, commit, monitor, and render-dashboard.",
+      "tags": [
+        "cli",
+        "typer",
+        "contract_intelligence"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/cli.py:bid_review",
+      "name": "bid_review",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "CLI command to run deterministic construction bid-review pilot.",
+      "tags": [
+        "command",
+        "bid_review"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/cli.py:evaluate_corpus_command",
+      "name": "evaluate_corpus_command",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "CLI command to run gold-corpus evaluation suite.",
+      "tags": [
+        "command",
+        "evaluation",
+        "corpus"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/cli.py:build_demo_command",
+      "name": "build_demo_command",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "CLI command to build sanitized demo assets and reference workspaces.",
+      "tags": [
+        "command",
+        "demo",
+        "export"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/cli.py:ensemble_bid_review",
+      "name": "ensemble_bid_review",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "CLI command to run bid review through ESE's real orchestration path.",
+      "tags": [
+        "command",
+        "ese",
+        "ensemble"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/cli.py:commit_command",
+      "name": "commit_command",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "CLI command to create committed contract record and obligation snapshot.",
+      "tags": [
+        "command",
+        "commit"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/cli.py:monitor_command",
+      "name": "monitor_command",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/cli.py",
+      "summary": "CLI command to apply operational status inputs and emit alerts.",
+      "tags": [
+        "command",
+        "monitor"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/demo/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/demo/__init__.py",
+      "summary": "Demo module exports for build_demo_assets, DemoExportResult, and default paths.",
+      "tags": [
+        "demo",
+        "export",
+        "init"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/demo/exporter.py",
+      "name": "exporter.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/demo/exporter.py",
+      "summary": "Demo asset builder. Creates sanitized demo cases from corpus, runs bid-review, commit, and monitoring lifecycle.",
+      "tags": [
+        "demo",
+        "export",
+        "corpus"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/demo/exporter.py:DemoCaseExport",
+      "name": "DemoCaseExport",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/demo/exporter.py",
+      "summary": "Dataclass representing an exported demo case with case_id, title, dashboard_path, recommendation, etc.",
+      "tags": [
+        "dataclass",
+        "demo",
+        "case"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/demo/exporter.py:DemoExportResult",
+      "name": "DemoExportResult",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/demo/exporter.py",
+      "summary": "Dataclass representing the result of demo asset building.",
+      "tags": [
+        "dataclass",
+        "demo",
+        "result"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/demo/exporter.py:build_demo_assets",
+      "name": "build_demo_assets",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/demo/exporter.py",
+      "summary": "Build sanitized demo assets and reference workspaces from the shipped corpus.",
+      "tags": [
+        "function",
+        "demo",
+        "build"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/domain/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/domain/__init__.py",
+      "summary": "Shared domain models for the contract intelligence pilot.",
+      "tags": [
+        "domain",
+        "models",
+        "init"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/domain/enums.py",
+      "name": "enums.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Domain enumerations for Contract Intelligence including Severity, Recommendation, AnalysisPerspective, ObligationType, AlertType, etc.",
+      "tags": [
+        "enums",
+        "domain",
+        "types"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/enums.py:Severity",
+      "name": "Severity",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Enum for finding severity levels: LOW, MEDIUM, HIGH, CRITICAL.",
+      "tags": [
+        "enum",
+        "severity"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/enums.py:Recommendation",
+      "name": "Recommendation",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Enum for bid review recommendations: GO, GO_WITH_CONDITIONS, NO_GO.",
+      "tags": [
+        "enum",
+        "recommendation"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/enums.py:AnalysisPerspective",
+      "name": "AnalysisPerspective",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Enum for analysis perspective: VENDOR or AGENCY.",
+      "tags": [
+        "enum",
+        "perspective"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/enums.py:ObligationType",
+      "name": "ObligationType",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Enum for obligation types: NOTICE_DEADLINE, RECURRING_REPORTING, PRE_START_REQUIREMENT.",
+      "tags": [
+        "enum",
+        "obligation"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/enums.py:AlertType",
+      "name": "AlertType",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Enum for alert types: DUE, LATE.",
+      "tags": [
+        "enum",
+        "alert"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/enums.py:DocumentType",
+      "name": "DocumentType",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/enums.py",
+      "summary": "Enum for document types in construction contracts (PRIME_CONTRACT, GENERAL_CONDITIONS, INSURANCE_REQUIREMENTS, etc.).",
+      "tags": [
+        "enum",
+        "document"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/domain/models.py",
+      "name": "models.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic domain models for Contract Intelligence including Finding, DecisionSummary, Obligation, CaseRecord, ContractCommitRecord, MonitoringRunRecord, etc.",
+      "tags": [
+        "models",
+        "pydantic",
+        "domain"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:Finding",
+      "name": "Finding",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for a bid review finding with id, role, category, severity, title, summary, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "finding"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:DecisionSummary",
+      "name": "DecisionSummary",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for decision summary with recommendation, overall_risk, confidence, top_reasons, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "decision"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:Obligation",
+      "name": "Obligation",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for a contract obligation with id, title, type, trigger, due_rule, owner_role, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "obligation"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:CaseRecord",
+      "name": "CaseRecord",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for overall case record with project_id, run_history, commit_history, monitoring_history.",
+      "tags": [
+        "model",
+        "pydantic",
+        "case"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:BidReviewRunRecord",
+      "name": "BidReviewRunRecord",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for a bid review run record with artifacts, document_inventory, decision_summary, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "run"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:ContractCommitRecord",
+      "name": "ContractCommitRecord",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for a contract commit record with decision_summary, finding_dispositions, obligations, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "commit"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:MonitoringRunRecord",
+      "name": "MonitoringRunRecord",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for a monitoring run record with alerts, monitored_obligations, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "monitoring"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/domain/models.py:AlertRecord",
+      "name": "AlertRecord",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/domain/models.py",
+      "summary": "Pydantic model for an alert record with alert_id, obligation_id, severity, alert_type, status, etc.",
+      "tags": [
+        "model",
+        "pydantic",
+        "alert"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/evaluation/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/evaluation/__init__.py",
+      "summary": "Gold-corpus evaluation helpers for the contract intelligence pilot.",
+      "tags": [
+        "evaluation",
+        "corpus",
+        "init"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/evaluation/corpus.py",
+      "name": "corpus.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/evaluation/corpus.py",
+      "summary": "Gold-corpus evaluation suite. Runs bid-review on corpus cases and validates outputs against expected.json.",
+      "tags": [
+        "evaluation",
+        "corpus",
+        "testing"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/evaluation/corpus.py:CorpusEvaluationResult",
+      "name": "CorpusEvaluationResult",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/evaluation/corpus.py",
+      "summary": "Dataclass for corpus evaluation result with case_id, passed, failures, artifacts_dir.",
+      "tags": [
+        "dataclass",
+        "evaluation",
+        "result"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/evaluation/corpus.py:evaluate_corpus",
+      "name": "evaluate_corpus",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/evaluation/corpus.py",
+      "summary": "Run evaluation on all cases in the corpus directory.",
+      "tags": [
+        "function",
+        "evaluation",
+        "corpus"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/evaluation/corpus.py:evaluate_corpus_case",
+      "name": "evaluate_corpus_case",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/evaluation/corpus.py",
+      "summary": "Evaluate a single corpus case against expected outputs.",
+      "tags": [
+        "function",
+        "evaluation",
+        "case"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/ingestion/__init__.py",
+      "name": "__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/ingestion/__init__.py",
+      "summary": "Ingestion helpers for contract intelligence pilot workflows.",
+      "tags": [
+        "ingestion",
+        "init"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/ingestion/document_classifier.py",
+      "name": "document_classifier.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/ingestion/document_classifier.py",
+      "summary": "Document classifier for construction contracts. Classifies documents by type using keyword matching and language patterns.",
+      "tags": [
+        "classification",
+        "document",
+        "ingestion"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ingestion/document_classifier.py:classify_document",
+      "name": "classify_document",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ingestion/document_classifier.py",
+      "summary": "Classify a document by filename and optional text content using keyword hints and language patterns.",
+      "tags": [
+        "function",
+        "classification",
+        "document"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ingestion/document_classifier.py:missing_required_documents",
+      "name": "missing_required_documents",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ingestion/document_classifier.py",
+      "summary": "Check for missing required bid-review documents (PRIME_CONTRACT, GENERAL_CONDITIONS, INSURANCE_REQUIREMENTS).",
+      "tags": [
+        "function",
+        "validation",
+        "documents"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/ingestion/project_loader.py",
+      "name": "project_loader.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/ingestion/project_loader.py",
+      "summary": "Project document loader. Loads documents from project directory, extracts text from various formats (PDF, DOCX, XLSX, PPTX), and identifies clause spans.",
+      "tags": [
+        "loading",
+        "documents",
+        "ingestion",
+        "pdf",
+        "docx"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/ingestion/project_loader.py:LoadedDocument",
+      "name": "LoadedDocument",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/ingestion/project_loader.py",
+      "summary": "Dataclass representing a loaded document with document_id, relative_path, document_type, text, clauses, etc.",
+      "tags": [
+        "dataclass",
+        "document",
+        "loaded"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/ingestion/project_loader.py:ClauseSpan",
+      "name": "ClauseSpan",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/ingestion/project_loader.py",
+      "summary": "Dataclass representing a clause span with clause_id, heading, location, and text.",
+      "tags": [
+        "dataclass",
+        "clause",
+        "span"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ingestion/project_loader.py:iter_project_documents",
+      "name": "iter_project_documents",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ingestion/project_loader.py",
+      "summary": "Iterate and load all documents from a project directory with text extraction and clause identification.",
+      "tags": [
+        "function",
+        "loading",
+        "documents"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ingestion/project_loader.py:extract_clause_spans",
+      "name": "extract_clause_spans",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ingestion/project_loader.py",
+      "summary": "Extract clause spans from document text by identifying headings and paragraphs.",
+      "tags": [
+        "function",
+        "extraction",
+        "clauses"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/monitoring/__init__.py",
+      "name": "monitoring/__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/monitoring/__init__.py",
+      "summary": "Exports MonitoringResult and monitor_contract from runner module",
+      "tags": [
+        "exports",
+        "module"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/monitoring/runner.py:MonitoringResult",
+      "name": "MonitoringResult",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Dataclass containing monitoring run result: project_id, run_id, monitoring_run_path, monitoring_snapshot_path, alerts_path, alerts_count",
+      "tags": [
+        "dataclass",
+        "result"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/monitoring/runner.py:_status_inputs_by_id",
+      "name": "_status_inputs_by_id",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Loads and validates MonitoringStatusInput objects from JSON file",
+      "tags": [
+        "private",
+        "validation"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/monitoring/runner.py:_status_from_due_dates",
+      "name": "_status_from_due_dates",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Computes status (pending/due/late/satisfied) based on due dates and last satisfied date",
+      "tags": [
+        "private",
+        "status"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/monitoring/runner.py:_default_status",
+      "name": "_default_status",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Returns default status based on obligation type for recurring_reporting, pre_start_requirement, notice_deadline",
+      "tags": [
+        "private",
+        "status"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/monitoring/runner.py:_monitored_obligation",
+      "name": "_monitored_obligation",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Converts Obligation to MonitoredObligation with status and summary",
+      "tags": [
+        "private",
+        "conversion"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/monitoring/runner.py:_alerts_for",
+      "name": "_alerts_for",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Generates AlertRecord list for obligations with due/late status",
+      "tags": [
+        "private",
+        "alerts"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract",
+      "name": "monitor_contract",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Main entry point for contract monitoring - loads obligations, computes statuses, generates alerts, persists run",
+      "tags": [
+        "public",
+        "monitoring"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/orchestration/__init__.py",
+      "name": "orchestration/__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/orchestration/__init__.py",
+      "summary": "Module docstring for orchestration definitions",
+      "tags": [
+        "module"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:FindingRule",
+      "name": "FindingRule",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Dataclass for bid review finding rules with role, category, severity, patterns",
+      "tags": [
+        "dataclass",
+        "rule"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:BidReviewRunResult",
+      "name": "BidReviewRunResult",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Result dataclass for bid review run with project_id, artifacts_dir, artifact_paths, decision_summary, case_record_path, run_record_path",
+      "tags": [
+        "dataclass",
+        "result"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:LabelRule",
+      "name": "LabelRule",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Dataclass for labeling rules (agreement_type, project_sector, payment_mechanism, procurement_method)",
+      "tags": [
+        "dataclass",
+        "rule"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:ClauseFamilyRule",
+      "name": "ClauseFamilyRule",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Dataclass for clause family detection rules",
+      "tags": [
+        "dataclass",
+        "rule"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:OutcomeEventRule",
+      "name": "OutcomeEventRule",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Dataclass for outcome event detection rules",
+      "tags": [
+        "dataclass",
+        "rule"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:RelationshipAdvice",
+      "name": "RelationshipAdvice",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Relationship impact assessment and negotiation strategy guidance dataclass",
+      "tags": [
+        "dataclass",
+        "advisory"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/bid_review_runner.py:NegotiationStrategy",
+      "name": "NegotiationStrategy",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Synthesized negotiation strategy with prioritized action items dataclass",
+      "tags": [
+        "dataclass",
+        "strategy"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:compute_project_id",
+      "name": "compute_project_id",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Computes project ID from project directory name using regex normalization",
+      "tags": [
+        "public",
+        "id"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_normalize_analysis_perspective",
+      "name": "_normalize_analysis_perspective",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Normalizes analysis_perspective string to AnalysisPerspective enum (vendor/agency)",
+      "tags": [
+        "private",
+        "normalization"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_clause_evidence",
+      "name": "_clause_evidence",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Creates EvidenceRef from document clause and regex match with excerpt context",
+      "tags": [
+        "private",
+        "evidence"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_finding_text",
+      "name": "_finding_text",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Returns title, summary, recommended_action for Finding based on perspective (vendor/agency)",
+      "tags": [
+        "private",
+        "finding"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_finding_from_rule",
+      "name": "_finding_from_rule",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Creates Finding from FindingRule by searching documents for pattern matches",
+      "tags": [
+        "private",
+        "finding"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_find_clause_match",
+      "name": "_find_clause_match",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Finds first clause in document matching any of the patterns",
+      "tags": [
+        "private",
+        "matching"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_iter_readable_documents",
+      "name": "_iter_readable_documents",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Filters documents by text_available and optional allowed_types",
+      "tags": [
+        "private",
+        "filter"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_first_label_match",
+      "name": "_first_label_match",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Finds first label match from rules in documents and returns matching label or default",
+      "tags": [
+        "private",
+        "labeling"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_governance_artifacts_present",
+      "name": "_governance_artifacts_present",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Detects governance artifacts (amendments, change_orders, board_minutes, etc.) in documents",
+      "tags": [
+        "private",
+        "detection"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_public_text_quality",
+      "name": "_public_text_quality",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Returns text quality assessment: structured_or_searchable, mixed, or portal_only_or_scanned",
+      "tags": [
+        "private",
+        "quality"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_detect_clause_families",
+      "name": "_detect_clause_families",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Detects clause families (gmp_offramp, appropriation_limit, etc.) from documents",
+      "tags": [
+        "private",
+        "detection"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_procurement_profile",
+      "name": "_procurement_profile",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Builds ProcurementProfile from documents: agreement_type, project_sector, payment_mechanism, procurement_method, etc.",
+      "tags": [
+        "private",
+        "profile"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_context_profile",
+      "name": "_context_profile",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Builds ContextProfile from documents: funding_flexibility, schedule_pressure, oversight_intensity, public_visibility",
+      "tags": [
+        "private",
+        "profile"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_outcome_events",
+      "name": "_outcome_events",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Extracts outcome events (award, change_order, settlement, closeout, termination, etc.) from documents",
+      "tags": [
+        "private",
+        "outcome"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_outcome_status",
+      "name": "_outcome_status",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Determines outcome_status from events: termination_takeover, bankruptcy_restructuring, etc.",
+      "tags": [
+        "private",
+        "outcome"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_outcome_evidence_bundle",
+      "name": "_outcome_evidence_bundle",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Builds OutcomeEvidenceBundle from documents and procurement_profile",
+      "tags": [
+        "private",
+        "evidence"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_relationship_advisor",
+      "name": "_relationship_advisor",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Assesses long-term relationship impact and provides negotiation strategy guidance",
+      "tags": [
+        "private",
+        "advisory"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_assess_long_term_risk",
+      "name": "_assess_long_term_risk",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Assesses long-term relationship risk based on impact score and outcome status",
+      "tags": [
+        "private",
+        "risk"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_negotiation_strategist",
+      "name": "_negotiation_strategist",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Synthesizes all inputs into comprehensive NegotiationStrategy with priority_matrix, phase_roadmap, trade_off_analysis",
+      "tags": [
+        "private",
+        "strategy"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_clause_for_match",
+      "name": "_clause_for_match",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Finds clause containing the regex match position",
+      "tags": [
+        "private",
+        "matching"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_extract_obligations",
+      "name": "_extract_obligations",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Extracts obligations (notice_deadline, recurring_reporting, pre_start_requirement) from contract text",
+      "tags": [
+        "private",
+        "extraction"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_relationship_strategy",
+      "name": "_relationship_strategy",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Builds relationship strategy dict with negotiation_posture, leverage_points, sensitive_issues",
+      "tags": [
+        "private",
+        "strategy"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_review_challenges",
+      "name": "_review_challenges",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Identifies contradictions and missed hazards, determines if human_review_required",
+      "tags": [
+        "private",
+        "challenges"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_decision_summary",
+      "name": "_decision_summary",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Builds DecisionSummary with recommendation (go/go-with-conditions/no-go), overall_risk, confidence",
+      "tags": [
+        "private",
+        "decision"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_write_json",
+      "name": "_write_json",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Writes JSON payload to file with indentation",
+      "tags": [
+        "private",
+        "io"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "name": "run_bid_review",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Main entry point for bid review - runs analysis, generates artifacts, persists to case store",
+      "tags": [
+        "public",
+        "main"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/commit_runner.py:CommitContractResult",
+      "name": "CommitContractResult",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Result dataclass for contract commit with project_id, commit_id, case_record_path, commit_record_path, obligations_path, obligations_count",
+      "tags": [
+        "dataclass",
+        "result"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/commit_runner.py:ObligationSnapshotResult",
+      "name": "ObligationSnapshotResult",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Result dataclass for loading committed obligations with project_id, obligations_path, obligations_count",
+      "tags": [
+        "dataclass",
+        "result"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:read_json",
+      "name": "read_json",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Reads and parses JSON file",
+      "tags": [
+        "private",
+        "io"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_load_optional_json_list",
+      "name": "_load_optional_json_list",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Loads optional JSON list from file, validates items are objects",
+      "tags": [
+        "private",
+        "validation"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_validate_json_models",
+      "name": "_validate_json_models",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Validates list of dicts against Pydantic model",
+      "tags": [
+        "private",
+        "validation"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_latest_findings_payloads",
+      "name": "_latest_findings_payloads",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Loads findings from risk_findings.json, insurance_findings.json, compliance_findings.json",
+      "tags": [
+        "private",
+        "load"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_default_accepted_risks",
+      "name": "_default_accepted_risks",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Creates default AcceptedRisk list from all findings",
+      "tags": [
+        "private",
+        "risk"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_finding_dispositions_from_payload",
+      "name": "_finding_dispositions_from_payload",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Creates FindingDisposition list from finding_dispositions_file or generates defaults",
+      "tags": [
+        "private",
+        "disposition"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_accepted_risks_from_dispositions",
+      "name": "_accepted_risks_from_dispositions",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Extracts AcceptedRisk from FindingDisposition list where disposition is 'accepted'",
+      "tags": [
+        "private",
+        "risk"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_validate_commit_dispositions",
+      "name": "_validate_commit_dispositions",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Validates that no HIGH/CRITICAL findings remain unresolved (raises ValueError if they do)",
+      "tags": [
+        "private",
+        "validation"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:_committed_document_inventory",
+      "name": "_committed_document_inventory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Builds document inventory from committed contract directory",
+      "tags": [
+        "private",
+        "inventory"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:commit_contract",
+      "name": "commit_contract",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Main entry point for contract commit - validates dispositions, persists contract commit record",
+      "tags": [
+        "public",
+        "commit"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/commit_runner.py:load_committed_obligations",
+      "name": "load_committed_obligations",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Loads current obligations from case store, optionally writes to output_path",
+      "tags": [
+        "public",
+        "load"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_normalize_analysis_perspective",
+      "name": "_normalize_analysis_perspective",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Normalizes analysis_perspective string to AnalysisPerspective enum",
+      "tags": [
+        "private",
+        "normalization"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_perspective_label",
+      "name": "_perspective_label",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Returns 'contractor-side' or 'agency-side' label based on perspective",
+      "tags": [
+        "private",
+        "label"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_prompt_for_role",
+      "name": "_prompt_for_role",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Builds prompt for role with perspective-specific guidance and output artifact",
+      "tags": [
+        "private",
+        "prompt"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_ordered_role_keys",
+      "name": "_ordered_role_keys",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Returns ordered list of role keys from bid_review_pipeline stages",
+      "tags": [
+        "private",
+        "roles"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_default_model_for",
+      "name": "_default_model_for",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Returns default model name for provider (openai, local, anthropic, etc.)",
+      "tags": [
+        "private",
+        "model"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_document_priority",
+      "name": "_document_priority",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Calculates priority score for document based on document_type and text_available",
+      "tags": [
+        "private",
+        "priority"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_clause_salience",
+      "name": "_clause_salience",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Calculates salience score for clause based on signal terms (pay-if-paid, indemnity, etc.)",
+      "tags": [
+        "private",
+        "scoring"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_render_project_context",
+      "name": "_render_project_context",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Renders project context with document inventory, missing docs, and top clauses by salience",
+      "tags": [
+        "private",
+        "render"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+      "name": "build_bid_review_ese_config",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Builds ESE configuration dict for bid review with roles, providers, prompts, and RAG/CRM context",
+      "tags": [
+        "public",
+        "config"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/ese_bridge.py:run_bid_review_with_ese",
+      "name": "run_bid_review_with_ese",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Main entry point for running bid review with ESE framework - builds config and runs pipeline",
+      "tags": [
+        "public",
+        "main"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/pipeline.py:PipelineStage",
+      "name": "PipelineStage",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/pipeline.py",
+      "summary": "Dataclass for pipeline stage with key, description, roles tuple, outputs tuple",
+      "tags": [
+        "dataclass",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_pipeline",
+      "name": "bid_review_pipeline",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/pipeline.py",
+      "summary": "Returns tuple of PipelineStage for bid review: intake, analysis, advisory, challenge, synthesis",
+      "tags": [
+        "public",
+        "pipeline"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/pipeline.py:universal_casework_workflow",
+      "name": "universal_casework_workflow",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/pipeline.py",
+      "summary": "Returns tuple of workflow phases: ingest, structure, evaluate, challenge, synthesize, decide, commit, monitor",
+      "tags": [
+        "public",
+        "workflow"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_artifacts",
+      "name": "bid_review_artifacts",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/pipeline.py",
+      "summary": "Returns sorted tuple of artifact names from BID_REVIEW_ROLE_CATALOG",
+      "tags": [
+        "public",
+        "artifacts"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/orchestration/role_catalog.py:DomainRole",
+      "name": "DomainRole",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/orchestration/role_catalog.py",
+      "summary": "Dataclass for domain role with key, purpose, output_artifact, output_schema, prompt_file, stage",
+      "tags": [
+        "dataclass",
+        "role"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/role_catalog.py:role_keys",
+      "name": "role_keys",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/role_catalog.py",
+      "summary": "Returns tuple of role keys from BID_REVIEW_ROLE_CATALOG",
+      "tags": [
+        "public",
+        "roles"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/orchestration/role_catalog.py:artifact_contract",
+      "name": "artifact_contract",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/orchestration/role_catalog.py",
+      "summary": "Returns dict mapping output_artifact to output_schema from BID_REVIEW_ROLE_CATALOG",
+      "tags": [
+        "public",
+        "artifacts"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:allowed_roots_from_env",
+      "name": "allowed_roots_from_env",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Returns tuple of allowed root paths from CONTRACT_INTELLIGENCE_ALLOWED_ROOTS env var",
+      "tags": [
+        "public",
+        "config"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:validate_allowed_root",
+      "name": "validate_allowed_root",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Validates path is within allowed roots, raises ValueError if not",
+      "tags": [
+        "public",
+        "validation"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:validate_allowed_roots_configured",
+      "name": "validate_allowed_roots_configured",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Validates configured allowed roots exist and are directories, returns tuple of roots",
+      "tags": [
+        "public",
+        "validation"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_existing_directory",
+      "name": "resolve_existing_directory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves path to existing directory, raises FileNotFoundError/ValueError if not",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_optional_existing_directory",
+      "name": "resolve_optional_existing_directory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves optional existing directory, returns None if path is None",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_output_directory",
+      "name": "resolve_output_directory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves output directory path, creates if needed",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_existing_file",
+      "name": "resolve_existing_file",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves path to existing file, raises FileNotFoundError/ValueError if not",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_guarded_existing_directory",
+      "name": "resolve_guarded_existing_directory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves existing directory with allowed_root validation",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_guarded_optional_existing_directory",
+      "name": "resolve_guarded_optional_existing_directory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves optional existing directory with allowed_root validation",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_guarded_output_directory",
+      "name": "resolve_guarded_output_directory",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves output directory with allowed_root validation",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_guarded_existing_file",
+      "name": "resolve_guarded_existing_file",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves existing file with allowed_root validation",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/paths.py:resolve_guarded_output_file",
+      "name": "resolve_guarded_output_file",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Resolves output file path with allowed_root validation",
+      "tags": [
+        "public",
+        "resolution"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/storage/__init__.py",
+      "name": "storage/__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/storage/__init__.py",
+      "summary": "Exports FileSystemCaseStore, PersistedCaseState, PersistedCommitState",
+      "tags": [
+        "exports",
+        "module"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/storage/filesystem.py:PersistedCaseState",
+      "name": "PersistedCaseState",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/storage/filesystem.py",
+      "summary": "Dataclass for persisted case state with storage_root, case_dir, case_record_path, run_record_path, run_id",
+      "tags": [
+        "dataclass",
+        "state"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/storage/filesystem.py:PersistedCommitState",
+      "name": "PersistedCommitState",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/storage/filesystem.py",
+      "summary": "Dataclass for persisted commit state with storage_root, case_dir, case_record_path, commit_record_path, obligations_path, commit_id",
+      "tags": [
+        "dataclass",
+        "state"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/storage/filesystem.py:PersistedMonitoringState",
+      "name": "PersistedMonitoringState",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/storage/filesystem.py",
+      "summary": "Dataclass for persisted monitoring state with storage_root, case_dir, case_record_path, monitoring_run_path, alerts_path, snapshot_path, run_id",
+      "tags": [
+        "dataclass",
+        "state"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/storage/filesystem.py:_write_json",
+      "name": "_write_json",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/storage/filesystem.py",
+      "summary": "Writes JSON payload to path with atomic file replacement and fsync",
+      "tags": [
+        "private",
+        "io"
+      ]
+    },
+    {
+      "id": "class:apps/contract_intelligence/storage/filesystem.py:FileSystemCaseStore",
+      "name": "FileSystemCaseStore",
+      "type": "class",
+      "filePath": "apps/contract_intelligence/storage/filesystem.py",
+      "summary": "Main class for persisting contract intelligence runs in filesystem case store",
+      "tags": [
+        "public",
+        "storage"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/ui/__init__.py",
+      "name": "ui/__init__.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/ui/__init__.py",
+      "summary": "Exports render_project_dashboard from dashboard module",
+      "tags": [
+        "exports",
+        "module"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ui/dashboard.py:_load_json_artifact",
+      "name": "_load_json_artifact",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ui/dashboard.py",
+      "summary": "Loads JSON artifact from path with diagnostics collection",
+      "tags": [
+        "private",
+        "load"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ui/dashboard.py:_severity_counts",
+      "name": "_severity_counts",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ui/dashboard.py",
+      "summary": "Counts findings by severity: critical, high, medium, low",
+      "tags": [
+        "private",
+        "counting"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ui/dashboard.py:_lifecycle_timeline",
+      "name": "_lifecycle_timeline",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ui/dashboard.py",
+      "summary": "Builds timeline from case_record with run, commit, and monitoring entries",
+      "tags": [
+        "private",
+        "timeline"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ui/dashboard.py:_load_dashboard_data",
+      "name": "_load_dashboard_data",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ui/dashboard.py",
+      "summary": "Loads all dashboard data from case store and artifacts",
+      "tags": [
+        "private",
+        "load"
+      ]
+    },
+    {
+      "id": "func:apps/contract_intelligence/ui/dashboard.py:render_project_dashboard",
+      "name": "render_project_dashboard",
+      "type": "function",
+      "filePath": "apps/contract_intelligence/ui/dashboard.py",
+      "summary": "Main entry point for rendering project dashboard as JSON",
+      "tags": [
+        "public",
+        "dashboard"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/monitoring/runner.py",
+      "name": "runner.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/monitoring/runner.py",
+      "summary": "Source file (250 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "name": "bid_review_runner.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "summary": "Source file (2276 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/orchestration/commit_runner.py",
+      "name": "commit_runner.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/orchestration/commit_runner.py",
+      "summary": "Source file (370 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "name": "ese_bridge.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/orchestration/ese_bridge.py",
+      "summary": "Source file (541 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/orchestration/pipeline.py",
+      "name": "pipeline.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/orchestration/pipeline.py",
+      "summary": "Source file (92 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "name": "role_catalog.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/orchestration/role_catalog.py",
+      "summary": "Source file (131 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/paths.py",
+      "name": "paths.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/paths.py",
+      "summary": "Source file (92 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/storage/filesystem.py",
+      "name": "filesystem.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/storage/filesystem.py",
+      "summary": "Source file (567 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:apps/contract_intelligence/ui/dashboard.py",
+      "name": "dashboard.py",
+      "type": "file",
+      "filePath": "apps/contract_intelligence/ui/dashboard.py",
+      "summary": "Source file (2342 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_adapters.py",
+      "name": "test_adapters.py",
+      "type": "file",
+      "filePath": "tests/test_adapters.py",
+      "summary": "Source file (245 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_cli.py",
+      "name": "test_cli.py",
+      "type": "file",
+      "filePath": "tests/test_cli.py",
+      "summary": "Source file (325 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_config.py",
+      "name": "test_config.py",
+      "type": "file",
+      "filePath": "tests/test_config.py",
+      "summary": "Source file (218 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_api.py",
+      "name": "test_contract_intelligence_api.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_api.py",
+      "summary": "Source file (323 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_bid_review.py",
+      "name": "test_contract_intelligence_bid_review.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_bid_review.py",
+      "summary": "Source file (422 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_commit_lifecycle.py",
+      "name": "test_contract_intelligence_commit_lifecycle.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_commit_lifecycle.py",
+      "summary": "Source file (198 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_corpus.py",
+      "name": "test_contract_intelligence_corpus.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_corpus.py",
+      "summary": "Source file (27 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_demo.py",
+      "name": "test_contract_intelligence_demo.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_demo.py",
+      "summary": "Source file (59 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_entrypoint.py",
+      "name": "test_contract_intelligence_entrypoint.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_entrypoint.py",
+      "summary": "Source file (14 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_ese_bridge.py",
+      "name": "test_contract_intelligence_ese_bridge.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_ese_bridge.py",
+      "summary": "Source file (113 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_ingestion.py",
+      "name": "test_contract_intelligence_ingestion.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_ingestion.py",
+      "summary": "Source file (122 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_monitoring.py",
+      "name": "test_contract_intelligence_monitoring.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_monitoring.py",
+      "summary": "Source file (230 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_scaffold.py",
+      "name": "test_contract_intelligence_scaffold.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_scaffold.py",
+      "summary": "Source file (137 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_contract_intelligence_ui.py",
+      "name": "test_contract_intelligence_ui.py",
+      "type": "file",
+      "filePath": "tests/test_contract_intelligence_ui.py",
+      "summary": "Source file (151 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_dashboard.py",
+      "name": "test_dashboard.py",
+      "type": "file",
+      "filePath": "tests/test_dashboard.py",
+      "summary": "Source file (111 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_diff_context.py",
+      "name": "test_diff_context.py",
+      "type": "file",
+      "filePath": "tests/test_diff_context.py",
+      "summary": "Source file (36 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_doctor.py",
+      "name": "test_doctor.py",
+      "type": "file",
+      "filePath": "tests/test_doctor.py",
+      "summary": "Source file (117 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_e2e.py",
+      "name": "test_e2e.py",
+      "type": "file",
+      "filePath": "tests/test_e2e.py",
+      "summary": "Source file (129 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_feedback.py",
+      "name": "test_feedback.py",
+      "type": "file",
+      "filePath": "tests/test_feedback.py",
+      "summary": "Source file (55 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_init_wizard.py",
+      "name": "test_init_wizard.py",
+      "type": "file",
+      "filePath": "tests/test_init_wizard.py",
+      "summary": "Source file (221 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_local_runtime.py",
+      "name": "test_local_runtime.py",
+      "type": "file",
+      "filePath": "tests/test_local_runtime.py",
+      "summary": "Source file (40 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_pipeline.py",
+      "name": "test_pipeline.py",
+      "type": "file",
+      "filePath": "tests/test_pipeline.py",
+      "summary": "Source file (395 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_pr_review.py",
+      "name": "test_pr_review.py",
+      "type": "file",
+      "filePath": "tests/test_pr_review.py",
+      "summary": "Source file (76 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_reports.py",
+      "name": "test_reports.py",
+      "type": "file",
+      "filePath": "tests/test_reports.py",
+      "summary": "Source file (187 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_role_drafting.py",
+      "name": "test_role_drafting.py",
+      "type": "file",
+      "filePath": "tests/test_role_drafting.py",
+      "summary": "Source file (40 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    },
+    {
+      "id": "file:tests/test_templates.py",
+      "name": "test_templates.py",
+      "type": "file",
+      "filePath": "tests/test_templates.py",
+      "summary": "Source file (96 lines)",
+      "tags": [
+        "missing-node"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:main.py",
+      "target": "file:apps/contract_intelligence/api/app.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/adapters.py",
+      "target": "file:ese/local_runtime.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/admin.py",
+      "target": "file:ese/knowledge_base.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/admin.py",
+      "target": "file:ese/crm.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/admin.py",
+      "target": "file:ese/pipeline.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/admin.py",
+      "target": "func:ese/admin.py:create_admin_app",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/config_packs.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/dashboard.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/doctor.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/feedback.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/init_wizard.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/pipeline.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "file:ese/pr_review.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "class:ese/cli.py:app",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "func:ese/cli.py:init",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "func:ese/cli.py:start",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "func:ese/cli.py:task",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/cli.py",
+      "target": "func:ese/cli.py:pr",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "file:ese/provider_runtime.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "class:ese/config.py:ConfigValidationError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "class:ese/config.py:ProviderConfig",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "class:ese/config.py:RoleConfig",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "class:ese/config.py:RuntimeConfig",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "class:ese/config.py:ESEConfig",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "func:ese/config.py:validate_config",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "func:ese/config.py:load_config",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config.py",
+      "target": "func:ese/config.py:write_config",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config_packs.py",
+      "target": "class:ese/config_packs.py:PackRoleDefinition",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config_packs.py",
+      "target": "class:ese/config_packs.py:ConfigPackDefinition",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config_packs.py",
+      "target": "func:ese/config_packs.py:list_config_packs",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/config_packs.py",
+      "target": "func:ese/config_packs.py:get_config_pack",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "class:ese/crm.py:Contact",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "class:ese/crm.py:Interaction",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "class:ese/crm.py:Entity",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "class:ese/crm.py:ContractCRM",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "func:ese/crm.py:create_entity",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "func:ese/crm.py:create_contact",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/crm.py",
+      "target": "func:ese/crm.py:create_interaction",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/dashboard.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/dashboard.py",
+      "target": "file:ese/pipeline.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/dashboard.py",
+      "target": "file:ese/pr_review.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/dashboard.py",
+      "target": "class:ese/dashboard.py:DashboardStateError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/dashboard.py",
+      "target": "class:ese/dashboard.py:DashboardJobStore",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/diff_context.py",
+      "target": "class:ese/diff_context.py:DiffExcerpt",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/diff_context.py",
+      "target": "func:ese/diff_context.py:build_file_aware_diff_excerpt",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/doctor.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/doctor.py",
+      "target": "file:ese/provider_runtime.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/doctor.py",
+      "target": "func:ese/doctor.py:evaluate_doctor",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/doctor.py",
+      "target": "func:ese/doctor.py:run_doctor",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/document_ingestion.py",
+      "target": "class:ese/document_ingestion.py:ExtractedDocument",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/document_ingestion.py",
+      "target": "class:ese/document_ingestion.py:ReflectionResult",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/document_ingestion.py",
+      "target": "func:ese/document_ingestion.py:extract_text_from_pdf",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/document_ingestion.py",
+      "target": "func:ese/document_ingestion.py:extract_text_from_docx",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/feedback.py",
+      "target": "class:ese/feedback.py:FeedbackStoreError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/feedback.py",
+      "target": "func:ese/feedback.py:record_feedback",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/feedback.py",
+      "target": "func:ese/feedback.py:feedback_summary",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/init_wizard.py",
+      "target": "file:ese/config_packs.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/init_wizard.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/init_wizard.py",
+      "target": "file:ese/provider_runtime.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/init_wizard.py",
+      "target": "func:ese/init_wizard.py:run_wizard",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/knowledge_base.py",
+      "target": "class:ese/knowledge_base.py:ContractKnowledgeBase",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/knowledge_base.py",
+      "target": "func:ese/knowledge_base.py:create_entry_from_bid_review",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/local_runtime.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/local_runtime.py",
+      "target": "class:ese/local_runtime.py:LocalRuntimeError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/local_runtime.py",
+      "target": "func:ese/local_runtime.py:local_runtime_selected",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/local_runtime.py",
+      "target": "func:ese/local_runtime.py:local_base_url",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/local_runtime.py",
+      "target": "func:ese/local_runtime.py:ensure_local_runtime_ready",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pipeline.py",
+      "target": "file:ese/adapters.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pipeline.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pipeline.py",
+      "target": "file:ese/provider_runtime.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pipeline.py",
+      "target": "class:ese/pipeline.py:PipelineError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pipeline.py",
+      "target": "class:ese/pipeline.py:RoleAdapter",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pipeline.py",
+      "target": "func:ese/pipeline.py:run_pipeline",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "file:ese/config.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "file:ese/diff_context.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "file:ese/pipeline.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "class:ese/pr_review.py:PullRequestReviewError",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "class:ese/pr_review.py:PullRequestReviewContext",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "func:ese/pr_review.py:build_pr_review_config",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/pr_review.py",
+      "target": "func:ese/pr_review.py:run_pr_review",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/provider_runtime.py",
+      "target": "class:ese/provider_runtime.py:ProviderRuntimeCapability",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/provider_runtime.py",
+      "target": "func:ese/provider_runtime.py:provider_runtime_capability",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/provider_runtime.py",
+      "target": "func:ese/provider_runtime.py:supports_builtin_live",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/provider_runtime.py",
+      "target": "func:ese/provider_runtime.py:default_provider_from_env",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/adapters.py:local_adapter",
+      "target": "func:ese/local_runtime.py:ensure_local_runtime_ready",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/cli.py:init",
+      "target": "func:ese/init_wizard.py:run_wizard",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/cli.py:start",
+      "target": "func:ese/pipeline.py:run_pipeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/cli.py:task",
+      "target": "func:ese/config.py:load_config",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/cli.py:task",
+      "target": "func:ese/pipeline.py:run_pipeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/cli.py:pr",
+      "target": "func:ese/pr_review.py:build_pr_review_config",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/cli.py:pr",
+      "target": "func:ese/pipeline.py:run_pipeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/admin.py:create_admin_app",
+      "target": "class:ese/knowledge_base.py:ContractKnowledgeBase",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/admin.py:create_admin_app",
+      "target": "class:ese/crm.py:ContractCRM",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/admin.py:create_admin_app",
+      "target": "func:ese/pipeline.py:run_pipeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/init_wizard.py:run_wizard",
+      "target": "func:ese/config_packs.py:get_config_pack",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/init_wizard.py:run_wizard",
+      "target": "func:ese/config.py:validate_config",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/init_wizard.py:run_wizard",
+      "target": "func:ese/config.py:write_config",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/pipeline.py:run_pipeline",
+      "target": "func:ese/adapters.py:dry_run_adapter",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/pipeline.py:run_pipeline",
+      "target": "func:ese/adapters.py:openai_adapter",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/pipeline.py:run_pipeline",
+      "target": "func:ese/adapters.py:local_adapter",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/pr_review.py:run_pr_review",
+      "target": "func:ese/pipeline.py:run_pipeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "file:main.py",
+      "target": "file:ese/__init__.py",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "class:ese/repo_context.py:RepoContextError",
+      "target": "file:ese/repo_context.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/repo_context.py:build_repo_context",
+      "target": "file:ese/repo_context.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/repo_context.py:render_repo_context",
+      "target": "file:ese/repo_context.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:ese/reports.py:RunReportError",
+      "target": "file:ese/reports.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/reports.py:load_pipeline_state",
+      "target": "file:ese/reports.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/reports.py:load_role_report",
+      "target": "file:ese/reports.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/reports.py:collect_run_report",
+      "target": "file:ese/reports.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/reports.py:render_sarif",
+      "target": "file:ese/reports.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/reports.py:render_junit",
+      "target": "file:ese/reports.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:ese/role_drafting.py",
+      "target": "file:ese/role_drafting.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:ese/role_drafting.py:FrameworkRoleInput",
+      "target": "file:ese/role_drafting.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:ese/role_drafting.py:FrameworkRoleDraft",
+      "target": "file:ese/role_drafting.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:ese/role_drafting.py:FrameworkRoleDraftReview",
+      "target": "file:ese/role_drafting.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/role_drafting.py:normalize_role_key",
+      "target": "file:ese/role_drafting.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/role_drafting.py:draft_framework_roles",
+      "target": "file:ese/role_drafting.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:ese/templates.py:TaskTemplate",
+      "target": "file:ese/templates.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/templates.py:build_task_config",
+      "target": "class:ese/templates.py:TaskTemplate",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:ese/templates.py:run_task_pipeline",
+      "target": "func:ese/templates.py:build_task_config",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/__init__.py",
+      "target": "file:apps/contract_intelligence/__init__.py",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/demo/exporter.py:DemoCaseExport",
+      "target": "file:apps/contract_intelligence/demo/exporter.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/demo/exporter.py:DemoExportResult",
+      "target": "file:apps/contract_intelligence/demo/exporter.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/demo/exporter.py:build_demo_assets",
+      "target": "file:apps/contract_intelligence/demo/exporter.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/domain/enums.py",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/enums.py:Severity",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/enums.py:Recommendation",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/enums.py:AnalysisPerspective",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/enums.py:ObligationType",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/enums.py:AlertType",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/enums.py:DocumentType",
+      "target": "file:apps/contract_intelligence/domain/enums.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:Finding",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:DecisionSummary",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:Obligation",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:CaseRecord",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:BidReviewRunRecord",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:ContractCommitRecord",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:MonitoringRunRecord",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/domain/models.py:AlertRecord",
+      "target": "file:apps/contract_intelligence/domain/models.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/evaluation/corpus.py:CorpusEvaluationResult",
+      "target": "file:apps/contract_intelligence/evaluation/corpus.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/evaluation/corpus.py:evaluate_corpus",
+      "target": "file:apps/contract_intelligence/evaluation/corpus.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/evaluation/corpus.py:evaluate_corpus_case",
+      "target": "file:apps/contract_intelligence/evaluation/corpus.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ingestion/document_classifier.py:classify_document",
+      "target": "file:apps/contract_intelligence/ingestion/document_classifier.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ingestion/document_classifier.py:missing_required_documents",
+      "target": "file:apps/contract_intelligence/ingestion/document_classifier.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/ingestion/project_loader.py:LoadedDocument",
+      "target": "file:apps/contract_intelligence/ingestion/project_loader.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "class:apps/contract_intelligence/ingestion/project_loader.py:ClauseSpan",
+      "target": "file:apps/contract_intelligence/ingestion/project_loader.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ingestion/project_loader.py:iter_project_documents",
+      "target": "file:apps/contract_intelligence/ingestion/project_loader.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ingestion/project_loader.py:extract_clause_spans",
+      "target": "file:apps/contract_intelligence/ingestion/project_loader.py",
+      "type": "contains",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/monitoring/__init__.py",
+      "target": "class:apps/contract_intelligence/monitoring/runner.py:MonitoringResult",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/monitoring/__init__.py",
+      "target": "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract",
+      "target": "func:apps/contract_intelligence/monitoring/runner.py:_status_inputs_by_id",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract",
+      "target": "func:apps/contract_intelligence/monitoring/runner.py:_monitored_obligation",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract",
+      "target": "func:apps/contract_intelligence/monitoring/runner.py:_alerts_for",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/monitoring/runner.py:_monitored_obligation",
+      "target": "func:apps/contract_intelligence/monitoring/runner.py:_default_status",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/monitoring/runner.py:_default_status",
+      "target": "func:apps/contract_intelligence/monitoring/runner.py:_status_from_due_dates",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/orchestration/__init__.py",
+      "target": "file:apps/contract_intelligence/orchestration/__init__.py",
+      "type": "contains",
+      "weight": 0
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:compute_project_id",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_finding_from_rule",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_context_profile",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_procurement_profile",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_relationship_strategy",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_extract_obligations",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_decision_summary",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_procurement_profile",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_detect_clause_families",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_procurement_profile",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_governance_artifacts_present",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_relationship_strategy",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_finding_from_rule",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_relationship_advisor",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_assess_long_term_risk",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_negotiation_strategist",
+      "target": "func:apps/contract_intelligence/orchestration/bid_review_runner.py:_relationship_advisor",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/commit_runner.py:commit_contract",
+      "target": "func:apps/contract_intelligence/orchestration/commit_runner.py:_finding_dispositions_from_payload",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/commit_runner.py:commit_contract",
+      "target": "func:apps/contract_intelligence/orchestration/commit_runner.py:_validate_commit_dispositions",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/commit_runner.py:_finding_dispositions_from_payload",
+      "target": "func:apps/contract_intelligence/orchestration/commit_runner.py:_load_optional_json_list",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/commit_runner.py:_finding_dispositions_from_payload",
+      "target": "func:apps/contract_intelligence/orchestration/commit_runner.py:_validate_json_models",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/commit_runner.py:_accepted_risks_from_dispositions",
+      "target": "func:apps/contract_intelligence/orchestration/commit_runner.py:_finding_dispositions_from_payload",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_normalize_analysis_perspective",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_prompt_for_role",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_render_project_context",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:run_bid_review_with_ese",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_prompt_for_role",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_perspective_label",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_ordered_role_keys",
+      "target": "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_pipeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_render_project_context",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_document_priority",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_render_project_context",
+      "target": "func:apps/contract_intelligence/orchestration/ese_bridge.py:_clause_salience",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_pipeline",
+      "target": "func:apps/contract_intelligence/orchestration/role_catalog.py:role_keys",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_artifacts",
+      "target": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/role_catalog.py:role_keys",
+      "target": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "type": "contains",
+      "weight": 0
+    },
+    {
+      "source": "func:apps/contract_intelligence/orchestration/role_catalog.py:artifact_contract",
+      "target": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "type": "contains",
+      "weight": 0
+    },
+    {
+      "source": "file:apps/contract_intelligence/storage/__init__.py",
+      "target": "class:apps/contract_intelligence/storage/filesystem.py:FileSystemCaseStore",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/storage/__init__.py",
+      "target": "class:apps/contract_intelligence/storage/filesystem.py:PersistedCaseState",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/storage/__init__.py",
+      "target": "class:apps/contract_intelligence/storage/filesystem.py:PersistedCommitState",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "file:apps/contract_intelligence/ui/__init__.py",
+      "target": "func:apps/contract_intelligence/ui/dashboard.py:render_project_dashboard",
+      "type": "exports",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ui/dashboard.py:render_project_dashboard",
+      "target": "func:apps/contract_intelligence/ui/dashboard.py:_load_dashboard_data",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ui/dashboard.py:_load_dashboard_data",
+      "target": "func:apps/contract_intelligence/ui/dashboard.py:_load_json_artifact",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ui/dashboard.py:_load_dashboard_data",
+      "target": "func:apps/contract_intelligence/ui/dashboard.py:_lifecycle_timeline",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "func:apps/contract_intelligence/ui/dashboard.py:_load_dashboard_data",
+      "target": "func:apps/contract_intelligence/ui/dashboard.py:_severity_counts",
+      "type": "calls",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_adapters.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_cli.py",
+      "target": "file:apps/contract_intelligence/monitoring/__init__.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_cli.py",
+      "target": "file:apps/contract_intelligence/orchestration/__init__.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_cli.py",
+      "target": "file:apps/contract_intelligence/storage/__init__.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_cli.py",
+      "target": "file:apps/contract_intelligence/ui/__init__.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_cli.py",
+      "target": "file:apps/contract_intelligence/paths.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_config.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_api.py",
+      "target": "file:apps/contract_intelligence/ui/__init__.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_bid_review.py",
+      "target": "file:apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_bid_review.py",
+      "target": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_bid_review.py",
+      "target": "file:apps/contract_intelligence/orchestration/pipeline.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_commit_lifecycle.py",
+      "target": "file:apps/contract_intelligence/orchestration/commit_runner.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_demo.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_ese_bridge.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_ingestion.py",
+      "target": "file:apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_monitoring.py",
+      "target": "file:apps/contract_intelligence/monitoring/runner.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_monitoring.py",
+      "target": "file:apps/contract_intelligence/storage/filesystem.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_scaffold.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_contract_intelligence_ui.py",
+      "target": "file:apps/contract_intelligence/ui/dashboard.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_dashboard.py",
+      "target": "file:apps/contract_intelligence/ui/dashboard.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_dashboard.py",
+      "target": "file:apps/contract_intelligence/storage/filesystem.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_pipeline.py",
+      "target": "file:apps/contract_intelligence/orchestration/pipeline.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_pipeline.py",
+      "target": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_init_wizard.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_init_wizard.py",
+      "target": "file:apps/contract_intelligence/paths.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_reports.py",
+      "target": "file:apps/contract_intelligence/orchestration/bid_review_runner.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_templates.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_role_drafting.py",
+      "target": "file:apps/contract_intelligence/orchestration/role_catalog.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_doctor.py",
+      "target": "file:apps/contract_intelligence/paths.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_e2e.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_e2e.py",
+      "target": "file:apps/contract_intelligence/monitoring/runner.py",
+      "type": "imports",
+      "weight": 1
+    },
+    {
+      "source": "file:tests/test_pr_review.py",
+      "target": "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+      "type": "imports",
+      "weight": 1
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:cli-entry-points",
+      "name": "CLI Layer / Entry Points",
+      "description": "Command-line interfaces and application entry points. Typer CLI commands for ESE and Contract Intelligence, pipeline runner, and main entry point.",
+      "nodeIds": [
+        "file:main.py",
+        "file:ese/cli.py",
+        "file:ese/pipeline.py",
+        "file:apps/contract_intelligence/__main__.py",
+        "file:apps/contract_intelligence/cli.py"
+      ]
+    },
+    {
+      "id": "layer:runtime-adapters",
+      "name": "Runtime/Adapter Layer",
+      "description": "Runtime adapters for executing roles with different LLM providers. Includes built-in adapters for OpenAI, local Ollama, custom API, and dry-run modes.",
+      "nodeIds": [
+        "file:ese/adapters.py",
+        "file:ese/local_runtime.py",
+        "file:ese/provider_runtime.py",
+        "func:ese/adapters.py:dry_run_adapter",
+        "func:ese/adapters.py:openai_adapter",
+        "func:ese/adapters.py:local_adapter",
+        "func:ese/adapters.py:custom_api_adapter",
+        "func:ese/adapters.py:check_adapter_health",
+        "class:ese/adapters.py:AdapterExecutionError"
+      ]
+    },
+    {
+      "id": "layer:configuration",
+      "name": "Configuration Layer",
+      "description": "Configuration loading, validation, and constants. Includes Pydantic models, YAML config handling, config-pack registry, and doctor validation.",
+      "nodeIds": [
+        "file:ese/config.py",
+        "file:ese/constants.py",
+        "file:ese/config_packs.py",
+        "file:ese/doctor.py",
+        "class:ese/config.py:ESEConfig",
+        "class:ese/config.py:ProviderConfig",
+        "class:ese/config.py:RoleConfig",
+        "class:ese/config.py:RuntimeConfig",
+        "class:ese/config.py:ConfigValidationError",
+        "func:ese/config.py:load_config",
+        "func:ese/config.py:validate_config",
+        "func:ese/config.py:write_config",
+        "class:ese/config_packs.py:ConfigPackDefinition",
+        "class:ese/config_packs.py:PackRoleDefinition",
+        "func:ese/config_packs.py:get_config_pack",
+        "func:ese/config_packs.py:list_config_packs",
+        "func:ese/doctor.py:run_doctor",
+        "func:ese/doctor.py:evaluate_doctor"
+      ]
+    },
+    {
+      "id": "layer:data-services",
+      "name": "Data/Services Layer",
+      "description": "Data services including knowledge base (RAG), CRM for entity management, and feedback capture for learning.",
+      "nodeIds": [
+        "file:ese/knowledge_base.py",
+        "file:ese/crm.py",
+        "file:ese/feedback.py",
+        "class:ese/knowledge_base.py:ContractKnowledgeBase",
+        "func:ese/knowledge_base.py:create_entry_from_bid_review",
+        "class:ese/crm.py:ContractCRM",
+        "class:ese/crm.py:Entity",
+        "class:ese/crm.py:Contact",
+        "class:ese/crm.py:Interaction",
+        "func:ese/crm.py:create_entity",
+        "func:ese/crm.py:create_contact",
+        "func:ese/crm.py:create_interaction",
+        "class:ese/feedback.py:FeedbackStoreError",
+        "func:ese/feedback.py:record_feedback",
+        "func:ese/feedback.py:feedback_summary"
+      ]
+    },
+    {
+      "id": "layer:ui-web-ese",
+      "name": "UI/Web Layer (ESE)",
+      "description": "Web interfaces and dashboards for ESE framework. Includes local dashboard and FastAPI admin application.",
+      "nodeIds": [
+        "file:ese/dashboard.py",
+        "file:ese/admin.py",
+        "class:ese/dashboard.py:DashboardJobStore",
+        "class:ese/dashboard.py:DashboardStateError",
+        "func:ese/dashboard.py:serve_dashboard",
+        "func:ese/admin.py:create_admin_app"
+      ]
+    },
+    {
+      "id": "layer:api",
+      "name": "API Layer",
+      "description": "FastAPI endpoints for Contract Intelligence application. Provides REST endpoints for project analysis, commit, and monitoring.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/api/app.py",
+        "file:apps/contract_intelligence/api/__init__.py",
+        "func:apps/contract_intelligence/api/app.py:analyze_project",
+        "func:apps/contract_intelligence/api/app.py:commit_project",
+        "func:apps/contract_intelligence/api/app.py:monitor_project"
+      ]
+    },
+    {
+      "id": "layer:orchestration",
+      "name": "Orchestration Layer",
+      "description": "Business logic orchestration for Contract Intelligence. Bid review runner, commit runner, ESE bridge, pipeline definitions, and role catalog.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/orchestration/bid_review_runner.py",
+        "file:apps/contract_intelligence/orchestration/commit_runner.py",
+        "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+        "file:apps/contract_intelligence/orchestration/pipeline.py",
+        "file:apps/contract_intelligence/orchestration/role_catalog.py",
+        "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+        "func:apps/contract_intelligence/orchestration/commit_runner.py:commit_contract",
+        "func:apps/contract_intelligence/orchestration/commit_runner.py:load_committed_obligations",
+        "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+        "func:apps/contract_intelligence/orchestration/ese_bridge.py:run_bid_review_with_ese",
+        "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_pipeline",
+        "func:apps/contract_intelligence/orchestration/pipeline.py:universal_casework_workflow",
+        "class:apps/contract_intelligence/orchestration/bid_review_runner.py:BidReviewRunResult",
+        "class:apps/contract_intelligence/orchestration/commit_runner.py:CommitContractResult",
+        "class:apps/contract_intelligence/orchestration/pipeline.py:PipelineStage",
+        "class:apps/contract_intelligence/orchestration/role_catalog.py:DomainRole"
+      ]
+    },
+    {
+      "id": "layer:domain-models",
+      "name": "Domain Models Layer",
+      "description": "Domain models and enumerations for Contract Intelligence. Pydantic models for findings, decisions, obligations, case records, etc.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/domain/enums.py",
+        "file:apps/contract_intelligence/domain/models.py",
+        "class:apps/contract_intelligence/domain/enums.py:Severity",
+        "class:apps/contract_intelligence/domain/enums.py:Recommendation",
+        "class:apps/contract_intelligence/domain/enums.py:AnalysisPerspective",
+        "class:apps/contract_intelligence/domain/enums.py:ObligationType",
+        "class:apps/contract_intelligence/domain/enums.py:AlertType",
+        "class:apps/contract_intelligence/domain/enums.py:DocumentType",
+        "class:apps/contract_intelligence/domain/models.py:Finding",
+        "class:apps/contract_intelligence/domain/models.py:DecisionSummary",
+        "class:apps/contract_intelligence/domain/models.py:Obligation",
+        "class:apps/contract_intelligence/domain/models.py:CaseRecord",
+        "class:apps/contract_intelligence/domain/models.py:BidReviewRunRecord",
+        "class:apps/contract_intelligence/domain/models.py:ContractCommitRecord",
+        "class:apps/contract_intelligence/domain/models.py:MonitoringRunRecord",
+        "class:apps/contract_intelligence/domain/models.py:AlertRecord"
+      ]
+    },
+    {
+      "id": "layer:ingestion",
+      "name": "Ingestion Layer",
+      "description": "Document ingestion and loading for Contract Intelligence. Includes document classifier and project document loader.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/ingestion/document_classifier.py",
+        "file:apps/contract_intelligence/ingestion/project_loader.py",
+        "func:apps/contract_intelligence/ingestion/document_classifier.py:classify_document",
+        "func:apps/contract_intelligence/ingestion/document_classifier.py:missing_required_documents",
+        "func:apps/contract_intelligence/ingestion/project_loader.py:iter_project_documents",
+        "func:apps/contract_intelligence/ingestion/project_loader.py:extract_clause_spans",
+        "class:apps/contract_intelligence/ingestion/project_loader.py:LoadedDocument",
+        "class:apps/contract_intelligence/ingestion/project_loader.py:ClauseSpan"
+      ]
+    },
+    {
+      "id": "layer:monitoring",
+      "name": "Monitoring Layer",
+      "description": "Contract monitoring and alerting. Monitors contract obligations and emits alerts for due/late status.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/monitoring/runner.py",
+        "class:apps/contract_intelligence/monitoring/runner.py:MonitoringResult",
+        "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract"
+      ]
+    },
+    {
+      "id": "layer:storage",
+      "name": "Storage Layer",
+      "description": "Filesystem-based case storage for Contract Intelligence. Persists case records, commit records, and monitoring state.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/storage/filesystem.py",
+        "file:apps/contract_intelligence/paths.py",
+        "class:apps/contract_intelligence/storage/filesystem.py:FileSystemCaseStore",
+        "class:apps/contract_intelligence/storage/filesystem.py:PersistedCaseState",
+        "class:apps/contract_intelligence/storage/filesystem.py:PersistedCommitState",
+        "class:apps/contract_intelligence/storage/filesystem.py:PersistedMonitoringState",
+        "func:apps/contract_intelligence/paths.py:allowed_roots_from_env",
+        "func:apps/contract_intelligence/paths.py:validate_allowed_root",
+        "func:apps/contract_intelligence/paths.py:resolve_output_directory",
+        "func:apps/contract_intelligence/paths.py:resolve_existing_file"
+      ]
+    },
+    {
+      "id": "layer:ui-contract-intelligence",
+      "name": "UI Layer (Contract Intelligence)",
+      "description": "Dashboard rendering for Contract Intelligence projects. Renders project dashboard as JSON with findings, timeline, and severity counts.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/ui/dashboard.py",
+        "func:apps/contract_intelligence/ui/dashboard.py:render_project_dashboard"
+      ]
+    },
+    {
+      "id": "layer:evaluation",
+      "name": "Evaluation Layer",
+      "description": "Gold-corpus evaluation suite for Contract Intelligence. Validates bid-review outputs against expected results.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/evaluation/corpus.py",
+        "class:apps/contract_intelligence/evaluation/corpus.py:CorpusEvaluationResult",
+        "func:apps/contract_intelligence/evaluation/corpus.py:evaluate_corpus",
+        "func:apps/contract_intelligence/evaluation/corpus.py:evaluate_corpus_case"
+      ]
+    },
+    {
+      "id": "layer:demo",
+      "name": "Demo Layer",
+      "description": "Demo asset builder for Contract Intelligence. Creates sanitized demo cases from corpus for demonstration purposes.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/demo/exporter.py",
+        "class:apps/contract_intelligence/demo/exporter.py:DemoExportResult",
+        "class:apps/contract_intelligence/demo/exporter.py:DemoCaseExport",
+        "func:apps/contract_intelligence/demo/exporter.py:build_demo_assets"
+      ]
+    },
+    {
+      "id": "layer:utilities",
+      "name": "Utilities Layer",
+      "description": "Helper utilities including diff context, repository context, reports, role drafting, templates, init wizard, PR review, and document ingestion.",
+      "nodeIds": [
+        "file:ese/diff_context.py",
+        "file:ese/repo_context.py",
+        "file:ese/reports.py",
+        "file:ese/role_drafting.py",
+        "file:ese/templates.py",
+        "file:ese/init_wizard.py",
+        "file:ese/pr_review.py",
+        "file:ese/document_ingestion.py",
+        "class:ese/diff_context.py:DiffExcerpt",
+        "func:ese/diff_context.py:build_file_aware_diff_excerpt",
+        "class:ese/repo_context.py:RepoContextError",
+        "func:ese/repo_context.py:build_repo_context",
+        "func:ese/repo_context.py:render_repo_context",
+        "class:ese/reports.py:RunReportError",
+        "func:ese/reports.py:collect_run_report",
+        "func:ese/reports.py:render_sarif",
+        "func:ese/reports.py:render_junit",
+        "class:ese/role_drafting.py:FrameworkRoleInput",
+        "class:ese/role_drafting.py:FrameworkRoleDraft",
+        "func:ese/role_drafting.py:draft_framework_roles",
+        "class:ese/templates.py:TaskTemplate",
+        "func:ese/templates.py:build_task_config",
+        "func:ese/templates.py:run_task_pipeline",
+        "func:ese/init_wizard.py:run_wizard",
+        "class:ese/pr_review.py:PullRequestReviewContext",
+        "func:ese/pr_review.py:run_pr_review",
+        "class:ese/document_ingestion.py:ExtractedDocument",
+        "class:ese/document_ingestion.py:ReflectionResult",
+        "func:ese/document_ingestion.py:extract_text_from_pdf",
+        "func:ese/document_ingestion.py:extract_text_from_docx"
+      ]
+    },
+    {
+      "id": "layer:tests",
+      "name": "Test Layer",
+      "description": "Test files for the project covering adapters, CLI, configuration, API, bid review, commit lifecycle, demo, ESE bridge, ingestion, monitoring, UI, pipeline, templates, role drafting, doctor, E2E, and PR review.",
+      "nodeIds": [
+        "file:tests/test_adapters.py",
+        "file:tests/test_cli.py",
+        "file:tests/test_config.py",
+        "file:tests/test_contract_intelligence_api.py",
+        "file:tests/test_contract_intelligence_bid_review.py",
+        "file:tests/test_contract_intelligence_commit_lifecycle.py",
+        "file:tests/test_contract_intelligence_demo.py",
+        "file:tests/test_contract_intelligence_ese_bridge.py",
+        "file:tests/test_contract_intelligence_ingestion.py",
+        "file:tests/test_contract_intelligence_monitoring.py",
+        "file:tests/test_contract_intelligence_scaffold.py",
+        "file:tests/test_contract_intelligence_ui.py",
+        "file:tests/test_dashboard.py",
+        "file:tests/test_pipeline.py",
+        "file:tests/test_init_wizard.py",
+        "file:tests/test_reports.py",
+        "file:tests/test_templates.py",
+        "file:tests/test_role_drafting.py",
+        "file:tests/test_doctor.py",
+        "file:tests/test_e2e.py",
+        "file:tests/test_pr_review.py"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Entry Points and CLI Layer",
+      "description": "Start by exploring the main entry points. main.py is the FastAPI entry point for the web service. ese/cli.py provides the Typer CLI for ESE framework commands (init, start, task, pr, status). apps/contract_intelligence/__main__.py and cli.py are the CLI entry points for the Contract Intelligence application.",
+      "nodeIds": [
+        "file:main.py",
+        "file:ese/cli.py",
+        "file:ese/pipeline.py",
+        "file:apps/contract_intelligence/__main__.py",
+        "file:apps/contract_intelligence/cli.py"
+      ]
+    },
+    {
+      "order": 2,
+      "title": "Configuration and Validation",
+      "description": "ESE uses Pydantic models for configuration. Explore config.py for the main ESEConfig, ProviderConfig, RoleConfig classes. Check config_packs.py for the registry of shipped config packs (including construction-contract-intelligence). The doctor.py module validates config and enforces role separation constraints.",
+      "nodeIds": [
+        "file:ese/config.py",
+        "file:ese/constants.py",
+        "file:ese/config_packs.py",
+        "file:ese/doctor.py",
+        "class:ese/config.py:ESEConfig",
+        "class:ese/config.py:ProviderConfig",
+        "class:ese/config.py:RoleConfig",
+        "func:ese/config.py:load_config",
+        "func:ese/config.py:validate_config",
+        "func:ese/doctor.py:run_doctor"
+      ]
+    },
+    {
+      "order": 3,
+      "title": "Runtime Adapters",
+      "description": "ESE supports multiple runtime adapters for executing AI roles. adapters.py contains built-in adapters: dry_run_adapter (no external calls), openai_adapter (OpenAI API), local_adapter (Ollama), and custom_api_adapter. provider_runtime.py provides capability metadata for different LLM providers.",
+      "nodeIds": [
+        "file:ese/adapters.py",
+        "file:ese/local_runtime.py",
+        "file:ese/provider_runtime.py",
+        "func:ese/adapters.py:dry_run_adapter",
+        "func:ese/adapters.py:openai_adapter",
+        "func:ese/adapters.py:local_adapter",
+        "func:ese/adapters.py:custom_api_adapter",
+        "func:ese/local_runtime.py:ensure_local_runtime_ready",
+        "func:ese/provider_runtime.py:provider_runtime_capability"
+      ]
+    },
+    {
+      "order": 4,
+      "title": "Contract Intelligence Domain Models",
+      "description": "The Contract Intelligence application is built on domain models. Explore enums.py for Severity, Recommendation, ObligationType, AlertType, DocumentType. Check models.py for Pydantic models: Finding, DecisionSummary, Obligation, CaseRecord, BidReviewRunRecord, ContractCommitRecord, MonitoringRunRecord, AlertRecord.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/domain/enums.py",
+        "file:apps/contract_intelligence/domain/models.py",
+        "class:apps/contract_intelligence/domain/enums.py:Severity",
+        "class:apps/contract_intelligence/domain/enums.py:Recommendation",
+        "class:apps/contract_intelligence/domain/enums.py:ObligationType",
+        "class:apps/contract_intelligence/domain/models.py:Finding",
+        "class:apps/contract_intelligence/domain/models.py:DecisionSummary",
+        "class:apps/contract_intelligence/domain/models.py:Obligation",
+        "class:apps/contract_intelligence/domain/models.py:CaseRecord",
+        "class:apps/contract_intelligence/domain/models.py:BidReviewRunRecord"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Orchestration Layer",
+      "description": "The orchestration layer coordinates the Contract Intelligence workflows. bid_review_runner.py runs bid reviews. commit_runner.py handles contract committing and obligation snapshots. ese_bridge.py connects to ESE for ensemble AI execution. pipeline.py defines the workflow stages.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/orchestration/bid_review_runner.py",
+        "file:apps/contract_intelligence/orchestration/commit_runner.py",
+        "file:apps/contract_intelligence/orchestration/ese_bridge.py",
+        "file:apps/contract_intelligence/orchestration/pipeline.py",
+        "file:apps/contract_intelligence/orchestration/role_catalog.py",
+        "func:apps/contract_intelligence/orchestration/bid_review_runner.py:run_bid_review",
+        "func:apps/contract_intelligence/orchestration/ese_bridge.py:build_bid_review_ese_config",
+        "func:apps/contract_intelligence/orchestration/ese_bridge.py:run_bid_review_with_ese",
+        "func:apps/contract_intelligence/orchestration/pipeline.py:bid_review_pipeline"
+      ]
+    },
+    {
+      "order": 6,
+      "title": "Ingestion and Storage",
+      "description": "Document ingestion loads and processes construction contract documents. project_loader.py loads project documents and extracts clause spans. document_classifier.py classifies documents by type. Storage layer persists case records, commits, and monitoring state to disk via filesystem.py.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/ingestion/project_loader.py",
+        "file:apps/contract_intelligence/ingestion/document_classifier.py",
+        "file:apps/contract_intelligence/storage/filesystem.py",
+        "file:apps/contract_intelligence/paths.py",
+        "func:apps/contract_intelligence/ingestion/project_loader.py:iter_project_documents",
+        "func:apps/contract_intelligence/ingestion/document_classifier.py:classify_document",
+        "class:apps/contract_intelligence/storage/filesystem.py:FileSystemCaseStore",
+        "class:apps/contract_intelligence/storage/filesystem.py:PersistedCaseState"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Monitoring and Alerts",
+      "description": "The monitoring layer tracks contract obligations and emits alerts. monitoring/runner.py monitors committed contracts and checks obligation due dates. It generates alerts for due and late obligations based on AlertType enum (DUE, LATE).",
+      "nodeIds": [
+        "file:apps/contract_intelligence/monitoring/runner.py",
+        "class:apps/contract_intelligence/monitoring/runner.py:MonitoringResult",
+        "func:apps/contract_intelligence/monitoring/runner.py:monitor_contract",
+        "class:apps/contract_intelligence/domain/enums.py:AlertType"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "Knowledge Base and Data Services",
+      "description": "ESE provides data services for contract intelligence. knowledge_base.py implements a RAG system using BM25 + cosine similarity for contract knowledge. crm.py provides lightweight CRM for tracking entities, contacts, and interactions. feedback.py captures user feedback for learning.",
+      "nodeIds": [
+        "file:ese/knowledge_base.py",
+        "file:ese/crm.py",
+        "file:ese/feedback.py",
+        "class:ese/knowledge_base.py:ContractKnowledgeBase",
+        "class:ese/crm.py:ContractCRM",
+        "class:ese/crm.py:Entity",
+        "func:ese/knowledge_base.py:create_entry_from_bid_review",
+        "func:ese/feedback.py:record_feedback"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "API and UI Layers",
+      "description": "The application exposes REST APIs and dashboards. api/app.py provides FastAPI endpoints: analyze_project (POST), commit_project (POST), monitor_project (POST). The UI layer renders project dashboards with findings, timeline, and severity counts via ui/dashboard.py. ESE also has a dashboard and admin web interfaces.",
+      "nodeIds": [
+        "file:apps/contract_intelligence/api/app.py",
+        "func:apps/contract_intelligence/api/app.py:analyze_project",
+        "func:apps/contract_intelligence/api/app.py:commit_project",
+        "func:apps/contract_intelligence/api/app.py:monitor_project",
+        "file:apps/contract_intelligence/ui/dashboard.py",
+        "func:apps/contract_intelligence/ui/dashboard.py:render_project_dashboard",
+        "file:ese/dashboard.py",
+        "file:ese/admin.py"
+      ]
+    }
+  ]
+}
