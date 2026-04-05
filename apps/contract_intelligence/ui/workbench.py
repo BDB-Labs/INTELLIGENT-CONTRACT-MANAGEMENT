@@ -432,6 +432,38 @@ def render_workbench_html() -> str:
       background: white;
     }
 
+    .path-field {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .path-field input {
+      min-width: 0;
+    }
+
+    .browse-button {
+      padding: 13px 16px;
+      border-radius: var(--radius-sm);
+      background: rgba(20, 33, 37, 0.06);
+      color: var(--ink);
+      border: 1px solid rgba(20, 33, 37, 0.14);
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .browse-button:disabled {
+      cursor: not-allowed;
+      opacity: 0.45;
+      box-shadow: none;
+      transform: none;
+    }
+
     .field-note {
       color: var(--muted);
       font-size: 0.85rem;
@@ -736,7 +768,7 @@ def render_workbench_html() -> str:
             <div class="form-grid single">
               <label>
                 <span>Project directory</span>
-                <input id="workspace-project-dir" type="text" placeholder="/absolute/path/to/project" autocomplete="off">
+                <input id="workspace-project-dir" type="text" placeholder="/absolute/path/to/project" autocomplete="off" data-picker="directory">
               </label>
               <label>
                 <span>Perspective</span>
@@ -811,7 +843,7 @@ def render_workbench_html() -> str:
                   <div class="form-grid single">
                     <label>
                       <span>Artifacts directory</span>
-                      <input type="text" name="artifacts_dir" placeholder="Optional output directory">
+                      <input type="text" name="artifacts_dir" placeholder="Optional output directory" data-picker="directory">
                     </label>
                   </div>
                   <div class="form-actions">
@@ -845,7 +877,7 @@ def render_workbench_html() -> str:
                     </label>
                     <label>
                       <span>Artifacts directory</span>
-                      <input type="text" name="artifacts_dir" id="ensemble-artifacts-dir">
+                      <input type="text" name="artifacts_dir" id="ensemble-artifacts-dir" data-picker="directory">
                     </label>
                     <label>
                       <span>Model override</span>
@@ -857,7 +889,7 @@ def render_workbench_html() -> str:
                     </label>
                     <label>
                       <span>Config output path</span>
-                      <input type="text" name="write_config_path" placeholder="Optional generated config path">
+                      <input type="text" name="write_config_path" placeholder="Optional generated config path" data-picker="save-file" data-save-filename="contract-intelligence-ese.config.yaml" data-file-types="YAML files (*.yaml;*.yml)">
                     </label>
                   </div>
                   <div class="form-actions">
@@ -883,19 +915,19 @@ def render_workbench_html() -> str:
               <div class="form-grid">
                 <label>
                   <span>Committed contract directory</span>
-                  <input type="text" name="committed_contract_dir" placeholder="Optional final contract package directory">
+                  <input type="text" name="committed_contract_dir" placeholder="Optional final contract package directory" data-picker="directory">
                 </label>
                 <label>
                   <span>Finding dispositions file</span>
-                  <input type="text" name="finding_dispositions_file" placeholder="JSON file with commit dispositions">
+                  <input type="text" name="finding_dispositions_file" placeholder="JSON file with commit dispositions" data-picker="open-file" data-file-types="JSON files (*.json)">
                 </label>
                 <label>
                   <span>Accepted risks file</span>
-                  <input type="text" name="accepted_risks_file" placeholder="Legacy optional JSON file">
+                  <input type="text" name="accepted_risks_file" placeholder="Legacy optional JSON file" data-picker="open-file" data-file-types="JSON files (*.json)">
                 </label>
                 <label>
                   <span>Negotiated changes file</span>
-                  <input type="text" name="negotiated_changes_file" placeholder="Optional JSON file">
+                  <input type="text" name="negotiated_changes_file" placeholder="Optional JSON file" data-picker="open-file" data-file-types="JSON files (*.json)">
                 </label>
               </div>
               <div class="form-actions">
@@ -919,7 +951,7 @@ def render_workbench_html() -> str:
               <div class="form-grid single">
                 <label>
                   <span>Status inputs file</span>
-                  <input type="text" name="status_inputs_file" placeholder="JSON list of live obligation statuses">
+                  <input type="text" name="status_inputs_file" placeholder="JSON list of live obligation statuses" data-picker="open-file" data-file-types="JSON files (*.json)">
                 </label>
               </div>
               <div class="form-actions">
@@ -954,7 +986,7 @@ def render_workbench_html() -> str:
                     </label>
                     <label>
                       <span>Output path</span>
-                      <input type="text" name="output_path" placeholder="Optional HTML output path">
+                      <input type="text" name="output_path" placeholder="Optional HTML output path" data-picker="save-file" data-save-filename="contract_intelligence_dashboard.html" data-file-types="HTML files (*.html)">
                     </label>
                   </div>
                   <div class="form-actions">
@@ -975,7 +1007,7 @@ def render_workbench_html() -> str:
                   <div class="form-grid single">
                     <label>
                       <span>Output path</span>
-                      <input type="text" name="output_path" placeholder="Optional JSON destination">
+                      <input type="text" name="output_path" placeholder="Optional JSON destination" data-picker="save-file" data-save-filename="obligations.json" data-file-types="JSON files (*.json)">
                     </label>
                   </div>
                   <div class="form-actions">
@@ -1004,11 +1036,11 @@ def render_workbench_html() -> str:
                   <div class="form-grid">
                     <label>
                       <span>Corpus directory</span>
-                      <input type="text" name="corpus_dir" id="corpus-dir-input">
+                      <input type="text" name="corpus_dir" id="corpus-dir-input" data-picker="directory">
                     </label>
                     <label>
                       <span>Artifacts directory</span>
-                      <input type="text" name="artifacts_dir" placeholder="Optional evaluation artifacts root">
+                      <input type="text" name="artifacts_dir" placeholder="Optional evaluation artifacts root" data-picker="directory">
                     </label>
                   </div>
                   <div class="form-actions">
@@ -1024,15 +1056,15 @@ def render_workbench_html() -> str:
                   <div class="form-grid">
                     <label>
                       <span>Corpus directory</span>
-                      <input type="text" name="corpus_dir" id="demo-corpus-dir-input">
+                      <input type="text" name="corpus_dir" id="demo-corpus-dir-input" data-picker="directory">
                     </label>
                     <label>
                       <span>Reference root</span>
-                      <input type="text" name="reference_root" id="reference-root-input">
+                      <input type="text" name="reference_root" id="reference-root-input" data-picker="directory">
                     </label>
                     <label>
                       <span>Site directory</span>
-                      <input type="text" name="site_dir" id="site-dir-input">
+                      <input type="text" name="site_dir" id="site-dir-input" data-picker="directory">
                     </label>
                   </div>
                   <div class="form-actions">
@@ -1227,6 +1259,94 @@ def render_workbench_html() -> str:
         .replaceAll("'", "&#39;");
     }
 
+    let desktopPathApiPromise = null;
+
+    function desktopPathBridge() {
+      if (window.pywebview?.api?.choose_path) {
+        return Promise.resolve(window.pywebview.api);
+      }
+      if (!desktopPathApiPromise) {
+        desktopPathApiPromise = new Promise((resolve) => {
+          const finish = () => resolve(window.pywebview?.api?.choose_path ? window.pywebview.api : null);
+          const onReady = () => finish();
+          window.addEventListener("pywebviewready", onReady, { once: true });
+          window.setTimeout(() => {
+            window.removeEventListener("pywebviewready", onReady);
+            finish();
+          }, 900);
+        });
+      }
+      return desktopPathApiPromise.then((api) => {
+        if (!api) {
+          desktopPathApiPromise = null;
+        }
+        return api;
+      });
+    }
+
+    function filenameFromPath(value) {
+      const cleaned = (value || "").trim();
+      if (!cleaned) return "";
+      const parts = cleaned.split(/[\\\\/]/).filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : "";
+    }
+
+    function pickerDirectoryHint(input) {
+      const explicit = input.value.trim();
+      if (explicit) return explicit;
+      const projectDir = currentProjectDir();
+      if (projectDir) return projectDir;
+      return bootstrap.defaults.reference_root || bootstrap.defaults.corpus_dir || "";
+    }
+
+    function pickerFileTypes(input) {
+      return input.dataset.fileTypes ? [input.dataset.fileTypes] : [];
+    }
+
+    function attachBrowseControls() {
+      document.querySelectorAll("input[data-picker]").forEach((input) => {
+        if (input.parentElement?.classList.contains("path-field")) {
+          return;
+        }
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "path-field";
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "browse-button";
+        button.textContent = "Browse";
+        button.title = "Select a local path";
+        button.addEventListener("click", async () => {
+          const bridge = await desktopPathBridge();
+          if (!bridge) {
+            showToast("Native path browsing is available in the desktop app only.", "error");
+            return;
+          }
+          try {
+            const selected = await bridge.choose_path(
+              input.dataset.picker,
+              pickerDirectoryHint(input),
+              false,
+              filenameFromPath(input.value) || input.dataset.saveFilename || "",
+              pickerFileTypes(input),
+            );
+            if (!selected) {
+              return;
+            }
+            input.value = Array.isArray(selected) ? selected.join(", ") : selected;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+          } catch (error) {
+            showToast(error.message || "Could not open the native file picker.", "error");
+          }
+        });
+        wrapper.appendChild(button);
+      });
+    }
+
     async function handleFormSubmit(event) {
       event.preventDefault();
       syncSharedInputs();
@@ -1403,6 +1523,7 @@ def render_workbench_html() -> str:
       $("demo-corpus-dir-input").value = bootstrap.defaults.corpus_dir;
       $("reference-root-input").value = bootstrap.defaults.reference_root;
       $("site-dir-input").value = bootstrap.defaults.site_dir;
+      attachBrowseControls();
       syncSharedInputs();
       renderCommandCatalog();
       renderActivity();

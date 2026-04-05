@@ -9,12 +9,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 desktop_app = importlib.import_module("ese.desktop.app")
 desktop_branding = importlib.import_module("ese.desktop.branding")
 desktop_config = importlib.import_module("ese.desktop.config")
+desktop_dialogs = importlib.import_module("ese.desktop.dialogs")
 desktop_runtime = importlib.import_module("ese.desktop.runtime")
 platform_catalog = importlib.import_module("ese.platform.catalog")
 dashboard_module = importlib.import_module("ese.dashboard")
 workbench_module = importlib.import_module("apps.contract_intelligence.ui.workbench")
 
 DesktopLaunchConfig = desktop_config.DesktopLaunchConfig
+DesktopPathDialogAPI = desktop_dialogs.DesktopPathDialogAPI
 get_surface_spec = desktop_config.get_surface_spec
 render_splash_html = desktop_branding.render_splash_html
 build_server_command = desktop_runtime.build_server_command
@@ -129,6 +131,25 @@ def test_save_config_payload_writes_generated_config(tmp_path: Path) -> None:
     assert "feature-delivery" in target.read_text(encoding="utf-8")
 
 
+def test_desktop_path_dialog_api_returns_selected_path(tmp_path: Path) -> None:
+    class FakeWindow:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        def create_file_dialog(self, **kwargs):  # noqa: ANN003
+            self.calls.append(kwargs)
+            return [str(tmp_path)]
+
+    window = FakeWindow()
+    api = DesktopPathDialogAPI()
+    api.attach(window)
+
+    selected = api.choose_path("directory", str(tmp_path))
+
+    assert selected == str(tmp_path.resolve())
+    assert window.calls[0]["directory"] == str(tmp_path.resolve())
+
+
 def test_workbench_html_exposes_contract_lifecycle_commands() -> None:
     html = render_workbench_html()
 
@@ -136,3 +157,5 @@ def test_workbench_html_exposes_contract_lifecycle_commands() -> None:
     assert "Deterministic review" in html
     assert "AI ensemble review" in html
     assert "/projects/render-dashboard" in html
+    assert 'data-picker="directory"' in html
+    assert 'data-picker="open-file"' in html

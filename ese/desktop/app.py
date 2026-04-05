@@ -6,6 +6,7 @@ import webbrowser
 
 from ese.desktop.branding import render_splash_html
 from ese.desktop.config import DesktopLaunchConfig, get_surface_spec
+from ese.desktop.dialogs import DesktopPathDialogAPI
 from ese.desktop.runtime import SubprocessSurfaceRuntime
 from ese.desktop.server import serve_desktop_surface
 
@@ -29,15 +30,18 @@ def launch_desktop_app(config: DesktopLaunchConfig | None = None) -> None:
                 time.sleep(0.5)
             return
 
+        dialog_api = DesktopPathDialogAPI()
         window = webview.create_window(
             launch_config.window_title or surface.window_title or surface.headline,
             html=render_splash_html(surface),
+            js_api=dialog_api,
             width=launch_config.width,
             height=launch_config.height,
             min_size=(launch_config.min_width, launch_config.min_height),
             text_select=True,
             background_color="#08111c",
         )
+        dialog_api.attach(window)
 
         def _load_surface(target_window):  # noqa: ANN001
             target_window.load_url(url)
