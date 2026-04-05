@@ -56,6 +56,8 @@ Files used:
 Steps:
 
 1. Create a new Render Blueprint from this repository.
+   Do not create a Static Site for ICM. If Render shows an error like
+   `Publish directory render.yaml does not exist!`, the service type is wrong.
 2. Confirm the disk mount is present at `/var/data/icm`.
 3. Deploy the `icm-reference` web service.
 4. Set a stable internal or semi-private hostname, such as `internal.<your-domain>` or `icm.<your-domain>`.

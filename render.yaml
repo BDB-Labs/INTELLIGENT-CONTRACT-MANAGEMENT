@@ -3,7 +3,7 @@ services:
     name: icm-reference
     runtime: python
     plan: starter
-    buildCommand: python -m pip install uv && uv sync --locked
+    buildCommand: python -m pip install uv && python -m uv sync --locked
     startCommand: /bin/bash scripts/start_icm_reference.sh
     healthCheckPath: /health
     disk:

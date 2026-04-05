@@ -1,6 +1,8 @@
 # Python cache/build artifacts
 __pycache__/
 *.py[cod]
+*.swp
+*.swo
 *.egg-info/
 .pytest_cache/
 .vercel/
