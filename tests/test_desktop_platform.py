@@ -21,6 +21,8 @@ SubprocessDashboardRuntime = desktop_runtime.SubprocessDashboardRuntime
 list_platform_targets = platform_catalog.list_platform_targets
 list_surface_specs = platform_catalog.list_surface_specs
 catalog_payload = dashboard_module._catalog_payload
+config_preview_payload = dashboard_module._config_preview_payload
+save_config_payload = dashboard_module._save_config_payload
 
 
 def test_surface_registry_falls_back_to_dashboard_surface() -> None:
@@ -80,3 +82,42 @@ def test_catalog_payload_exposes_commands_and_surfaces() -> None:
     assert "platforms" in command_names
     assert "ese-dashboard" in surface_names
     assert payload["platforms"]
+
+
+def test_task_config_preview_payload_exposes_yaml_and_cli_equivalent() -> None:
+    payload = config_preview_payload(
+        {
+            "workflow": "task",
+            "scope": "Review a staged release checklist",
+            "template_key": "release-readiness",
+            "provider": "openai",
+            "execution_mode": "demo",
+            "artifacts_dir": "artifacts",
+        },
+        root_artifacts_dir="artifacts",
+    )
+
+    assert payload["workflow"] == "task"
+    assert "ese task" in payload["command_preview"]
+    assert "template_key: release-readiness" in payload["config_yaml"]
+
+
+def test_save_config_payload_writes_generated_config(tmp_path: Path) -> None:
+    target = tmp_path / "preview.config.yaml"
+
+    payload = save_config_payload(
+        {
+            "workflow": "task",
+            "scope": "Review a staged release checklist",
+            "template_key": "feature-delivery",
+            "provider": "openai",
+            "execution_mode": "demo",
+            "artifacts_dir": "artifacts",
+            "config_path": str(target),
+        },
+        root_artifacts_dir="artifacts",
+    )
+
+    assert payload["config_path"] == str(target)
+    assert target.exists()
+    assert "feature-delivery" in target.read_text(encoding="utf-8")

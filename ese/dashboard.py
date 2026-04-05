@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import shlex
 import signal
 import threading
 import uuid
@@ -16,14 +17,21 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from ese.config import ConfigValidationError, load_config
+import yaml
+
+from ese.config import ConfigValidationError, load_config, write_config
 from ese.config_packs import list_config_packs
 from ese.feedback import record_feedback
 from ese.doctor import build_doctor_guidance, evaluate_doctor
 from ese.init_wizard import ROLE_DESCRIPTIONS
 from ese.pipeline import run_pipeline
 from ese.platform.catalog import list_platform_targets, list_surface_specs
-from ese.pr_review import PullRequestReviewError, run_pr_review
+from ese.pr_review import (
+    DEFAULT_MAX_DIFF_CHARS,
+    PullRequestReviewError,
+    build_pr_review_config,
+    run_pr_review,
+)
 from ese.reports import (
     RunReportError,
     collect_run_report,
@@ -33,6 +41,7 @@ from ese.reports import (
     render_sarif,
 )
 from ese.templates import (
+    build_task_config,
     list_task_templates,
     recommend_template_for_scope,
     run_task_pipeline,
@@ -123,8 +132,8 @@ _COMMAND_CATALOG = (
     {
         "command": "init",
         "group": "setup",
-        "summary": "Interactive config wizard. Still richer in CLI than in the dashboard.",
-        "ui_status": "planned",
+        "summary": "Config generation and save are available in the desktop app, though the full interactive wizard still lives in the CLI.",
+        "ui_status": "partial",
     },
 )
 
@@ -365,6 +374,203 @@ def _task_run_kwargs(
             payload.get("include_repo_diff"), default=True
         ),
         "max_repo_diff_chars": int(payload.get("max_repo_diff_chars") or 8000),
+    }
+
+
+def _dashboard_task_config_kwargs(
+    payload: dict[str, Any], *, root_artifacts_dir: str
+) -> dict[str, Any]:
+    return {
+        "scope": str(payload.get("scope") or ""),
+        "template_key": str(payload.get("template_key") or "feature-delivery"),
+        "provider": str(payload.get("provider") or "openai"),
+        "execution_mode": str(payload.get("execution_mode") or "auto"),
+        "artifacts_dir": str(payload.get("artifacts_dir") or root_artifacts_dir),
+        "model": str(payload.get("model")) if payload.get("model") else None,
+        "runtime_adapter": str(payload.get("runtime_adapter"))
+        if payload.get("runtime_adapter")
+        else None,
+        "provider_name": str(payload.get("provider_name"))
+        if payload.get("provider_name")
+        else None,
+        "base_url": str(payload.get("base_url")) if payload.get("base_url") else None,
+        "api_key_env": str(payload.get("api_key_env"))
+        if payload.get("api_key_env")
+        else None,
+        "repo_path": str(payload.get("repo_path"))
+        if payload.get("repo_path")
+        else None,
+        "include_repo_status": _coerce_bool(
+            payload.get("include_repo_status"), default=True
+        ),
+        "include_repo_diff": _coerce_bool(
+            payload.get("include_repo_diff"), default=True
+        ),
+        "max_repo_diff_chars": int(payload.get("max_repo_diff_chars") or 8000),
+    }
+
+
+def _dashboard_pr_config_kwargs(
+    payload: dict[str, Any], *, root_artifacts_dir: str
+) -> dict[str, Any]:
+    return {
+        "repo_path": str(payload.get("repo_path") or "."),
+        "pr": str(payload.get("pr")) if payload.get("pr") else None,
+        "base": str(payload.get("base")) if payload.get("base") else None,
+        "head": str(payload.get("head")) if payload.get("head") else None,
+        "title": str(payload.get("title")) if payload.get("title") else None,
+        "focus": str(payload.get("focus")) if payload.get("focus") else None,
+        "max_diff_chars": int(payload.get("max_diff_chars") or DEFAULT_MAX_DIFF_CHARS),
+        "provider": str(payload.get("provider") or "openai"),
+        "execution_mode": str(payload.get("execution_mode") or "auto"),
+        "artifacts_dir": str(payload.get("artifacts_dir") or root_artifacts_dir),
+        "model": str(payload.get("model")) if payload.get("model") else None,
+        "runtime_adapter": str(payload.get("runtime_adapter"))
+        if payload.get("runtime_adapter")
+        else None,
+        "provider_name": str(payload.get("provider_name"))
+        if payload.get("provider_name")
+        else None,
+        "base_url": str(payload.get("base_url")) if payload.get("base_url") else None,
+        "api_key_env": str(payload.get("api_key_env"))
+        if payload.get("api_key_env")
+        else None,
+    }
+
+
+def _shell_join(parts: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in parts if part)
+
+
+def _task_command_preview(payload: dict[str, Any], *, root_artifacts_dir: str) -> str:
+    args = _dashboard_task_config_kwargs(payload, root_artifacts_dir=root_artifacts_dir)
+    parts = [
+        "ese",
+        "task",
+        args["scope"],
+        "--template",
+        str(args["template_key"]),
+        "--provider",
+        str(args["provider"]),
+        "--execution-mode",
+        str(args["execution_mode"]),
+        "--artifacts-dir",
+        str(args["artifacts_dir"]),
+    ]
+    if args["model"]:
+        parts.extend(["--model", str(args["model"])])
+    if args["runtime_adapter"]:
+        parts.extend(["--runtime-adapter", str(args["runtime_adapter"])])
+    if args["base_url"]:
+        parts.extend(["--base-url", str(args["base_url"])])
+    if args["api_key_env"]:
+        parts.extend(["--api-key-env", str(args["api_key_env"])])
+    if args["repo_path"]:
+        parts.extend(["--repo-path", str(args["repo_path"])])
+    if args["include_repo_status"] is False:
+        parts.extend(["--include-repo-status", "false"])
+    if args["include_repo_diff"] is False:
+        parts.extend(["--include-repo-diff", "false"])
+    return _shell_join(parts)
+
+
+def _pr_command_preview(payload: dict[str, Any], *, root_artifacts_dir: str) -> str:
+    args = _dashboard_pr_config_kwargs(payload, root_artifacts_dir=root_artifacts_dir)
+    parts = [
+        "ese",
+        "pr",
+        "--repo-path",
+        str(args["repo_path"]),
+        "--provider",
+        str(args["provider"]),
+        "--execution-mode",
+        str(args["execution_mode"]),
+        "--artifacts-dir",
+        str(args["artifacts_dir"]),
+    ]
+    if args["pr"]:
+        parts.extend(["--pr", str(args["pr"])])
+    if args["base"]:
+        parts.extend(["--base", str(args["base"])])
+    if args["head"]:
+        parts.extend(["--head", str(args["head"])])
+    if args["focus"]:
+        parts.extend(["--focus", str(args["focus"])])
+    if args["model"]:
+        parts.extend(["--model", str(args["model"])])
+    if args["runtime_adapter"]:
+        parts.extend(["--runtime-adapter", str(args["runtime_adapter"])])
+    if args["base_url"]:
+        parts.extend(["--base-url", str(args["base_url"])])
+    if args["api_key_env"]:
+        parts.extend(["--api-key-env", str(args["api_key_env"])])
+    return _shell_join(parts)
+
+
+def _build_config_preview(
+    payload: dict[str, Any], *, root_artifacts_dir: str
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    workflow = str(payload.get("workflow") or "task").strip().lower()
+    if workflow == "task":
+        cfg = build_task_config(
+            **_dashboard_task_config_kwargs(payload, root_artifacts_dir=root_artifacts_dir)
+        )
+        meta = {
+            "workflow": "task",
+            "command_preview": _task_command_preview(
+                payload, root_artifacts_dir=root_artifacts_dir
+            ),
+            "context": {
+                "template_key": str(cfg.get("template_key") or ""),
+                "provider": str((cfg.get("provider") or {}).get("name") or ""),
+                "execution_mode": str(cfg.get("execution_mode") or ""),
+            },
+        }
+        return cfg, meta
+
+    if workflow == "pr":
+        context, cfg = build_pr_review_config(
+            **_dashboard_pr_config_kwargs(payload, root_artifacts_dir=root_artifacts_dir)
+        )
+        meta = {
+            "workflow": "pr",
+            "command_preview": _pr_command_preview(
+                payload, root_artifacts_dir=root_artifacts_dir
+            ),
+            "context": {
+                "repo_path": context.repo_path,
+                "base_ref": context.base_ref,
+                "head_ref": context.head_ref,
+                "review_title": context.review_title,
+            },
+        }
+        return cfg, meta
+
+    raise ConfigValidationError(f"Unsupported workflow '{workflow}'.")
+
+
+def _config_preview_payload(
+    payload: dict[str, Any], *, root_artifacts_dir: str
+) -> dict[str, Any]:
+    cfg, meta = _build_config_preview(payload, root_artifacts_dir=root_artifacts_dir)
+    return {
+        **meta,
+        "config_yaml": yaml.safe_dump(cfg, sort_keys=False).strip(),
+    }
+
+
+def _save_config_payload(
+    payload: dict[str, Any], *, root_artifacts_dir: str
+) -> dict[str, Any]:
+    config_path = str(payload.get("config_path") or "").strip()
+    if not config_path:
+        raise ConfigValidationError("config_path is required.")
+    cfg, meta = _build_config_preview(payload, root_artifacts_dir=root_artifacts_dir)
+    write_config(config_path, cfg)
+    return {
+        **meta,
+        "config_path": config_path,
+        "config_yaml": yaml.safe_dump(cfg, sort_keys=False).strip(),
     }
 
 
@@ -981,6 +1187,34 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       border-color: rgba(255, 123, 114, 0.18);
       background: rgba(255, 123, 114, 0.08);
     }
+    .config-panel {
+      display: grid;
+      gap: 14px;
+    }
+    .config-status {
+      flex: 1;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .config-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .cli-preview {
+      margin: 0;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(2, 7, 12, 0.88);
+      color: #edf3fb;
+      font-family: "SFMono-Regular", "Consolas", monospace;
+      font-size: 0.84rem;
+      line-height: 1.55;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     .panel, .metric {
       animation: rise 240ms ease-out both;
     }
@@ -1111,6 +1345,11 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <input id="config_path" name="config_path" placeholder="Optional path to run an existing config instead">
         </div>
 
+        <div class="field-group" data-advanced="true">
+          <label for="config_write_path">Config Output Path</label>
+          <input id="config_write_path" name="config_write_path" placeholder="Optional path for saving a generated config">
+        </div>
+
         <label for="artifacts_dir">Artifacts Directory</label>
         <input id="artifacts_dir" name="artifacts_dir" value="">
 
@@ -1118,6 +1357,10 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <button id="run-button" type="submit">Start Task Run</button>
           <button id="pr-button" type="button">Review PR</button>
           <button id="refresh-button" type="button" class="secondary">Refresh</button>
+        </div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button id="preview-task-config" type="button" class="secondary">Preview Task Config</button>
+          <button id="preview-pr-config" type="button" class="secondary">Preview PR Config</button>
         </div>
       </form>
       <div style="margin-top:16px" class="tiny">
@@ -1154,6 +1397,15 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <h2>Catalog and Platform Map</h2>
           <div id="catalog" class="catalog-grid"></div>
         </section>
+      </section>
+      <section class="panel section config-panel">
+        <div class="section-kicker">Config Studio</div>
+        <h2>Preview and save CLI-equivalent configs</h2>
+        <div class="action-row">
+          <div id="config-status" class="config-status">Preview a task or PR config from the sidebar, then save the generated YAML to the configured output path.</div>
+          <button id="save-config-button" type="button">Save Preview</button>
+        </div>
+        <div id="config-preview" class="viewer"></div>
       </section>
       <section class="panel section">
         <h2>Recent Runs</h2>
@@ -1208,6 +1460,7 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     const recommendTemplateButton = document.getElementById('recommend-template');
     const artifactsInput = document.getElementById('artifacts_dir');
     const configInput = document.getElementById('config_path');
+    const configWritePathInput = document.getElementById('config_write_path');
     const repoInput = document.getElementById('repo_path');
     const includeRepoContext = document.getElementById('include_repo_context');
     const includeRepoStatus = document.getElementById('include_repo_status');
@@ -1225,6 +1478,11 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     const rolesEl = document.getElementById('roles');
     const viewerEl = document.getElementById('viewer');
     const catalogEl = document.getElementById('catalog');
+    const configPreviewEl = document.getElementById('config-preview');
+    const configStatusEl = document.getElementById('config-status');
+    const previewTaskConfigButton = document.getElementById('preview-task-config');
+    const previewPrConfigButton = document.getElementById('preview-pr-config');
+    const saveConfigButton = document.getElementById('save-config-button');
     const doctorConfigInput = document.getElementById('doctor_config_path');
     const doctorResultsEl = document.getElementById('doctor-results');
     const doctorButton = document.getElementById('doctor-button');
@@ -1236,6 +1494,8 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       activeJobId: null,
       history: [],
       selectedArtifact: null,
+      configPreview: null,
+      configPreviewRequest: null,
     };
     const advancedFields = Array.from(document.querySelectorAll('[data-advanced="true"]'));
 
@@ -1244,6 +1504,7 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
     if (bootstrap.config_path) {
       configInput.value = bootstrap.config_path;
     }
+    configWritePathInput.value = bootstrap.config_path || '';
     doctorConfigInput.value = bootstrap.config_path || '';
 
     async function request(url, options = {}) {
@@ -1261,6 +1522,39 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
+    }
+
+    function buildTaskPayload() {
+      return {
+        scope: form.scope.value.trim(),
+        template_key: form.template.value,
+        provider: form.provider.value,
+        execution_mode: form.execution_mode.value,
+        model: form.model.value.trim() || undefined,
+        base_url: form.base_url.value.trim() || undefined,
+        runtime_adapter: form.runtime_adapter.value.trim() || undefined,
+        config_path: form.config_path.value.trim() || undefined,
+        artifacts_dir: form.artifacts_dir.value.trim() || bootstrap.artifacts_dir,
+        repo_path: parseBool(form.include_repo_context.value) ? (form.repo_path.value.trim() || bootstrap.repo_path || '.') : undefined,
+        include_repo_status: parseBool(form.include_repo_status.value),
+        include_repo_diff: parseBool(form.include_repo_diff.value),
+      };
+    }
+
+    function buildPrPayload() {
+      return {
+        repo_path: form.repo_path.value.trim() || bootstrap.repo_path || '.',
+        pr: form.pr_ref.value.trim() || undefined,
+        base: form.base_ref.value.trim() || undefined,
+        head: form.head_ref.value.trim() || undefined,
+        focus: form.review_focus.value.trim() || undefined,
+        provider: form.provider.value,
+        execution_mode: form.execution_mode.value,
+        model: form.model.value.trim() || undefined,
+        base_url: form.base_url.value.trim() || undefined,
+        runtime_adapter: form.runtime_adapter.value.trim() || undefined,
+        artifacts_dir: form.artifacts_dir.value.trim() || bootstrap.artifacts_dir,
+      };
     }
 
     function renderTemplates(templates) {
@@ -1409,6 +1703,32 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
           <div class="section-kicker" style="margin-top:4px;">Role Models</div>
           <div class="chip-grid">${roleModels || '<span class="chip">No role assignments loaded</span>'}</div>
         </div>
+      `;
+    }
+
+    function renderConfigPreview(preview) {
+      if (!preview) {
+        configPreviewEl.innerHTML = `<div class="empty">No generated config yet. Use the preview buttons in the sidebar to build a task or PR config from the current desktop form.</div>`;
+        return;
+      }
+
+      const context = preview.context || {};
+      const contextChips = Object.entries(context).map(([key, value]) => `
+        <span class="chip"><strong>${escapeHtml(key)}</strong> ${escapeHtml(value)}</span>
+      `).join('');
+      const savedCopy = preview.config_path
+        ? `Saved preview to ${escapeHtml(preview.config_path)}.`
+        : `Previewing a ${escapeHtml(preview.workflow)} config built from the current desktop form.`;
+      configStatusEl.innerHTML = savedCopy;
+      configPreviewEl.innerHTML = `
+        <div class="config-meta">
+          <span class="status-tag supported">${escapeHtml(preview.workflow)} config</span>
+          ${contextChips}
+        </div>
+        <div class="section-kicker" style="margin-top:4px;">CLI Equivalent</div>
+        <pre class="cli-preview">${escapeHtml(preview.command_preview || '')}</pre>
+        <div class="section-kicker" style="margin-top:4px;">Generated YAML</div>
+        <pre>${escapeHtml(preview.config_yaml || '')}</pre>
       `;
     }
 
@@ -1740,6 +2060,55 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       renderCatalog(response);
     }
 
+    async function previewConfig(workflow) {
+      try {
+        const payload = workflow === 'pr' ? buildPrPayload() : buildTaskPayload();
+        payload.workflow = workflow;
+        const response = await request('/api/config-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        state.configPreviewRequest = payload;
+        state.configPreview = response;
+        renderConfigPreview(response);
+        if (!configWritePathInput.value.trim() && configInput.value.trim()) {
+          configWritePathInput.value = configInput.value.trim();
+        }
+      } catch (error) {
+        configStatusEl.textContent = error.message;
+      }
+    }
+
+    async function saveConfigPreview() {
+      if (!state.configPreviewRequest) {
+        configStatusEl.textContent = 'Preview a task or PR config before saving it.';
+        return;
+      }
+      const configPath = configWritePathInput.value.trim();
+      if (!configPath) {
+        configStatusEl.textContent = 'Set Config Output Path in the sidebar before saving the preview.';
+        return;
+      }
+      try {
+        const payload = {
+          ...state.configPreviewRequest,
+          config_path: configPath,
+        };
+        const response = await request('/api/config-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        state.configPreview = response;
+        renderConfigPreview(response);
+        configInput.value = response.config_path || configInput.value;
+        doctorConfigInput.value = response.config_path || doctorConfigInput.value;
+      } catch (error) {
+        configStatusEl.textContent = error.message;
+      }
+    }
+
     async function runDoctor() {
       const configPath = doctorConfigInput.value.trim() || configInput.value.trim();
       if (!configPath) {
@@ -1883,63 +2252,35 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const scope = form.scope.value.trim();
-      const configPath = form.config_path.value.trim();
+      const taskPayload = buildTaskPayload();
+      const scope = taskPayload.scope || '';
+      const configPath = taskPayload.config_path || '';
       if (!scope && !configPath) {
         jobStatus.textContent = 'Provide a task scope or an existing config path.';
         return;
       }
 
-      const payload = {
-        scope,
-        template_key: form.template.value,
-        provider: form.provider.value,
-        execution_mode: form.execution_mode.value,
-        model: form.model.value.trim() || undefined,
-        base_url: form.base_url.value.trim() || undefined,
-        runtime_adapter: form.runtime_adapter.value.trim() || undefined,
-        config_path: configPath || undefined,
-        artifacts_dir: form.artifacts_dir.value.trim() || bootstrap.artifacts_dir,
-        repo_path: parseBool(form.include_repo_context.value) ? (form.repo_path.value.trim() || bootstrap.repo_path || '.') : undefined,
-        include_repo_status: parseBool(form.include_repo_status.value),
-        include_repo_diff: parseBool(form.include_repo_diff.value),
-      };
-
       const endpoint = configPath ? '/api/run-config' : '/api/run';
       const response = await request(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(taskPayload),
       });
       await pollJob(response.job_id);
     });
 
     prButton.addEventListener('click', async () => {
-      const repoPath = form.repo_path.value.trim() || bootstrap.repo_path || '.';
-      const reviewFocus = form.review_focus.value.trim() || undefined;
+      const prPayload = buildPrPayload();
+      const repoPath = prPayload.repo_path || bootstrap.repo_path || '.';
       if (!repoPath) {
         jobStatus.textContent = 'Provide a repository path for PR review.';
         return;
       }
 
-      const payload = {
-        repo_path: repoPath,
-        pr: form.pr_ref.value.trim() || undefined,
-        base: form.base_ref.value.trim() || undefined,
-        head: form.head_ref.value.trim() || undefined,
-        focus: reviewFocus,
-        provider: form.provider.value,
-        execution_mode: form.execution_mode.value,
-        model: form.model.value.trim() || undefined,
-        base_url: form.base_url.value.trim() || undefined,
-        runtime_adapter: form.runtime_adapter.value.trim() || undefined,
-        artifacts_dir: form.artifacts_dir.value.trim() || bootstrap.artifacts_dir,
-      };
-
       const response = await request('/api/pr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(prPayload),
       });
       await pollJob(response.job_id);
     });
@@ -1952,9 +2293,24 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       await runDoctor();
     });
 
+    previewTaskConfigButton.addEventListener('click', async () => {
+      await previewConfig('task');
+    });
+
+    previewPrConfigButton.addEventListener('click', async () => {
+      await previewConfig('pr');
+    });
+
+    saveConfigButton.addEventListener('click', async () => {
+      await saveConfigPreview();
+    });
+
     configInput.addEventListener('change', () => {
       if (!doctorConfigInput.value.trim()) {
         doctorConfigInput.value = configInput.value.trim();
+      }
+      if (!configWritePathInput.value.trim()) {
+        configWritePathInput.value = configInput.value.trim();
       }
     });
 
@@ -1970,6 +2326,7 @@ def _dashboard_html(bootstrap: dict[str, Any]) -> str:
       renderTemplates(templates.templates);
       applyInterfaceMode();
       await loadCatalog();
+      renderConfigPreview(null);
       if (doctorConfigInput.value || configInput.value) {
         await runDoctor();
       } else {
@@ -2205,6 +2562,23 @@ def serve_dashboard(
                 if parsed.path == "/api/doctor":
                     self._send_json(
                         _doctor_payload(str(payload.get("config_path") or ""))
+                    )
+                    return
+
+                if parsed.path == "/api/config-preview":
+                    self._send_json(
+                        _config_preview_payload(
+                            payload, root_artifacts_dir=root_artifacts_dir
+                        )
+                    )
+                    return
+
+                if parsed.path == "/api/config-save":
+                    self._send_json(
+                        _save_config_payload(
+                            payload, root_artifacts_dir=root_artifacts_dir
+                        ),
+                        status=HTTPStatus.CREATED,
                     )
                     return
 

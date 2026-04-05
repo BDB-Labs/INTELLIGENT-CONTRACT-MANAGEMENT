@@ -211,7 +211,7 @@ ese platforms
 ```
 
 The dashboard now supports both task-first runs and PR review runs.
-It also includes config doctor validation plus catalogs for commands, packs, roles, surfaces, and platform targets.
+It also includes config doctor validation, Config Studio preview/save for generated task and PR configs, plus catalogs for commands, packs, roles, surfaces, and platform targets.
 
 ## macOS Desktop Build
 
